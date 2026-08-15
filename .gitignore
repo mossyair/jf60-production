@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+
+export-*.json
+jf60-content-export.json
+.DS_Store

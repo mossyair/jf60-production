@@ -1,0 +1,27 @@
+name = "jf60-production"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Static frontend (the dashboard UI) is served from ./public
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# D1 database. If the database_id is left as 65d05fd1-4647-4998-82fd-d260cf30b5a0, Wrangler will
+# auto-provision a new database for you on first `wrangler deploy`.
+[[d1_databases]]
+binding = "DB"
+database_name = "jf60-db"
+database_id = "65d05fd1-4647-4998-82fd-d260cf30b5a0"
+
+# R2 bucket for file uploads (content + general files).
+# Create it first with:  npx wrangler r2 bucket create jf60-files
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "jf60-files"
+
+# Access secrets. Set these AFTER first deploy with:
+#   wrangler secret put EDIT_TOKEN
+#   wrangler secret put ADMIN_TOKEN
+#   wrangler secret put ANTHROPIC_API_KEY   (for the AI assistant)
+# (You will be prompted to paste each value.)

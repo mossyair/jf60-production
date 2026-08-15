@@ -78,6 +78,10 @@ export default {
           try {
             contacts = await env.DB.prepare("SELECT * FROM contacts ORDER BY name").all();
           } catch (e) { /* table may not exist until migration is run */ }
+          let team = { results: [] };
+          try {
+            team = await env.DB.prepare("SELECT * FROM team ORDER BY name").all();
+          } catch (e) { /* table may not exist until migration is run */ }
           let timeline = { results: [] };
           try {
             timeline = await env.DB.prepare("SELECT * FROM timeline ORDER BY due_date, sort_hint, id").all();
@@ -89,6 +93,7 @@ export default {
             checklist: checks.results,
             venues: venues.results,
             contacts: contacts.results,
+            team: team.results,
             timeline: timeline.results,
           });
         }
@@ -547,6 +552,47 @@ ${context}`;
           ).bind((b.due_date||"").slice(0,10), b.title.trim().slice(0,300), (b.category||"General").slice(0,40), (b.owner||"").slice(0,80)).run();
           return json({ ok: true, id: r.meta.last_row_id });
         }
+        // ---- CONTENT BRIEF ----
+        // POST /api/segment/brief  { id, field, value }  — one field at a time (autosave)
+        if (path === "/api/segment/brief" && request.method === "POST") {
+          const b = await readBody(request);
+          const allowed = ["brief_runsheet","brief_location","brief_av","brief_staging","brief_materials","brief_catering","brief_speakers","content_status"];
+          if (!b.id || !allowed.includes(b.field)) return json({ error: "bad field" }, 400);
+          await env.DB.prepare(`UPDATE segments SET ${b.field}=? WHERE id=?`)
+            .bind((b.value || "").slice(0, 5000), b.id).run();
+          return json({ ok: true });
+        }
+
+        // ---- TEAM MEMBERS ----
+        if (path === "/api/team/add" && request.method === "POST") {
+          const b = await readBody(request);
+          if (!b.name || !b.name.trim()) return json({ error: "name required" }, 400);
+          const r = await env.DB.prepare("INSERT INTO team (name, role) VALUES (?,?)")
+            .bind(b.name.trim().slice(0,120), (b.role||"").slice(0,120)).run();
+          return json({ ok: true, id: r.meta.last_row_id });
+        }
+        if (path === "/api/team/delete" && request.method === "POST") {
+          const b = await readBody(request);
+          await env.DB.prepare("DELETE FROM team WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+
+        // ---- TASK ASSIGNMENT ----
+        // POST /api/check/assign  { id, owner }
+        if (path === "/api/check/assign" && request.method === "POST") {
+          const b = await readBody(request);
+          await env.DB.prepare("UPDATE checklist SET owner=? WHERE id=?")
+            .bind((b.owner||"").slice(0,120), b.id).run();
+          return json({ ok: true });
+        }
+        // POST /api/timeline/assign  { id, owner }
+        if (path === "/api/timeline/assign" && request.method === "POST") {
+          const b = await readBody(request);
+          await env.DB.prepare("UPDATE timeline SET owner=? WHERE id=?")
+            .bind((b.owner||"").slice(0,120), b.id).run();
+          return json({ ok: true });
+        }
+
         // POST /api/timeline/edit  { id, due_date, title, category, owner, notes }
         if (path === "/api/timeline/edit" && request.method === "POST") {
           const b = await readBody(request);

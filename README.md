@@ -96,3 +96,4 @@ Changes save instantly to the shared database. The board also auto-refreshes eve
 ## Cost
 
 Cloudflare's free tier covers this comfortably (100k requests/day, 5 GB D1). A 100-guest event team won't come close.
+

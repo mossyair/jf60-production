@@ -673,6 +673,7 @@ async function deletePerson(id){
 }
 
 function renderDrawer(id){
+  const NOCONTACTS_MSG = t("dNoContacts");
   const s=data.segments.find(x=>x.id===id); if(!s) return;
   const d=DAYS[s.day]; const ppl=segPeople(id); const checks=segChecks(id);
   const dr=document.getElementById("drawer"), back=document.getElementById("drawerBack");
@@ -696,7 +697,7 @@ function renderDrawer(id){
         <div class="save-hint" id="descHint"></div>
       </div>
       <div class="field"><label>${t("dVenueContacts")} · ${esc(L(s,'venue'))}</label>
-        ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${t("dNoContacts")}</div>`; })()}
+        ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${NOCONTACTS_MSG}</div>`; })()}
         <textarea class="notes-area" id="venueContacts" placeholder="Contact people for this venue — name, role, phone, email. Shared across all segments at ${esc(s.venue)}.">${esc(venueContacts(s.venue))}</textarea>
         <div class="save-hint" id="venueHint"></div>
       </div>
@@ -774,9 +775,9 @@ function renderDrawer(id){
   ap.onclick=()=>addPerson(id,npi.value); npi.addEventListener("keydown",e=>{if(e.key==="Enter")addPerson(id,npi.value);});
   const asc=document.getElementById("addSegCheck"), nsc=document.getElementById("newSegCheck");
   asc.onclick=()=>addCheck(nsc.value,id); nsc.addEventListener("keydown",e=>{if(e.key==="Enter")addCheck(nsc.value,id);});
-  let t; const notes=document.getElementById("notes");
-  notes.addEventListener("input",()=>{ clearTimeout(t); document.getElementById("saveHint").textContent="saving…";
-    t=setTimeout(async()=>{ await api("segment/notes",{id,notes:notes.value}); s.notes=notes.value; document.getElementById("saveHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("saveHint");if(h)h.textContent="";},1500); },600); });
+  let tn; const notes=document.getElementById("notes");
+  notes.addEventListener("input",()=>{ clearTimeout(tn); document.getElementById("saveHint").textContent="saving…";
+    tn=setTimeout(async()=>{ await api("segment/notes",{id,notes:notes.value}); s.notes=notes.value; document.getElementById("saveHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("saveHint");if(h)h.textContent="";},1500); },600); });
 
   let td; const descEl=document.getElementById("descEdit");
   descEl.addEventListener("input",()=>{ clearTimeout(td); document.getElementById("descHint").textContent="saving…";

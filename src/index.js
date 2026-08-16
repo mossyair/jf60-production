@@ -578,6 +578,16 @@ ${context}`;
         }
 
         // ---- TASK ASSIGNMENT ----
+        // POST /api/check/edit  { id, text }  — admin only
+        if (path === "/api/check/edit" && request.method === "POST") {
+          if (!admin) return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          if (!b.id || !b.text || !b.text.trim()) return json({ error: "missing" }, 400);
+          await env.DB.prepare("UPDATE checklist SET text=? WHERE id=?")
+            .bind(b.text.trim().slice(0, 500), b.id).run();
+          return json({ ok: true });
+        }
+
         // POST /api/check/assign  { id, owner }
         if (path === "/api/check/assign" && request.method === "POST") {
           const b = await readBody(request);

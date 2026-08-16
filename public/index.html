@@ -579,16 +579,22 @@ function openAddEvent(){
 function renderLoose(){
   const el=document.getElementById("content");
   const q=ui.search.toLowerCase();
-  const items=data.checklist.filter(c=>!q||c.text.toLowerCase().includes(q));
+  // chronological order: general items first, then by event day/time following the schedule
+  const segOrder = {};
+  data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0))
+    .forEach((sg,i)=>{ segOrder[sg.id]= i+1; });
+  const rank = it => it.segment_id ? (segOrder[it.segment_id]||9998) : 0;
+  const items=data.checklist.filter(c=>!q||c.text.toLowerCase().includes(q))
+    .slice().sort((a,b)=> rank(a)-rank(b) || a.id-b.id);
   const open=items.filter(i=>!i.done), done=items.filter(i=>i.done);
-  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${s.time} · ${s.title}`:"General"; };
+  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${s.time} · ${L(s,'title')}`:"General"; };
 
   function row(it){
     return `<div class="loose-item ${it.done?'done':''}" data-id="${it.id}">
       <div class="lcheck" data-toggle="${it.id}">${it.done?'\u2713':''}</div>
       <div class="litext" data-open="${it.segment_id||''}">${esc(L(it,"text"))} ${ownerBadge(it.owner)}
         <span class="ctx">${esc(segTitle(it.segment_id))}${it.created_by?` · <span class="by">added by ${esc(it.created_by)}</span>`:''}</span></div>
-      <div class="lmeta"><button class="edit-btn" data-cassign="${it.id}" title="Assign">\ud83d\udc64</button>${(it.seeded===0||ROLE==='admin')?`<button class="del-btn" data-del="${it.id}" title="Delete">\u00d7</button>`:''}</div>
+      <div class="lmeta">${ROLE==='admin'?`<button class="edit-btn" data-cedit="${it.id}" title="Edit text">\u270e</button>`:''}<button class="edit-btn" data-cassign="${it.id}" title="Assign">\ud83d\udc64</button>${(it.seeded===0||ROLE==='admin')?`<button class="del-btn" data-del="${it.id}" title="Delete">\u00d7</button>`:''}</div>
     </div>`;
   }
   let html = `
@@ -606,6 +612,12 @@ function renderLoose(){
   el.innerHTML=html;
   el.querySelectorAll("[data-toggle]").forEach(x=>x.onclick=async()=>{ await toggleCheck(x.dataset.toggle); });
   const tb=document.getElementById("teamBtn"); if(tb)tb.onclick=manageTeam;
+  el.querySelectorAll("[data-cedit]").forEach(x=>x.onclick=async()=>{
+    const it=data.checklist.find(i=>i.id==x.dataset.cedit); if(!it) return;
+    const txt=prompt("Edit checklist item:", it.text); if(txt===null||!txt.trim()) return;
+    try{ await api("check/edit",{id:parseInt(x.dataset.cedit), text:txt.trim()}); await refresh(); toast("Updated"); }
+    catch(e){ toast("Couldn't update",true); }
+  });
   el.querySelectorAll("[data-cassign]").forEach(x=>x.onclick=()=>{ const it=data.checklist.find(i=>i.id==x.dataset.cassign); assignTask("check", x.dataset.cassign, it?it.owner:""); });
   el.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{ await delCheck(x.dataset.del); });
   el.querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{ if(x.dataset.open){ ui.openId=x.dataset.open; renderDrawer(x.dataset.open);} });

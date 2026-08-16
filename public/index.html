@@ -283,11 +283,21 @@ const T = {
   en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
-       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", schedTitle:"Conference Schedule", people:"People", meal:"Meal", printed:"Printed" },
+       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
+       dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
+       dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
+       dDuplicate:"Duplicate (split)", dDelete:"Delete event", dNoContacts:"No structured contacts for this site yet — add them in the Contacts tab.",
+       dNoFiles:"No files attached yet.", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס" }
+       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
+       dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
+       dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
+       dDuplicate:"שכפל (פיצול)", dDelete:"מחק אירוע", dNoContacts:"אין עדיין אנשי קשר מובנים לאתר זה — הוסיפו בלשונית אנשי קשר.",
+       dNoFiles:"לא צורפו קבצים.", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
 };
 let LANG = (function(){ try{ return sessionStorage.getItem("jf60lang")||"en"; }catch(e){ return "en"; } })();
 function t(k){ return (T[LANG]&&T[LANG][k])||T.en[k]||k; }
@@ -674,31 +684,34 @@ function renderDrawer(id){
       <div class="seg-venue" style="font-size:13px;">${esc(L(s,'venue'))}</div>
     </div>
     <div class="drawer-body">
-      <div class="field"><label>Status</label>
+      <div class="field"><label>${t("dStatus")}</label>
         <div class="status-picker">
           ${["open","progress","confirmed"].map(st=>`<button data-st="${st}" class="${s.status===st?'sel '+st:''}">${STATUS_LABEL[st]}</button>`).join('')}
         </div></div>
-      <div class="field"><label>Description</label>
-        <textarea class="notes-area" id="descEdit" style="min-height:64px;">${esc(s.descr||'')}</textarea>
+      <div class="field"><label>${t("dDesc")}</label>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <textarea class="notes-area" id="descEdit" style="min-height:60px;">${esc(s.descr||'')}</textarea>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin:6px 0 2px;">עברית</div>
+        <textarea class="notes-area" id="descEditHe" dir="rtl" style="min-height:60px;text-align:right;">${esc(s.descr_he||'')}</textarea>
         <div class="save-hint" id="descHint"></div>
       </div>
-      <div class="field"><label>Venue contacts · ${esc(s.venue)}</label>
-        ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">No structured contacts for this site yet — add them in the Contacts tab.</div>`; })()}
+      <div class="field"><label>${t("dVenueContacts")} · ${esc(L(s,'venue'))}</label>
+        ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${t("dNoContacts")}</div>`; })()}
         <textarea class="notes-area" id="venueContacts" placeholder="Contact people for this venue — name, role, phone, email. Shared across all segments at ${esc(s.venue)}.">${esc(venueContacts(s.venue))}</textarea>
         <div class="save-hint" id="venueHint"></div>
       </div>
-      ${ppl.length?`<div class="field"><label>People (${ppl.filter(p=>p.confirmed).length}/${ppl.length} confirmed)</label>
+      ${ppl.length?`<div class="field"><label>${t("dPeople")} (${ppl.filter(p=>p.confirmed).length}/${ppl.length} ${t("dConfirmed")})</label>
         <ul class="people-list">
           ${ppl.map(p=>`<li class="${p.confirmed?'conf':''}"><span class="pcheck" data-ptoggle="${p.id}">${p.confirmed?'\u2713':''}</span><span class="pname">${esc(p.name)}</span>${ROLE==="admin"?`<span style="margin-left:auto;display:flex;gap:2px;"><button class="edit-btn" data-pedit="${p.id}" title="Rename">\u270e</button><button class="del-btn" data-pdel="${p.id}" title="Delete">\u00d7</button></span>`:''}</li>`).join('')}
         </ul>
-        <div class="add-row"><input id="newPerson" placeholder="Add a person…"><button id="addPerson">Add</button></div>
+        <div class="add-row"><input id="newPerson" placeholder="${t('dAddPerson')}"><button id="addPerson">Add</button></div>
       </div>`:`<div class="field"><label>People</label>
         <div class="add-row"><input id="newPerson" placeholder="Add a person…"><button id="addPerson">Add</button></div></div>`}
-      <div class="field"><label>Checklist for this segment</label>
+      <div class="field"><label>${t("dChecklist")}</label>
         <ul class="people-list">
           ${checks.map(c=>`<li class="${c.done?'conf':''}"><span class="pcheck" data-ctoggle="${c.id}">${c.done?'\u2713':''}</span><span class="pname">${esc(L(c,"text"))}</span>${(c.seeded===0||ROLE==="admin")?`<button class="del-btn" data-cdel="${c.id}" title="Delete" style="margin-left:auto;">\u00d7</button>`:''}</li>`).join('')}
         </ul>
-        <div class="add-row"><input id="newSegCheck" placeholder="Add item to this segment…"><button id="addSegCheck">Add</button></div>
+        <div class="add-row"><input id="newSegCheck" placeholder="${t('dAddItem')}"><button id="addSegCheck">Add</button></div>
       </div>
       <div class="field" style="border-top:2px solid var(--gold);padding-top:14px;margin-top:6px;">
         <label style="color:var(--gold-deep);font-size:11px;">📋 Content brief — for production</label>
@@ -724,16 +737,16 @@ function renderDrawer(id){
           </div>`).join('')}
         <div class="save-hint" id="briefHint"></div>
       </div>
-      <div class="field"><label>Notes</label>
+      <div class="field"><label>${t("dNotes")}</label>
         <textarea class="notes-area" id="notes" placeholder="Vendor contacts, confirmations, open questions…">${esc(s.notes||'')}</textarea>
         <div class="save-hint" id="saveHint"></div>
       </div>
-      <div class="field"><label>Content files for this event</label>
+      <div class="field"><label>${t("dFiles")}</label>
         <div id="segFiles"><div class="save-hint">Loading…</div></div>
         <div class="add-row"><input type="file" id="segFileInput" style="flex:1;font-size:12px;"><button id="segFileUpload">Upload</button></div>
       </div>
       ${ROLE==="admin"?`<div class="field" style="border-top:2px solid var(--line);padding-top:16px;margin-top:8px;">
-        <label style="color:var(--terra);">Admin · edit this event</label>
+        <label style="color:var(--terra);">${t("dAdminEdit")}</label>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <select id="ed_day" class="search" style="flex:1;">${[1,2,3].map(d=>`<option value="${d}" ${d==s.day?'selected':''}>${DAYS[d].num}</option>`).join('')}</select>
           <input id="ed_time" class="search" style="width:74px;" value="${esc(s.time)}">
@@ -767,7 +780,11 @@ function renderDrawer(id){
 
   let td; const descEl=document.getElementById("descEdit");
   descEl.addEventListener("input",()=>{ clearTimeout(td); document.getElementById("descHint").textContent="saving…";
-    td=setTimeout(async()=>{ await api("segment/desc",{id,descr:descEl.value}); s.descr=descEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
+    td=setTimeout(async()=>{ await api("segment/field",{id,field:"descr",value:descEl.value}); s.descr=descEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdh; const descHeEl=document.getElementById("descEditHe");
+  if(descHeEl) descHeEl.addEventListener("input",()=>{ clearTimeout(tdh); document.getElementById("descHint").textContent="saving…";
+    tdh=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_he",value:descHeEl.value}); s.descr_he=descHeEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
 
   let tv; const vcEl=document.getElementById("venueContacts");
   vcEl.addEventListener("input",()=>{ clearTimeout(tv); document.getElementById("venueHint").textContent="saving…";

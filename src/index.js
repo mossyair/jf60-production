@@ -124,6 +124,16 @@ export default {
           return json({ ok: true });
         }
 
+        // POST /api/segment/field  { id, field, value }  — bilingual-safe single-field save
+        if (path === "/api/segment/field" && request.method === "POST") {
+          const b = await readBody(request);
+          const allowed = ["title","venue","descr","title_he","venue_he","descr_he"];
+          if (!b.id || !allowed.includes(b.field)) return json({ error: "bad field" }, 400);
+          await env.DB.prepare(`UPDATE segments SET ${b.field}=? WHERE id=?`)
+            .bind((b.value || "").slice(0, 5000), b.id).run();
+          return json({ ok: true });
+        }
+
         // POST /api/segment/edit  { id, day, time, end_time, title, venue }  — admin only
         if (path === "/api/segment/edit" && request.method === "POST") {
           if (!admin) return json({ error: "admin required" }, 403);

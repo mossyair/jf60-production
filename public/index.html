@@ -284,7 +284,7 @@ const T = {
   en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
-       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show — Production", noRos:"(no internal run-of-show entered)", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
        dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
@@ -293,7 +293,7 @@ const T = {
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו — הפקה", noRos:"(לא הוזן לו״ז פנימי)", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
        dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
@@ -1410,51 +1410,87 @@ function exportRunOfShowPDF(){
   const dir = rtl?"rtl":"ltr";
   const align = rtl?"right":"left";
   let body="", curDay=null;
-  data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0)).forEach(sg=>{
-    if(sg.day!==curDay){ curDay=sg.day; const d=DAYS[sg.day];
-      body += `<div class="dh"><span class="dn">${esc(d.num)}</span> <span class="dd">${esc(d.date)}</span></div>`;
+  const segs = data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0));
+  segs.forEach(sg=>{
+    if(sg.day!==curDay){
+      curDay=sg.day; const d=DAYS[sg.day];
+      if(body) body += `<div class="pb"></div>`;
+      body += `<section class="day">
+        <div class="dh">
+          <div class="dnum">${esc(d.num)}</div>
+          <div class="ddate">${esc(d.date)}</div>
+          <div class="dtheme">${esc(d.theme)}</div>
+        </div>`;
     }
+    const desc = (L(sg,'descr')||"").trim();
     const runsheet = (sg.brief_runsheet||"").trim();
-    body += `<div class="ev">
-      <div class="hd"><span class="tm">${esc(sg.time)}–${esc(sg.end_time)}</span> <span class="ti">${esc(L(sg,'title'))}</span></div>
-      <div class="vn">${esc(L(sg,'venue'))}</div>
-      <div class="rs">${runsheet? esc(runsheet).replace(/\n/g,'<br>') : '<span class="none">'+t("noRos")+'</span>'}</div>
-    </div>`;
+    body += `<article class="ev">
+      <div class="evtop">
+        <div class="tm">${esc(sg.time)}<span class="tmend">${esc(sg.end_time)}</span></div>
+        <div class="evmain">
+          <h3>${esc(L(sg,'title'))}</h3>
+          <div class="vn">${esc(L(sg,'venue'))}</div>
+          ${desc?`<div class="de">${esc(desc).replace(/\n/g,'<br>')}</div>`:''}
+          ${runsheet?`<div class="rs"><div class="rslab">${t("rosLabel")}</div><div class="rstext">${esc(runsheet).replace(/\n/g,'<br>')}</div></div>`:''}
+        </div>
+      </div>
+    </article>`;
   });
+  body += `</section>`;
+
   const today=new Date().toLocaleDateString(rtl?"he-IL":"en-GB",{day:"numeric",month:"long",year:"numeric"});
   const html = `<!DOCTYPE html><html dir="${dir}" lang="${rtl?'he':'en'}"><head><meta charset="utf-8"><title>${t("rosTitle")}</title>
   <style>
-    @page { margin: 16mm 14mm; }
-    body { font-family:${rtl?"'Frank Ruhl Libre','David',":""}Georgia,serif; color:#22201B; margin:0; direction:${dir}; text-align:${align}; }
-    .head { border-bottom:2px solid #22201B; padding-bottom:10px; margin-bottom:16px; }
-    .eye { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#8A6820; font-weight:700; }
-    h1 { font-size:24px; margin:5px 0 2px; font-weight:400; }
-    h1 .num { color:#A24E2E; font-style:italic; }
-    .sub { font-size:11px; color:#4A463D; }
-    .dh { margin:18px 0 6px; padding-bottom:4px; border-bottom:1px solid #C9BFA8; page-break-after:avoid; }
-    .dn { font-style:italic; color:#A24E2E; font-size:13px; }
-    .dd { font-size:17px; font-weight:700; }
-    .ev { padding:10px 0; border-bottom:1px solid #E8E1D4; page-break-inside:avoid; }
-    .hd { margin-bottom:1px; }
-    .tm { font-size:12px; font-weight:700; direction:ltr; display:inline-block; }
-    .ti { font-size:14px; font-weight:700; }
-    .vn { font-size:10.5px; color:#3E6B7A; font-weight:600; margin-bottom:5px; }
-    .rs { font-size:11.5px; line-height:1.65; color:#22201B; background:#FAF7EF; border-${rtl?'right':'left'}:3px solid #B5892E; padding:7px 10px; }
-    .none { color:#A24E2E; font-style:italic; }
-    .foot { margin-top:18px; font-size:9px; color:#8a8272; text-align:center; }
+    @page { margin: 20mm 18mm 16mm; }
+    *{box-sizing:border-box;}
+    body { font-family:${rtl?"'Frank Ruhl Libre','David',":""}Georgia,'Times New Roman',serif;
+      color:#22201B; margin:0; direction:${dir}; text-align:${align};
+      -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+    /* cover header */
+    .cover { padding-bottom:16px; margin-bottom:6px; border-bottom:2.5px solid #22201B; }
+    .eyebrow { font-size:9.5px; letter-spacing:.26em; text-transform:uppercase; color:#8A6820; font-weight:700; margin-bottom:8px; }
+    .title { font-size:34px; line-height:1.05; font-weight:400; letter-spacing:-.01em; margin:0 0 6px; }
+    .title .num { color:#A24E2E; font-style:italic; }
+    .subtitle { font-size:12px; color:#4A463D; letter-spacing:.01em; }
+
+    /* day section */
+    .pb { page-break-before:always; }
+    .dh { margin:26px 0 14px; page-break-after:avoid; }
+    .dnum { font-style:italic; color:#A24E2E; font-size:13px; letter-spacing:.04em; }
+    .ddate { font-size:23px; font-weight:400; line-height:1.15; margin:1px 0 3px; }
+    .dtheme { font-size:11px; color:#6B7145; font-style:italic; }
+
+    /* event */
+    .ev { padding:13px 0; border-bottom:1px solid #E4DCCB; page-break-inside:avoid; }
+    .ev:last-child { border-bottom:none; }
+    .evtop { display:flex; gap:16px; }
+    .tm { min-width:64px; font-size:13.5px; font-weight:700; direction:ltr;
+      text-align:${rtl?'right':'left'}; letter-spacing:.01em; padding-top:1px; }
+    .tmend { display:block; font-size:11px; font-weight:400; color:#8a8272; margin-top:1px; }
+    .evmain { flex:1; }
+    h3 { font-size:15.5px; font-weight:700; margin:0 0 2px; line-height:1.25; }
+    .vn { font-size:10.5px; color:#3E6B7A; font-weight:600; letter-spacing:.02em; margin-bottom:6px; }
+    .de { font-size:11.5px; line-height:1.6; color:#3f3b33; }
+    .rs { margin-top:9px; background:#FBF8F1; border-${rtl?'right':'left'}:2.5px solid #B5892E; padding:8px 11px; }
+    .rslab { font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:#8A6820; font-weight:700; margin-bottom:4px; }
+    .rstext { font-size:11px; line-height:1.7; }
+
+    .foot { margin-top:22px; padding-top:8px; border-top:1px solid #E4DCCB;
+      font-size:8.5px; color:#9a927f; text-align:center; letter-spacing:.04em; }
   </style></head><body>
-    <div class="head">
-      <div class="eye">Jerusalem Foundation</div>
-      <h1><span class="num">60</span> — ${t("rosTitle")}</h1>
-      <div class="sub">${t("subtitle")}</div>
+    <div class="cover">
+      <div class="eyebrow">Jerusalem Foundation</div>
+      <div class="title"><span class="num">60</span>${rtl?' — ראן אוף שואו':'th Anniversary — Run of Show'}</div>
+      <div class="subtitle">${t("subtitle")}</div>
     </div>
     ${body}
-    <div class="foot">${t("printed")}: ${today}</div>
+    <div class="foot">${t("printed")} ${today}</div>
   </body></html>`;
   const w=window.open("","_blank");
   if(!w){ toast("Allow pop-ups to export PDF", true); return; }
   w.document.open(); w.document.write(html); w.document.close();
-  setTimeout(()=>{ w.focus(); w.print(); }, 350);
+  setTimeout(()=>{ w.focus(); w.print(); }, 400);
 }
 
 // ---- util ----

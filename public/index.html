@@ -39,6 +39,7 @@
   .brand .eyebrow { font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:var(--gold-deep); font-weight:700; margin-bottom:6px; }
   .brand h1 { font-family:var(--serif); font-size:38px; font-weight:400; line-height:1; }
   .brand h1 .num { color:var(--terra); font-style:italic; }
+  .brand .conf-theme { font-size:13px; color:var(--gold-deep); font-style:italic; letter-spacing:.01em; margin-top:6px; }
   .brand .sub { font-size:13px; color:var(--ink-soft); margin-top:8px; }
   .header-stats { display:flex; gap:26px; }
   .hstat { text-align:right; } .hstat .n { font-family:var(--serif); font-size:28px; line-height:1; }
@@ -221,7 +222,8 @@
       <div class="brand">
         <div class="eyebrow">Jerusalem Foundation · Production Control</div>
         <h1><span class="num">60</span>th Anniversary Conference</h1>
-        <div class="sub">20–22 October 2026 · ~100 international donors <span id="roleWrap"></span></div>
+        <div class="conf-theme" id="confTheme">Jerusalem — Yesterday, Today and Tomorrow</div>
+        <div class="sub">20–22 October 2026 · 80 guests from around the world <span id="roleWrap"></span></div>
       </div>
       <div class="header-stats">
         <div class="hstat open"><div class="n" id="cOpen">–</div><div class="l">Open</div></div>
@@ -284,7 +286,7 @@ const T = {
   en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
-       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       subtitle:"20–22 October 2026 · 80 guests from around the world", theme:"Jerusalem — Yesterday, Today and Tomorrow", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
        dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
@@ -293,7 +295,7 @@ const T = {
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       subtitle:"20–22 באוקטובר 2026 · 80 אורחים מרחבי העולם", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
        dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
@@ -406,6 +408,7 @@ function render(){
   document.querySelectorAll("#viewSwitch [data-t]").forEach(b=>{ b.textContent = t(b.dataset.t); });
   const se=document.getElementById("search"); if(se) se.placeholder=t("search");
   const sub=document.querySelector(".sub"); if(sub){ const rw=document.getElementById("roleWrap").outerHTML; sub.innerHTML = t("subtitle")+" "+rw; }
+  const ct=document.getElementById("confTheme"); if(ct) ct.textContent=t("theme");
   const lt=document.getElementById("langToggle"); if(lt){ lt.textContent = LANG==="he"?"EN":"עב"; lt.onclick=()=>setLang(LANG==="he"?"en":"he"); }
   const pb2=document.getElementById("pdfBtn"); if(pb2){ pb2.textContent=t("pdf"); pb2.onclick=exportSchedulePDF; }
   const rb=document.getElementById("rosBtn"); if(rb){ rb.textContent=t("ros"); rb.onclick=exportRunOfShowPDF; }
@@ -1353,7 +1356,7 @@ function exportSchedulePDF(){
     <div class="head">
       <div class="eye">Jerusalem Foundation</div>
       <h1><span class="num">60</span>${rtl?' — לוח זמנים לכנס':'th Anniversary — Conference Schedule'}</h1>
-      <div class="sub">${t("subtitle")}</div>
+      <div class="sub">${t("theme")} · ${t("subtitle")}</div>
     </div>
     ${body}
     <div class="foot">${t("printed")}: ${today}</div>
@@ -1482,7 +1485,7 @@ function exportRunOfShowPDF(){
     <div class="cover">
       <div class="eyebrow">Jerusalem Foundation</div>
       <div class="title"><span class="num">60</span>${rtl?' — ראן אוף שואו':'th Anniversary — Run of Show'}</div>
-      <div class="subtitle">${t("subtitle")}</div>
+      <div class="subtitle">${t("theme")} · ${t("subtitle")}</div>
     </div>
     ${body}
     <div class="foot">${t("printed")} ${today}</div>

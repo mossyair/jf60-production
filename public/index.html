@@ -251,6 +251,7 @@
       <input class="search" id="search" placeholder="Search…">
       <button class="btn-ghost" id="langToggle" style="font-weight:700;min-width:44px;">עב</button>
       <button class="btn-ghost" id="pdfBtn" title="Export schedule to PDF">⭳ PDF</button>
+      <button class="btn-ghost" id="rosBtn" title="Export run of show">⭳ Run of show</button>
     </div>
   </div>
 
@@ -283,7 +284,7 @@ const T = {
   en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
-       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       subtitle:"20–22 October 2026 · ~100 international donors", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show — Production", noRos:"(no internal run-of-show entered)", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
        dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
@@ -292,7 +293,7 @@ const T = {
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       subtitle:"20–22 באוקטובר 2026 · כ-100 תורמים מרחבי העולם", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו — הפקה", noRos:"(לא הוזן לו״ז פנימי)", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
        dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
@@ -407,6 +408,7 @@ function render(){
   const sub=document.querySelector(".sub"); if(sub){ const rw=document.getElementById("roleWrap").outerHTML; sub.innerHTML = t("subtitle")+" "+rw; }
   const lt=document.getElementById("langToggle"); if(lt){ lt.textContent = LANG==="he"?"EN":"עב"; lt.onclick=()=>setLang(LANG==="he"?"en":"he"); }
   const pb2=document.getElementById("pdfBtn"); if(pb2){ pb2.textContent=t("pdf"); pb2.onclick=exportSchedulePDF; }
+  const rb=document.getElementById("rosBtn"); if(rb){ rb.textContent=t("ros"); rb.onclick=exportRunOfShowPDF; }
   // stat labels
   document.querySelectorAll(".hstat .l").forEach((el,i)=>{ el.textContent = [t("open"),t("inProgress"),t("confirmed")][i]||el.textContent; });
 
@@ -753,8 +755,12 @@ function renderDrawer(id){
           <input id="ed_time" class="search" style="width:74px;" value="${esc(s.time)}">
           <input id="ed_end" class="search" style="width:74px;" value="${esc(s.end_time)}">
         </div>
-        <input id="ed_title" class="search" style="width:100%;margin-bottom:8px;" value="${esc(s.title)}">
-        <input id="ed_venue" class="search" style="width:100%;margin-bottom:8px;" value="${esc(s.venue)}">
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <input id="ed_title" class="search" style="width:100%;margin-bottom:6px;" value="${esc(s.title)}" placeholder="Title">
+        <input id="ed_venue" class="search" style="width:100%;margin-bottom:8px;" value="${esc(s.venue)}" placeholder="Venue">
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">עברית</div>
+        <input id="ed_title_he" class="search" dir="rtl" style="width:100%;margin-bottom:6px;text-align:right;" value="${esc(s.title_he||'')}" placeholder="כותרת">
+        <input id="ed_venue_he" class="search" dir="rtl" style="width:100%;margin-bottom:8px;text-align:right;" value="${esc(s.venue_he||'')}" placeholder="מיקום">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn-ghost" id="ed_save" style="background:var(--sky);color:#fff;border-color:var(--sky);">Save changes</button>
           <button class="btn-ghost" id="ed_dup" title="Make a copy — use this to split one event into two">Duplicate (split)</button>
@@ -830,7 +836,11 @@ function renderDrawer(id){
     if(edSave) edSave.onclick=async()=>{
       const payload={ id, day:document.getElementById("ed_day").value, time:document.getElementById("ed_time").value,
         end_time:document.getElementById("ed_end").value, title:document.getElementById("ed_title").value, venue:document.getElementById("ed_venue").value };
-      try{ await api("segment/edit",payload); await refresh(); closeDrawer(); toast("Saved"); }
+      const heTitle=document.getElementById("ed_title_he").value, heVenue=document.getElementById("ed_venue_he").value;
+      try{ await api("segment/edit",payload);
+        await api("segment/field",{id, field:"title_he", value:heTitle});
+        await api("segment/field",{id, field:"venue_he", value:heVenue});
+        await refresh(); closeDrawer(); toast("Saved"); }
       catch(e){ toast("Couldn't save",true); }
     };
     const edDup=document.getElementById("ed_dup");
@@ -1392,6 +1402,59 @@ async function manageTeam(){
     }
     await refresh(); toast("Team updated");
   }catch(e){ toast("Couldn't update team",true); }
+}
+
+// ---- RUN OF SHOW PDF ----
+function exportRunOfShowPDF(){
+  const rtl = LANG==="he";
+  const dir = rtl?"rtl":"ltr";
+  const align = rtl?"right":"left";
+  let body="", curDay=null;
+  data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0)).forEach(sg=>{
+    if(sg.day!==curDay){ curDay=sg.day; const d=DAYS[sg.day];
+      body += `<div class="dh"><span class="dn">${esc(d.num)}</span> <span class="dd">${esc(d.date)}</span></div>`;
+    }
+    const runsheet = (sg.brief_runsheet||"").trim();
+    body += `<div class="ev">
+      <div class="hd"><span class="tm">${esc(sg.time)}–${esc(sg.end_time)}</span> <span class="ti">${esc(L(sg,'title'))}</span></div>
+      <div class="vn">${esc(L(sg,'venue'))}</div>
+      <div class="rs">${runsheet? esc(runsheet).replace(/\n/g,'<br>') : '<span class="none">'+t("noRos")+'</span>'}</div>
+    </div>`;
+  });
+  const today=new Date().toLocaleDateString(rtl?"he-IL":"en-GB",{day:"numeric",month:"long",year:"numeric"});
+  const html = `<!DOCTYPE html><html dir="${dir}" lang="${rtl?'he':'en'}"><head><meta charset="utf-8"><title>${t("rosTitle")}</title>
+  <style>
+    @page { margin: 16mm 14mm; }
+    body { font-family:${rtl?"'Frank Ruhl Libre','David',":""}Georgia,serif; color:#22201B; margin:0; direction:${dir}; text-align:${align}; }
+    .head { border-bottom:2px solid #22201B; padding-bottom:10px; margin-bottom:16px; }
+    .eye { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#8A6820; font-weight:700; }
+    h1 { font-size:24px; margin:5px 0 2px; font-weight:400; }
+    h1 .num { color:#A24E2E; font-style:italic; }
+    .sub { font-size:11px; color:#4A463D; }
+    .dh { margin:18px 0 6px; padding-bottom:4px; border-bottom:1px solid #C9BFA8; page-break-after:avoid; }
+    .dn { font-style:italic; color:#A24E2E; font-size:13px; }
+    .dd { font-size:17px; font-weight:700; }
+    .ev { padding:10px 0; border-bottom:1px solid #E8E1D4; page-break-inside:avoid; }
+    .hd { margin-bottom:1px; }
+    .tm { font-size:12px; font-weight:700; direction:ltr; display:inline-block; }
+    .ti { font-size:14px; font-weight:700; }
+    .vn { font-size:10.5px; color:#3E6B7A; font-weight:600; margin-bottom:5px; }
+    .rs { font-size:11.5px; line-height:1.65; color:#22201B; background:#FAF7EF; border-${rtl?'right':'left'}:3px solid #B5892E; padding:7px 10px; }
+    .none { color:#A24E2E; font-style:italic; }
+    .foot { margin-top:18px; font-size:9px; color:#8a8272; text-align:center; }
+  </style></head><body>
+    <div class="head">
+      <div class="eye">Jerusalem Foundation</div>
+      <h1><span class="num">60</span> — ${t("rosTitle")}</h1>
+      <div class="sub">${t("subtitle")}</div>
+    </div>
+    ${body}
+    <div class="foot">${t("printed")}: ${today}</div>
+  </body></html>`;
+  const w=window.open("","_blank");
+  if(!w){ toast("Allow pop-ups to export PDF", true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 350);
 }
 
 // ---- util ----

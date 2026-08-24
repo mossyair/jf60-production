@@ -253,7 +253,7 @@
       <input class="search" id="search" placeholder="Search…">
       <button class="btn-ghost" id="langToggle" style="font-weight:700;min-width:44px;">עב</button>
       <button class="btn-ghost" id="pdfBtn" title="Export schedule to PDF">⭳ PDF</button>
-      <button class="btn-ghost" id="rosBtn" title="Export run of show">⭳ Run of show</button>
+      <button class="btn-ghost" id="rosBtn" title="Export detailed schedule">⭳ Run of show</button>
     </div>
   </div>
 
@@ -286,7 +286,7 @@ const T = {
   en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
-       subtitle:"20–22 October 2026 · 80 guests from around the world", theme:"Jerusalem — Yesterday, Today and Tomorrow", pdf:"⭳ PDF", ros:"⭳ Run of show", rosTitle:"Run of Show", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       subtitle:"20–22 October 2026 · 80 guests from around the world", theme:"Jerusalem — Yesterday, Today and Tomorrow", pdf:"⭳ PDF", ros:"⭳ Detailed schedule", rosTitle:"Detailed Conference Schedule", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
        dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
@@ -295,7 +295,7 @@ const T = {
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · 80 אורחים מרחבי העולם", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ ראן אוף שואו", rosTitle:"ראן אוף שואו", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       subtitle:"20–22 באוקטובר 2026 · 80 אורחים מרחבי העולם", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ לו״ז מפורט", rosTitle:"לו״ז מפורט של הכנס", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
        dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
@@ -1315,14 +1315,12 @@ function exportSchedulePDF(){
     if(s.day!==curDay){ curDay=s.day; const d=DAYS[s.day];
       body += `<div class="dh"><span class="dn">${esc(d.num)}</span> <span class="dd">${esc(d.date)}</span><div class="dt">${esc(d.theme)}</div></div>`;
     }
-    const ppl = data.people.filter(p=>p.segment_id===s.id);
     body += `<div class="ev">
       <div class="tm">${esc(s.time)}–${esc(s.end_time)}</div>
       <div class="bd">
         <div class="ti">${esc(L(s,'title'))}</div>
         <div class="vn">${esc(L(s,'venue'))}</div>
         ${L(s,'descr')?`<div class="de">${esc(L(s,'descr')).replace(/\n/g,'<br>')}</div>`:''}
-        ${ppl.length?`<div class="pp">${rtl?'משתתפים':'People'}: ${ppl.map(p=>esc(p.name)).join(' · ')}</div>`:''}
         ${s.is_meal?`<span class="ml">${t("meal")}</span>`:''}
       </div>
     </div>`;
@@ -1484,7 +1482,7 @@ function exportRunOfShowPDF(){
   </style></head><body>
     <div class="cover">
       <div class="eyebrow">Jerusalem Foundation</div>
-      <div class="title"><span class="num">60</span>${rtl?' — ראן אוף שואו':'th Anniversary — Run of Show'}</div>
+      <div class="title"><span class="num">60</span>${rtl?' — לו״ז מפורט של הכנס':'th Anniversary — Detailed Schedule'}</div>
       <div class="subtitle">${t("theme")} · ${t("subtitle")}</div>
     </div>
     ${body}

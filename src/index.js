@@ -566,7 +566,7 @@ ${context}`;
         // POST /api/segment/brief  { id, field, value }  — one field at a time (autosave)
         if (path === "/api/segment/brief" && request.method === "POST") {
           const b = await readBody(request);
-          const allowed = ["brief_runsheet","brief_location","brief_av","brief_staging","brief_materials","brief_catering","brief_speakers","content_status"];
+          const allowed = ["brief_runsheet","brief_location","brief_av","brief_staging","brief_materials","brief_catering","brief_speakers","content_status","notes_speaker","notes_logistics"];
           if (!b.id || !allowed.includes(b.field)) return json({ error: "bad field" }, 400);
           await env.DB.prepare(`UPDATE segments SET ${b.field}=? WHERE id=?`)
             .bind((b.value || "").slice(0, 5000), b.id).run();

@@ -291,7 +291,7 @@ const T = {
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
        dDuplicate:"Duplicate (split)", dDelete:"Delete event", dNoContacts:"No structured contacts for this site yet — add them in the Contacts tab.",
-       dNoFiles:"No files attached yet.", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
+       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grabelsky", dLogistics:"Logistics", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
@@ -300,7 +300,7 @@ const T = {
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
        dDuplicate:"שכפל (פיצול)", dDelete:"מחק אירוע", dNoContacts:"אין עדיין אנשי קשר מובנים לאתר זה — הוסיפו בלשונית אנשי קשר.",
-       dNoFiles:"לא צורפו קבצים.", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
+       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גרבלסקי", dLogistics:"לוגיסטיקה", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
 };
 let LANG = (function(){ try{ return sessionStorage.getItem("jf60lang")||"en"; }catch(e){ return "en"; } })();
 function t(k){ return (T[LANG]&&T[LANG][k])||T.en[k]||k; }
@@ -743,6 +743,16 @@ function renderDrawer(id){
           </div>`).join('')}
         <div class="save-hint" id="briefHint"></div>
       </div>
+      <div class="field" style="border-top:2px solid var(--sky);padding-top:14px;margin-top:6px;">
+        <label style="color:var(--sky);">🎤 ${t("dSpeakerNotes")}</label>
+        <textarea class="notes-area nb-f" data-nb="notes_speaker" style="min-height:70px;">${esc(s.notes_speaker||'')}</textarea>
+        <div class="save-hint" id="nbHintSpeaker"></div>
+      </div>
+      <div class="field">
+        <label style="color:var(--olive);">🚚 ${t("dLogistics")}</label>
+        <textarea class="notes-area nb-f" data-nb="notes_logistics" style="min-height:70px;">${esc(s.notes_logistics||'')}</textarea>
+        <div class="save-hint" id="nbHintLogistics"></div>
+      </div>
       <div class="field"><label>${t("dNotes")}</label>
         <textarea class="notes-area" id="notes" placeholder="Vendor contacts, confirmations, open questions…">${esc(s.notes||'')}</textarea>
         <div class="save-hint" id="saveHint"></div>
@@ -803,6 +813,22 @@ function renderDrawer(id){
       document.getElementById("venueHint").textContent="saved (all "+esc(s.venue)+" segments)"; setTimeout(()=>{const h=document.getElementById("venueHint");if(h)h.textContent="";},1800); },600); });
 
   // segment content files
+  // speaker / logistics note boxes autosave
+  let nbT={};
+  dr.querySelectorAll(".nb-f").forEach(ta=>{
+    ta.addEventListener("input",()=>{
+      const f=ta.dataset.nb;
+      const hid = f==="notes_speaker" ? "nbHintSpeaker" : "nbHintLogistics";
+      const h=document.getElementById(hid); if(h)h.textContent="saving…";
+      clearTimeout(nbT[f]);
+      nbT[f]=setTimeout(async()=>{
+        try{ await api("segment/brief",{id, field:f, value:ta.value}); s[f]=ta.value;
+          if(h){h.textContent="saved"; setTimeout(()=>{const x=document.getElementById(hid); if(x&&x.textContent==="saved")x.textContent="";},1500);} }
+        catch(e){ if(h)h.textContent="save failed"; }
+      },700);
+    });
+  });
+
   // content brief autosave
   let briefT={};
   dr.querySelectorAll(".brief-f").forEach(ta=>{

@@ -287,20 +287,20 @@ const T = {
        search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
        admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
        subtitle:"20–22 October 2026", theme:"Jerusalem — Yesterday, Today and Tomorrow", pdf:"⭳ PDF", ros:"⭳ Detailed schedule", rosTitle:"Detailed Conference Schedule", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
-       dStatus:"Status", dDesc:"Description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
+       dStatus:"Status", dDesc:"Description", dDescLong:"Long description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
        dDuplicate:"Duplicate (split)", dDelete:"Delete event", dNoContacts:"No structured contacts for this site yet — add them in the Contacts tab.",
-       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grabelsky", dLogistics:"Logistics", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
+       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grebelsky", dLogistics:"Logistics", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
-       subtitle:"20–22 באוקטובר 2026 · 80 אורחים מרחבי העולם", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ לו״ז מפורט", rosTitle:"לו״ז מפורט של הכנס", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
-       dStatus:"סטטוס", dDesc:"תיאור", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
+       subtitle:"20–22 באוקטובר 2026", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ לו״ז מפורט", rosTitle:"לו״ז מפורט של הכנס", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       dStatus:"סטטוס", dDesc:"תיאור", dDescLong:"תיאור מורחב", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
        dDuplicate:"שכפל (פיצול)", dDelete:"מחק אירוע", dNoContacts:"אין עדיין אנשי קשר מובנים לאתר זה — הוסיפו בלשונית אנשי קשר.",
-       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גרבלסקי", dLogistics:"לוגיסטיקה", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
+       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גְרֶבֶלְסְקִי", dLogistics:"לוגיסטיקה", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
 };
 let LANG = (function(){ try{ return sessionStorage.getItem("jf60lang")||"en"; }catch(e){ return "en"; } })();
 function t(k){ return (T[LANG]&&T[LANG][k])||T.en[k]||k; }
@@ -701,6 +701,13 @@ function renderDrawer(id){
         <textarea class="notes-area" id="descEditHe" dir="rtl" style="min-height:60px;text-align:right;">${esc(s.descr_he||'')}</textarea>
         <div class="save-hint" id="descHint"></div>
       </div>
+      <div class="field"><label>${t("dDescLong")}</label>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <textarea class="notes-area" id="descLongEdit" style="min-height:100px;">${esc(s.descr_long||'')}</textarea>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin:6px 0 2px;">עברית</div>
+        <textarea class="notes-area" id="descLongEditHe" dir="rtl" style="min-height:100px;text-align:right;">${esc(s.descr_long_he||'')}</textarea>
+        <div class="save-hint" id="descLongHint"></div>
+      </div>
       <div class="field"><label>${t("dVenueContacts")} · ${esc(L(s,'venue'))}</label>
         ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${NOCONTACTS_MSG}</div>`; })()}
         <textarea class="notes-area" id="venueContacts" placeholder="Contact people for this venue — name, role, phone, email. Shared across all segments at ${esc(s.venue)}.">${esc(venueContacts(s.venue))}</textarea>
@@ -805,6 +812,14 @@ function renderDrawer(id){
   let tdh; const descHeEl=document.getElementById("descEditHe");
   if(descHeEl) descHeEl.addEventListener("input",()=>{ clearTimeout(tdh); document.getElementById("descHint").textContent="saving…";
     tdh=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_he",value:descHeEl.value}); s.descr_he=descHeEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdl; const descLongEl=document.getElementById("descLongEdit");
+  descLongEl.addEventListener("input",()=>{ clearTimeout(tdl); document.getElementById("descLongHint").textContent="saving…";
+    tdl=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_long",value:descLongEl.value}); s.descr_long=descLongEl.value; document.getElementById("descLongHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descLongHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdlh; const descLongHeEl=document.getElementById("descLongEditHe");
+  if(descLongHeEl) descLongHeEl.addEventListener("input",()=>{ clearTimeout(tdlh); document.getElementById("descLongHint").textContent="saving…";
+    tdlh=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_long_he",value:descLongHeEl.value}); s.descr_long_he=descLongHeEl.value; document.getElementById("descLongHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descLongHint");if(h)h.textContent="";},1500); },600); });
 
   let tv; const vcEl=document.getElementById("venueContacts");
   vcEl.addEventListener("input",()=>{ clearTimeout(tv); document.getElementById("venueHint").textContent="saving…";

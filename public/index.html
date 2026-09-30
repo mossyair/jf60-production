@@ -458,6 +458,7 @@ async function tryEnter(){
   KEY = document.getElementById("gateKey").value.trim();
   NAME = document.getElementById("gateName").value.trim();
   if(!KEY){ document.getElementById("gateErr").textContent="Enter a key."; return; }
+  document.getElementById("gateErr").textContent="";
   try {
     const s = await api("state");
     if(!s || !s.level) throw new Error("rejected");

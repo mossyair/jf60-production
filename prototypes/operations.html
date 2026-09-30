@@ -1,0 +1,511 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JF60 Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500&family=Heebo:wght@400;500;700&display=swap">
+<style>
+/* Layout: one calm column; controls on top, a live clock bar, then the chosen view. Drawer slides in from the right. */
+:root{
+  --bg:#F5F1E8; --surface:#FFFDF8; --sunk:#ECE6D9; --ink:#211F1A; --muted:#6A6356; --line:#DDD4C3;
+  --setup:#3E6B7A; --guest:#5F6A3A; --move:#8A6820; --strike:#A24E2E; --issue:#A24E2E; --live:#2F7D5B;
+  --on-accent:#FFFFFF; --focus:#3E6B7A;
+  --display:'Frank Ruhl Libre', Georgia, 'Times New Roman', serif;
+  --body:'Heebo', 'Helvetica Neue', Arial, sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#171613; --surface:#201E1A; --sunk:#2A2722; --ink:#EDE7DA; --muted:#A8A092; --line:#36322B;
+  --setup:#7FAFBF; --guest:#A9B57A; --move:#D2AE5E; --strike:#E08A68; --issue:#E08A68; --live:#6CC79D;
+  --on-accent:#171613; --focus:#7FAFBF; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#171613; --surface:#201E1A; --sunk:#2A2722; --ink:#EDE7DA; --muted:#A8A092; --line:#36322B;
+  --setup:#7FAFBF; --guest:#A9B57A; --move:#D2AE5E; --strike:#E08A68; --issue:#E08A68; --live:#6CC79D;
+  --on-accent:#171613; --focus:#7FAFBF; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:0 64px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1120px;margin:0 auto}
+.num{font-variant-numeric:tabular-nums}
+
+header.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-block:28px 18px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,42px);line-height:1.05;margin:6px 0 0;text-wrap:balance}
+h1 em{font-style:italic;color:var(--strike)}
+
+.seg{display:inline-flex;background:var(--sunk);border-radius:999px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted);min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding-block:4px 14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 13px;font-size:13px;min-height:36px;color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip .c{opacity:.6;margin-inline-start:4px}
+
+.clock{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;flex-wrap:wrap}
+.clock .play{width:38px;height:38px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;flex:none}
+.clock .t{font-family:var(--display);font-size:24px;line-height:1;min-width:64px}
+.clock .d{font-size:12px;color:var(--muted)}
+.clock input[type=range]{flex:1;min-width:160px;accent-color:var(--ink)}
+.clock .sum{display:flex;gap:18px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.clock .sum b{color:var(--ink);font-weight:700}
+.clock .sum .bad b{color:var(--issue)}
+
+main{padding-block:16px}
+.banner{border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
+
+/* Run sheet */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:92px 1fr minmax(0,210px) auto;gap:14px;align-items:center;padding:14px 16px;border-top:1px solid var(--line);cursor:pointer;background:transparent;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:start}
+.row:first-child{border-top:0}
+.row:hover{background:var(--sunk)}
+.row.past{opacity:.5}
+.row .time{font-family:var(--display);font-size:16px}
+.row .ttl{font-weight:500;display:flex;align-items:center;gap:8px;min-width:0}
+.row .ttl span.txt{overflow:hidden;text-overflow:ellipsis}
+.row .sub{font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.k-setup{background:var(--setup)} .k-guest{background:var(--guest)} .k-move{background:var(--move)} .k-strike{background:var(--strike)}
+.crew{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pill.unk{border-color:var(--issue);color:var(--issue)}
+.status{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.status.live{color:var(--live)} .status.done{color:var(--muted)} .status.next{color:var(--ink)}
+.flag{color:var(--issue);font-size:12.5px;font-weight:500;display:flex;gap:5px;align-items:center;margin-top:2px}
+.livebar{box-shadow:inset 3px 0 0 var(--live)}
+
+/* Sites */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+.card.gap{border-color:var(--issue)}
+.card h3{font-family:var(--display);font-weight:400;font-size:21px;margin:0;line-height:1.15}
+.card .meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);gap:8px}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;font-size:13.5px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500}
+.kv dd.miss{color:var(--issue);font-weight:700}
+.mini{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.mini button{all:unset;cursor:pointer;display:grid;grid-template-columns:86px 1fr;gap:8px;font-size:13px;padding:3px 0}
+.mini button:focus-visible{outline:2px solid var(--focus)}
+.mini .tm{color:var(--muted)} .livechip{font-size:10px;font-weight:700;color:var(--live);letter-spacing:.08em}
+
+/* Timeline */
+.tl{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow-x:auto}
+.tl-in{min-width:760px}
+.tl-row{display:grid;grid-template-columns:170px 1fr;border-top:1px solid var(--line)}
+.tl-row:first-child{border-top:0}
+.tl-lab{padding:12px 14px;font-size:13.5px;font-weight:500;border-inline-end:1px solid var(--line)}
+.tl-lab small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.tl-track{position:relative;height:58px;background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);background-size:calc(100%/8) 100%}
+.tl-axis .tl-track{height:30px;background:none}
+.tick{position:absolute;top:7px;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+.bar{position:absolute;top:9px;height:40px;border-radius:7px;padding:3px 8px;color:var(--on-accent);font-size:12px;overflow:hidden;border:0;text-align:start;display:flex;flex-direction:column;justify-content:center;line-height:1.25}
+.bar b{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar span{white-space:nowrap;opacity:.9}
+.bar.unk{background:transparent!important;color:var(--issue);border:2px dashed var(--issue)}
+.bar.past{opacity:.45}
+.nowline{position:absolute;top:0;bottom:0;width:2px;background:var(--live);z-index:2;pointer-events:none}
+.midnight{position:absolute;top:0;bottom:0;border-left:2px solid var(--ink);opacity:.35}
+
+/* My day */
+.phone-wrap{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.phone{width:min(380px,100%);border:1px solid var(--line);border-radius:34px;background:var(--bg);padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.screen{border-radius:24px;overflow:hidden;background:var(--bg);min-height:640px;display:flex;flex-direction:column}
+.ph-head{background:var(--ink);color:var(--bg);padding:20px 18px 16px}
+.ph-head .n{font-family:var(--display);font-size:26px;line-height:1.1}
+.ph-head .r{font-size:12.5px;opacity:.75}
+.ph-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+.nowcard{background:var(--live);color:var(--on-accent);border-radius:14px;padding:14px}
+.nowcard.idle{background:var(--sunk);color:var(--ink)}
+.nowcard .l{font-size:10.5px;letter-spacing:.14em;font-weight:700;opacity:.85}
+.nowcard .h{font-family:var(--display);font-size:21px;line-height:1.2;margin:4px 0}
+.nowcard .s{font-size:13px}
+.nowcard .acts{display:flex;gap:8px;margin-top:10px}
+.nowcard .acts button{flex:1;min-height:44px;border-radius:9px;border:0;background:rgba(255,255,255,.2);color:inherit;font-weight:700}
+.nowcard.idle .acts button{background:var(--surface)}
+.ph-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ph-list button{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:58px 1fr;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.ph-list button:focus-visible{outline:2px solid var(--focus)}
+.ph-list button.iss{border:2px solid var(--issue)}
+.ph-list .tm{font-family:var(--display);font-size:15px}
+.ph-list .tt{font-weight:500;font-size:14px}
+.ph-list .ss{font-size:12px;color:var(--muted)}
+.ph-list .ss.bad{color:var(--issue);font-weight:500}
+.ph-sec{font-size:10.5px;letter-spacing:.14em;color:var(--muted);font-weight:700;margin-top:6px}
+.side-note{flex:1;min-width:240px;max-width:420px;color:var(--muted);font-size:14px}
+.side-note label{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;color:var(--ink)}
+.side-note select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);border-inline-start:1px solid var(--line);transform:translateX(100%);transition:transform .25s ease;z-index:11;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.drawer.on{transform:none}
+.dr-head{padding:20px 22px 12px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dr-head h2{font-family:var(--display);font-weight:400;font-size:26px;line-height:1.15;margin:4px 0 0;text-wrap:balance}
+.x{border:0;background:var(--sunk);width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center}
+.dr-body{padding:4px 22px 28px;overflow:auto;display:flex;flex-direction:column;gap:18px;flex:1}
+.field label,.field .lb{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-height:44px}
+.field textarea{min-height:84px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.issuebox{border:1px solid var(--issue);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.issuebox p{margin:0;color:var(--issue);font-weight:500}
+.btn{border:0;border-radius:9px;padding:10px 16px;min-height:44px;font-weight:700;background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.good{background:var(--live);color:var(--on-accent)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.readonly{font-size:13px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:10px 12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:13.5px;opacity:0;transition:all .2s;z-index:20;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding-block:10px}
+footer button{border:0;background:none;text-decoration:underline;color:var(--muted);padding:0}
+
+@media (max-width:720px){
+  .row{grid-template-columns:70px 1fr;}
+  .row .site,.row .crew{grid-column:2}
+  .crew{justify-content:flex-start}
+  .clock .sum{width:100%}
+}
+@media (prefers-reduced-motion: reduce){ .drawer,.scrim,.toast{transition:none} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Jerusalem Foundation · 60th · Production</div>
+      <h1><em>Operations</em> prototype</h1>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">Signed in as</div>
+      <div class="seg" role="group" aria-label="Role" id="roles"></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Layout" id="views"></div>
+    <div class="chips" role="group" aria-label="Day" id="days"></div>
+  </div>
+
+  <section class="clock" aria-label="Time simulator">
+    <button class="play" id="play" aria-label="Play the day"></button>
+    <div><div class="t num" id="clockT">10:40</div><div class="d" id="clockD">Tue 20.10 · simulated</div></div>
+    <input type="range" id="scrub" min="360" max="1800" step="5" aria-label="Simulated time">
+    <div class="sum" id="summary"></div>
+  </section>
+
+  <div class="controls" style="padding-block:14px 0">
+    <div class="chips" role="group" aria-label="Filter" id="filters"></div>
+    <button class="btn ghost" id="addBtn" hidden>Add item</button>
+  </div>
+
+  <main id="view"></main>
+
+  <footer>
+    <span>Prototype with sample rows from the production sheet. Changes stay in this browser only.</span>
+    <button id="reset">Reset demo</button>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Details" aria-hidden="true"></aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+const DAYS = { '19':'Mon 19.10', '20':'Tue 20.10', '21':'Wed 21.10', '22':'Thu 22.10' };
+const KINDS = { setup:'Setup', guest:'Guest program', move:'Move', strike:'Strike' };
+const PEOPLE = ['Hagai','Uri','Natali','Kosta','Yarden','Elnatan'];
+const SM = 'Site manager';
+const h = (hh, mm) => hh*60 + (mm||0);
+const C = (name, role) => ({ name, role });
+
+const SEED = [
+  { day:'19', s:h(8), e:h(18), title:'Furniture & design install', site:'Mishkenot Sha’ananim', kind:'setup', crew:[C('Hagai',SM), C('Designer','Design')] },
+
+  { day:'20', s:h(7), e:h(11), title:'Crew arrival · coffee station · sound check', site:'Mishkenot Sha’ananim', kind:'setup', crew:[C('Hagai',SM), C('Natali',SM), C('1','runner')] },
+  { day:'20', s:h(8), e:h(8,30), title:'Hotel pickups', site:'Hotels (4)', kind:'move', crew:[C('3','escorts')], note:'Each vehicle: cooler with ice, water, soda.' },
+  { day:'20', s:h(8,30), e:h(9,10), title:'Registration desk for walk-ins', site:'Mishkenot Sha’ananim', kind:'guest', crew:[C('2','ushers')], flag:'Desk location not decided' },
+  { day:'20', s:h(8,30), e:h(10), title:'Coffee & pastries · gallery', site:'Mishkenot Sha’ananim', kind:'guest', crew:[] },
+  { day:'20', s:h(9,15), e:h(9,45), title:'Opening presentation · auditorium', site:'Mishkenot Sha’ananim', kind:'guest', crew:[] },
+  { day:'20', s:h(9,45), e:h(10,30), title:'Advance vehicle · sound setup, restrooms check', site:'Botanical Garden', kind:'setup', crew:[C('Uri',SM), C('Natali',SM), C('Schuster','AV')] },
+  { day:'20', s:h(9,45), e:h(10), title:'Board the double-decker', site:'Mishkenot Sha’ananim', kind:'move', crew:[C('4','escorts')], flag:'Can the bus stand at Mishkenot?' },
+  { day:'20', s:h(10,30), e:h(11), title:'Show (15 min) + tour', site:'Botanical Garden', kind:'guest', crew:[C('Uri',SM), C('1','runner')] },
+  { day:'20', s:h(10,30), e:h(12,30), title:'Tables, furniture, signage', site:'Ein Yael', kind:'setup', crew:[C('Kosta',SM), C('Natali',SM), C('1','crew')] },
+  { day:'20', s:h(11,15), e:h(12,15), title:'Show (15 min) + tour', site:'Gazelle Valley', kind:'guest', crew:[C('Hagai',SM), C('1','runner')] },
+  { day:'20', s:h(12,45), e:h(14), title:'Lunch + show', site:'Ein Yael', kind:'guest', crew:[C('?',SM), C('1','runner')], flag:'Plan B needed · site manager unconfirmed' },
+  { day:'20', s:h(14,30), e:h(16,30), title:'Panel · Jerusalem women leaders', site:'Train Theater', kind:'guest', crew:[C('Uri',SM), C('1','runner')] },
+  { day:'20', s:h(19), e:h(22), title:'Opening evening', site:'Jerusalem Theatre', kind:'guest', crew:[C('Hagai',SM), C('2','runners')] },
+
+  { day:'21', s:h(7), e:h(9), title:'Round tables setup', site:'Mishkenot Sha’ananim', kind:'setup', crew:[C('Hagai',SM), C('2','runners'), C('4','table heads')] },
+  { day:'21', s:h(9), e:h(14), title:'Morning program', site:'Gan Yael', kind:'guest', crew:[C('?',SM)], flag:'Site manager unconfirmed' },
+  { day:'21', s:h(10), e:h(13), title:'Setup for tomorrow', site:'Cinematheque', kind:'setup', crew:[C('Hagai',SM)] },
+  { day:'21', s:h(14), e:h(17), tbc:true, title:'Visit', site:'Beit Hanina', kind:'guest', crew:[C('Uri',SM), C('1','runner')] },
+  { day:'21', s:h(15), e:h(22), tbc:true, title:'Evening venue', site:'The Factory', kind:'setup', crew:[C('Hagai',SM), C('2','runners')] },
+  { day:'21', s:h(23), e:h(29), title:'Overnight build #1', site:'Tower of David', kind:'setup', crew:[C('?','Build lead')], flag:'Setup & strike lead not named' },
+
+  { day:'22', s:h(7), e:h(12), title:'Build #2 · engineer sign-off', site:'Tower of David', kind:'setup', crew:[C('2','runners')] },
+  { day:'22', s:h(9,30), e:h(12,30), title:'Main gathering + organizations fair', site:'Cinematheque', kind:'guest', crew:[C('Hagai',SM), C('Yarden',SM), C('2','runners')] },
+  { day:'22', s:h(13), e:h(16), tbc:true, title:'TED-style build', site:'Science Museum', kind:'guest', crew:[C('?',SM), C('1','runner')], flag:'Site manager unconfirmed' },
+  { day:'22', s:h(18), e:h(24), title:'Gala evening', site:'Tower of David', kind:'guest', crew:[C('Uri',SM), C('3','runners')] },
+  { day:'22', s:h(23,30), e:h(29), title:'Overnight strike', site:'Tower of David', kind:'strike', crew:[C('?','Build lead')], flag:'Strike lead not named' }
+].map((x,i) => Object.assign({ id:'i'+i, done:false, notes:'' }, x));
+
+const KEY = 'jf60-ops-proto-v1';
+let items = load();
+const S = { view:'sheet', day:'20', filter:'all', role:'admin', now:h(10,40), playing:false, person:'Hagai', open:null };
+try { const u = JSON.parse(localStorage.getItem(KEY+'-ui')||'{}'); Object.assign(S, u, { playing:false, open:null }); } catch(e){}
+
+function load(){ try { const v = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(v) && v.length) return v; } catch(e){} return JSON.parse(JSON.stringify(SEED)); }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(items)); localStorage.setItem(KEY+'-ui', JSON.stringify({ view:S.view, day:S.day, filter:S.filter, role:S.role, person:S.person })); } catch(e){} }
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = m => { const d = ((m % 1440) + 1440) % 1440; return String(Math.floor(d/60)).padStart(2,'0') + ':' + String(d%60).padStart(2,'0'); };
+const span = x => (x.tbc ? '≈ ' : '') + fmt(x.s) + '–' + fmt(x.e);
+const unk = c => c.name === '?';
+const isCount = c => /^\d/.test(c.name);
+const crewLabel = c => unk(c) ? c.role + ' ?' : isCount(c) ? c.name + ' ' + c.role : c.name;
+const can = { edit: () => S.role !== 'viewer', admin: () => S.role === 'admin' };
+
+function status(x){
+  if (x.done) return 'done';
+  if (x.e <= S.now) return 'past';
+  if (x.s <= S.now) return 'live';
+  return 'next';
+}
+function dayItems(){ return items.filter(x => x.day === S.day).sort((a,b) => a.s - b.s || a.e - b.e); }
+function passes(x){
+  if (S.filter === 'crew') return x.kind !== 'guest';
+  if (S.filter === 'guest') return x.kind === 'guest';
+  if (S.filter === 'open') return !!x.flag;
+  return true;
+}
+
+/* ---------- controls ---------- */
+function seg(el, opts, cur, onPick){
+  el.innerHTML = opts.map(([k, l, extra]) => `<button type="button" data-k="${k}" aria-pressed="${k===cur}">${esc(l)}${extra!=null?`<span class="c num">${extra}</span>`:''}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => onPick(b.dataset.k));
+}
+function renderControls(){
+  seg($('roles'), [['admin','Admin'],['edit','Editor'],['viewer','Viewer']], S.role, k => { S.role = k; closeDrawer(); render(); toast('Viewing as ' + ({admin:'admin',edit:'editor',viewer:'viewer'})[k]); });
+  seg($('views'), [['sheet','Run sheet'],['sites','Sites'],['timeline','Timeline'],['me','My day']], S.view, k => { S.view = k; render(); });
+  const dayEl = $('days');
+  dayEl.innerHTML = Object.keys(DAYS).map(k => `<button type="button" class="chip" data-k="${k}" aria-pressed="${k===S.day}">${DAYS[k]}<span class="c num">${items.filter(x=>x.day===k).length}</span></button>`).join('');
+  dayEl.querySelectorAll('button').forEach(b => b.onclick = () => { S.day = b.dataset.k; render(); });
+  const fEl = $('filters'); const di = dayItems();
+  const F = [['all','All',di.length],['crew','Setup & strike',di.filter(x=>x.kind!=='guest').length],['guest','Guest program',di.filter(x=>x.kind==='guest').length],['open','Open issues',di.filter(x=>x.flag).length]];
+  fEl.innerHTML = F.map(([k,l,n]) => `<button type="button" class="chip" data-k="${k}" aria-pressed="${k===S.filter}">${l}<span class="c num">${n}</span></button>`).join('');
+  fEl.querySelectorAll('button').forEach(b => b.onclick = () => { S.filter = b.dataset.k; render(); });
+  $('filters').parentElement.hidden = S.view === 'me';
+  $('addBtn').hidden = !can.admin() || S.view === 'me';
+}
+function renderClock(){
+  $('scrub').value = S.now;
+  $('clockT').textContent = fmt(S.now);
+  $('clockD').textContent = (S.now >= 1440 ? 'Night after ' : '') + DAYS[S.day] + ' · simulated';
+  $('play').innerHTML = S.playing
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>';
+  $('play').setAttribute('aria-label', S.playing ? 'Pause' : 'Play the day');
+  const di = dayItems();
+  const live = di.filter(x => status(x) === 'live');
+  const next = di.find(x => status(x) === 'next');
+  const open = di.filter(x => x.flag).length;
+  const onShift = new Set(); live.forEach(x => x.crew.forEach(c => { if (!isCount(c) && !unk(c)) onShift.add(c.name); }));
+  $('summary').innerHTML =
+    `<span>Live <b class="num">${live.length}</b></span>` +
+    `<span>Next <b>${next ? esc(fmt(next.s) + ' ' + next.title) : '—'}</b></span>` +
+    `<span class="${open?'bad':''}">Open issues <b class="num">${open}</b></span>` +
+    `<span>Leads on site <b class="num">${onShift.size}</b></span>`;
+}
+
+/* ---------- views ---------- */
+const statusLabel = { live:'Live now', done:'Done', past:'Finished', next:'' };
+const flagIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+
+function viewSheet(){
+  const list = dayItems().filter(passes);
+  if (!list.length) return `<div class="banner">Nothing here for ${DAYS[S.day]} with this filter.</div>`;
+  return `<div class="sheet">` + list.map(x => {
+    const st = status(x);
+    return `<button type="button" class="row ${st==='past'||st==='done'?'past':''} ${st==='live'?'livebar':''}" data-open="${x.id}">
+      <div class="time num">${fmt(x.s)}<div class="sub">${x.tbc?'≈ ':''}to ${fmt(x.e)}</div></div>
+      <div style="min-width:0">
+        <div class="ttl"><span class="dot k-${x.kind}" aria-hidden="true"></span><span class="txt">${esc(x.title)}</span></div>
+        ${x.flag ? `<div class="flag">${flagIcon}${esc(x.flag)}</div>` : `<div class="sub">${KINDS[x.kind]}${x.notes?' · note':''}</div>`}
+      </div>
+      <div class="site sub" style="font-size:13px">${esc(x.site)}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span class="status ${st==='past'?'done':st}">${statusLabel[st]}</span>
+        <div class="crew">${x.crew.map(c => `<span class="pill ${unk(c)?'unk':''}">${esc(crewLabel(c))}</span>`).join('')}</div>
+      </div>
+    </button>`;
+  }).join('') + `</div>`;
+}
+
+function viewSites(){
+  const list = dayItems().filter(passes);
+  const bySite = {};
+  list.forEach(x => (bySite[x.site] = bySite[x.site] || []).push(x));
+  const names = Object.keys(bySite);
+  if (!names.length) return `<div class="banner">No sites match this filter.</div>`;
+  return `<div class="grid">` + names.map(n => {
+    const xs = bySite[n];
+    const leads = new Set(), missing = xs.some(x => x.crew.some(c => unk(c)));
+    let runners = 0;
+    xs.forEach(x => x.crew.forEach(c => { if (c.role === SM && !unk(c)) leads.add(c.name); if (isCount(c) && /runner/.test(c.role)) runners += +c.name; }));
+    const live = xs.some(x => status(x) === 'live');
+    const s = Math.min(...xs.map(x=>x.s)), e = Math.max(...xs.map(x=>x.e));
+    return `<article class="card ${missing?'gap':''}">
+      <div class="meta"><span class="num">${fmt(s)}–${fmt(e)}</span>${live?'<span class="livechip">● LIVE</span>':''}</div>
+      <h3>${esc(n)}</h3>
+      <dl class="kv">
+        <dt>Site manager</dt><dd class="${leads.size?'':'miss'}">${leads.size ? esc([...leads].join(', ')) : 'Unassigned'}${leads.size && missing ? ' <span style="color:var(--issue)">+ gap</span>' : ''}</dd>
+        <dt>Runners</dt><dd class="num">${runners || '—'}</dd>
+        <dt>Open issues</dt><dd class="${xs.some(x=>x.flag)?'miss':''} num">${xs.filter(x=>x.flag).length || '—'}</dd>
+      </dl>
+      <ul class="mini">${xs.map(x => `<li><button type="button" data-open="${x.id}"><span class="tm num">${fmt(x.s)}</span><span>${esc(x.title)} ${status(x)==='live'?'<span class="livechip">LIVE</span>':''}${x.flag?' <span style="color:var(--issue)">•</span>':''}</span></button></li>`).join('')}</ul>
+    </article>`;
+  }).join('') + `</div>`;
+}
+
+function viewTimeline(){
+  const list = dayItems().filter(passes);
+  if (!list.length) return `<div class="banner">Nothing to plot with this filter.</div>`;
+  const START = 360, SPAN = 1440, pct = m => ((m - START) / SPAN * 100);
+  const sites = [...new Set(list.map(x => x.site))];
+  const ticks = []; for (let m = START; m <= START + SPAN; m += 180) ticks.push(`<span class="tick num" style="left:${pct(m)}%">${fmt(m)}</span>`);
+  const nowL = (S.now >= START && S.now <= START + SPAN) ? `<div class="nowline" style="left:${pct(S.now)}%"></div>` : '';
+  const mid = `<div class="midnight" style="left:${pct(1440)}%"></div>`;
+  const colour = { setup:'var(--setup)', guest:'var(--guest)', move:'var(--move)', strike:'var(--strike)' };
+  const rows = sites.map(site => {
+    const xs = list.filter(x => x.site === site);
+    const lead = [...new Set(xs.flatMap(x => x.crew.filter(c => c.role===SM && !unk(c)).map(c=>c.name)))].join(', ');
+    // stack overlapping bars in two rows
+    const lanes = []; xs.forEach(x => { let i = lanes.findIndex(end => end <= x.s); if (i < 0) { i = lanes.length; lanes.push(0); } lanes[i] = x.e; x._lane = i; });
+    const tall = Math.max(1, lanes.length);
+    const bars = xs.map(x => {
+      const st = status(x), gap = x.crew.some(unk);
+      const top = 9 + x._lane * (tall > 1 ? 24 : 0), hgt = tall > 1 ? 21 : 40;
+      return `<button type="button" class="bar ${gap?'unk':''} ${st==='past'||st==='done'?'past':''}" data-open="${x.id}" title="${esc(x.title)}" style="left:calc(${pct(x.s)}% + 2px);width:calc(${pct(x.e)-pct(x.s)}% - 4px);top:${top}px;height:${hgt}px;background:${colour[x.kind]}"><b>${esc(x.title)}</b>${tall>1?'':`<span class="num">${span(x)}</span>`}</button>`;
+    }).join('');
+    return `<div class="tl-row"><div class="tl-lab">${esc(site)}<small>${lead?esc(lead):'<span style="color:var(--issue)">No site manager</span>'}</small></div><div class="tl-track" style="height:${tall>1?18+tall*24:58}px">${mid}${nowL}${bars}</div></div>`;
+  }).join('');
+  return `<div class="tl"><div class="tl-in"><div class="tl-row tl-axis"><div class="tl-lab" style="font-size:11px;color:var(--muted);letter-spacing:.1em">SITE</div><div class="tl-track">${ticks.join('')}${mid}</div></div>${rows}</div></div>`;
+}
+
+function viewMe(){
+  const mine = items.filter(x => x.day === S.day && x.crew.some(c => c.name === S.person)).sort((a,b)=>a.s-b.s);
+  const live = mine.find(x => status(x) === 'live');
+  const upcoming = mine.filter(x => status(x) === 'next');
+  const role = mine.some(x => x.crew.some(c => c.name===S.person && c.role===SM)) ? 'Site manager' : 'Crew';
+  const nowCard = live
+    ? `<div class="nowcard"><div class="l">NOW · UNTIL ${fmt(live.e)}</div><div class="h">${esc(live.title)}</div><div class="s">${esc(live.site)}${live.crew.filter(isCount).length?' · '+esc(live.crew.filter(isCount).map(crewLabel).join(' · ')):''}</div>
+        <div class="acts"><button type="button" data-open="${live.id}">Details</button>${can.edit()?`<button type="button" data-done="${live.id}">${live.done?'Undo done':'Mark done'}</button>`:''}</div></div>`
+    : `<div class="nowcard idle"><div class="l">NOW</div><div class="h">Free right now</div><div class="s">${upcoming[0] ? 'Next at ' + fmt(upcoming[0].s) + ' · ' + esc(upcoming[0].site) : 'Nothing else today'}</div></div>`;
+  const li = x => `<li><button type="button" class="${x.flag?'iss':''}" data-open="${x.id}"><span class="tm num">${fmt(x.s)}</span><span><div class="tt">${esc(x.title)}</div><div class="ss ${x.flag?'bad':''}">${x.flag?esc(x.flag):esc(x.site)}</div></span></button></li>`;
+  return `<div class="phone-wrap">
+    <div class="phone" aria-label="Phone preview"><div class="screen">
+      <div class="ph-head"><div class="eyebrow" style="color:inherit;opacity:.7">MY DAY · ${DAYS[S.day].toUpperCase()}</div><div class="n">${esc(S.person)}</div><div class="r">${role} · ${mine.length} assignment${mine.length===1?'':'s'}</div></div>
+      <div class="ph-body">${nowCard}
+        ${upcoming.length ? `<div class="ph-sec">NEXT</div><ul class="ph-list">${upcoming.map(li).join('')}</ul>` : ''}
+        ${mine.filter(x=>['past','done'].includes(status(x))).length ? `<div class="ph-sec">EARLIER</div><ul class="ph-list" style="opacity:.55">${mine.filter(x=>['past','done'].includes(status(x))).map(li).join('')}</ul>` : ''}
+        ${!mine.length ? `<p class="ss" style="color:var(--muted)">No assignments on ${DAYS[S.day]}.</p>` : ''}
+      </div></div></div>
+    <div class="side-note">
+      <label for="person">Preview as</label>
+      <select id="person">${PEOPLE.map(p => `<option ${p===S.person?'selected':''}>${p}</option>`).join('')}</select>
+      <p>What each crew member would see on their phone. Press play above and the “Now” card follows the clock. Assigning someone as site manager in the details panel adds the item to their day.</p>
+    </div>
+  </div>`;
+}
+
+function render(){
+  renderControls(); renderClock();
+  const v = $('view');
+  v.innerHTML = { sheet:viewSheet, sites:viewSites, timeline:viewTimeline, me:viewMe }[S.view]();
+  v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openDrawer(b.dataset.open));
+  v.querySelectorAll('[data-done]').forEach(b => b.onclick = () => toggleDone(b.dataset.done));
+  const p = $('person'); if (p) p.onchange = () => { S.person = p.value; render(); };
+  save();
+}
+
+/* ---------- drawer ---------- */
+function find(id){ return items.find(x => x.id === id); }
+function toggleDone(id){ const x = find(id); x.done = !x.done; toast(x.done ? 'Marked done' : 'Marked not done'); render(); if (S.open === id) openDrawer(id); }
+function openDrawer(id){
+  const x = id === 'new' ? null : find(id);
+  S.open = id;
+  const d = $('drawer');
+  if (!x) {
+    d.innerHTML = `<div class="dr-head"><div><div class="eyebrow">New item · ${DAYS[S.day]}</div><h2>Add to the crew schedule</h2></div><button class="x" type="button" aria-label="Close" data-close>✕</button></div>
+      <form class="dr-body" id="newForm">
+        <div class="field"><label for="nTitle">What happens</label><input id="nTitle" required placeholder="e.g. Signage install"></div>
+        <div class="field"><label for="nSite">Site</label><input id="nSite" required placeholder="e.g. Cinematheque"></div>
+        <div class="two"><div class="field"><label for="nS">Start</label><input id="nS" type="time" value="09:00" required></div><div class="field"><label for="nE">End</label><input id="nE" type="time" value="11:00" required></div></div>
+        <div class="two"><div class="field"><label for="nK">Type</label><select id="nK">${Object.keys(KINDS).map(k=>`<option value="${k}">${KINDS[k]}</option>`).join('')}</select></div>
+        <div class="field"><label for="nM">Site manager</label><select id="nM"><option value="?">Unassigned</option>${PEOPLE.map(p=>`<option>${p}</option>`).join('')}</select></div></div>
+        <div class="btns"><button class="btn" type="submit">Add item</button><button class="btn ghost" type="button" data-close>Cancel</button></div>
+      </form>`;
+    d.querySelector('#newForm').onsubmit = e => {
+      e.preventDefault();
+      const tm = v => { const [a,b] = v.split(':').map(Number); return a*60+b; };
+      let s = tm($('nS').value), en = tm($('nE').value); if (en <= s) en += 1440;
+      const m = $('nM').value;
+      items.push({ id:'n'+Date.now(), day:S.day, s, e:en, title:$('nTitle').value.trim(), site:$('nSite').value.trim(), kind:$('nK').value, crew:[C(m,SM)], flag: m==='?' ? 'Site manager unassigned' : '', done:false, notes:'' });
+      closeDrawer(); toast('Item added'); render();
+    };
+  } else {
+    const st = status(x);
+    const lead = x.crew.find(c => c.role === SM || c.role === 'Build lead');
+    d.innerHTML = `<div class="dr-head"><div><div class="eyebrow"><span class="dot k-${x.kind}" style="display:inline-block;margin-inline-end:6px"></span>${KINDS[x.kind]} · ${DAYS[x.day]}</div><h2>${esc(x.title)}</h2></div><button class="x" type="button" aria-label="Close" data-close>✕</button></div>
+      <div class="dr-body">
+        <dl class="kv"><dt>When</dt><dd class="num">${span(x)}${x.e>1440?' (overnight)':''}</dd><dt>Site</dt><dd>${esc(x.site)}</dd><dt>Status</dt><dd>${x.done?'Done':({live:'Live now',past:'Finished',next:'Upcoming'})[st]}</dd></dl>
+        ${x.flag ? `<div class="issuebox"><p>${flagIcon} ${esc(x.flag)}</p>${can.admin()?`<div class="btns"><button class="btn good" type="button" id="resolve">Mark resolved</button></div>`:'<div class="readonly">Only an admin can resolve issues.</div>'}</div>` : ''}
+        <div class="field"><span class="lb">Crew</span><div class="crew" style="justify-content:flex-start">${x.crew.length ? x.crew.map(c=>`<span class="pill ${unk(c)?'unk':''}">${esc(crewLabel(c))}${!isCount(c)&&!unk(c)?' · '+esc(c.role):''}</span>`).join('') : '<span class="sub">No crew listed</span>'}</div></div>
+        ${lead ? (can.admin()
+          ? `<div class="field"><label for="lead">${esc(lead.role)}</label><select id="lead"><option value="?" ${unk(lead)?'selected':''}>Unassigned</option>${PEOPLE.map(p=>`<option ${p===lead.name?'selected':''}>${p}</option>`).join('')}</select></div>`
+          : `<div class="field"><span class="lb">${esc(lead.role)}</span><div class="readonly">${unk(lead)?'Unassigned':esc(lead.name)} · admins assign leads</div></div>`) : ''}
+        ${x.note ? `<div class="field"><span class="lb">From the sheet</span><div class="readonly">${esc(x.note)}</div></div>` : ''}
+        <div class="field"><label for="notes">Notes</label>${can.edit()?`<textarea id="notes" placeholder="Anything the crew should know">${esc(x.notes)}</textarea>`:`<div class="readonly">${x.notes?esc(x.notes):'No notes'}</div>`}</div>
+        ${can.edit() ? `<div class="btns"><button class="btn" type="button" id="doneBtn">${x.done?'Mark not done':'Mark done'}</button>${can.admin()?'<button class="btn ghost" type="button" id="delBtn">Remove item</button>':''}</div>` : '<div class="readonly">Viewing only. Editors can mark items done and add notes.</div>'}
+        <div id="confirmDel" hidden class="issuebox"><p>Remove “${esc(x.title)}” from the schedule?</p><div class="btns"><button class="btn" type="button" id="delYes">Remove</button><button class="btn ghost" type="button" id="delNo">Keep</button></div></div>
+      </div>`;
+    const q = s => d.querySelector(s);
+    if (q('#resolve')) q('#resolve').onclick = () => { x.flag = ''; toast('Issue resolved'); render(); openDrawer(x.id); };
+    if (q('#lead')) q('#lead').onchange = e => { lead.name = e.target.value; if (lead.name !== '?' && /unconfirmed|not named|unassigned/i.test(x.flag||'')) x.flag = ''; if (lead.name === '?' && !x.flag) x.flag = lead.role + ' unassigned'; toast(lead.name==='?' ? 'Lead cleared' : lead.name + ' assigned'); render(); openDrawer(x.id); };
+    if (q('#notes')) q('#notes').oninput = e => { x.notes = e.target.value; save(); };
+    if (q('#doneBtn')) q('#doneBtn').onclick = () => toggleDone(x.id);
+    if (q('#delBtn')) q('#delBtn').onclick = () => { q('#confirmDel').hidden = false; q('#delYes').focus(); };
+    if (q('#delYes')) q('#delYes').onclick = () => { items = items.filter(i => i.id !== x.id); closeDrawer(); toast('Item removed'); render(); };
+    if (q('#delNo')) q('#delNo').onclick = () => { q('#confirmDel').hidden = true; };
+  }
+  d.querySelectorAll('[data-close]').forEach(b => b.onclick = closeDrawer);
+  d.classList.add('on'); d.setAttribute('aria-hidden','false'); $('scrim').classList.add('on');
+  const f = d.querySelector('input,select,textarea,button.btn'); (f || d.querySelector('.x')).focus({ preventScroll:true });
+}
+function closeDrawer(){ S.open = null; const d = $('drawer'); d.classList.remove('on'); d.setAttribute('aria-hidden','true'); $('scrim').classList.remove('on'); }
+
+let tt; function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 1800); }
+
+/* ---------- clock ---------- */
+let timer = null;
+function setPlaying(on){
+  S.playing = on; clearInterval(timer);
+  if (on) timer = setInterval(() => { S.now += 10; if (S.now >= 1800) { S.now = 1800; setPlaying(false); } render(); }, 350);
+  renderClock();
+}
+$('play').onclick = () => { if (!S.playing && S.now >= 1800) S.now = 360; setPlaying(!S.playing); };
+$('scrub').oninput = e => { S.now = +e.target.value; render(); };
+$('scrim').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.open) closeDrawer(); });
+$('addBtn').onclick = () => openDrawer('new');
+$('reset').onclick = () => { items = JSON.parse(JSON.stringify(SEED)); S.now = h(10,40); S.day = '20'; S.filter = 'all'; closeDrawer(); render(); toast('Demo reset'); };
+
+render();
+})();
+</script>

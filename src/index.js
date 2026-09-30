@@ -1174,9 +1174,17 @@ ${context}`;
           if (!admin)
             return json({ error: "admin required" }, 403);
           const b = await readBody(request);
-          const ops = Array.isArray(b.ops) ? b.ops : [];
+          const ops = Array.isArray(b.ops) ? b.ops.slice(0, 100) : [];
+          const segIds = new Set((await env.DB.prepare("SELECT id FROM segments").all()).results.map((s) => s.id));
+          const checkIds = new Set((await env.DB.prepare("SELECT id FROM checklist").all()).results.map((c) => c.id));
           let applied = 0;
           for (const op of ops) {
+            if (op.segment_id != null && !segIds.has(op.segment_id))
+              continue;
+            if (op.type === "edit_check" && !checkIds.has(+op.check_id))
+              continue;
+            if (op.type === "edit_event" && op.day != null && ![1, 2, 3].includes(+op.day))
+              continue;
             if (op.type === "add_check" && op.segment_id && op.text) {
               await env.DB.prepare("INSERT INTO checklist (segment_id,text,done,seeded,created_by) VALUES (?,?,0,0,'AI')").bind(op.segment_id, String(op.text).slice(0, 500)).run();
               applied++;

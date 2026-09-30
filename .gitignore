@@ -5,3 +5,10 @@ node_modules/
 export-*.json
 jf60-content-export.json
 .DS_Store
+
+# Live data backups / exports contain guest PII (passports, phones) - never commit
+backups/
+jf60-backups/
+*-full.sql
+*.export.sql
+.dev.vars*

@@ -165,7 +165,8 @@ var src_default = {
               run_stops: vStops.results
             });
           } catch (e) {
-            return json({ error: String(e) }, 500);
+            console.error("api error", path, e);
+            return json({ error: "server error" }, 500);
           }
         }
         return json({ error: "forbidden" }, 403);
@@ -1026,7 +1027,8 @@ var src_default = {
             });
             aiResp = await r.json();
           } catch (e) {
-            return json({ error: "AI request failed: " + String(e) }, 502);
+            console.error("AI request failed", path, e);
+            return json({ error: "AI request failed" }, 502);
           }
           if (aiResp.error)
             return json({ error: "AI error: " + (aiResp.error.message || JSON.stringify(aiResp.error)) }, 502);
@@ -1125,7 +1127,8 @@ ${context}`;
             });
             aiResp2 = await r.json();
           } catch (e) {
-            return json({ error: "AI request failed: " + String(e) }, 502);
+            console.error("AI request failed", path, e);
+            return json({ error: "AI request failed" }, 502);
           }
           if (aiResp2.error)
             return json({ error: "AI error: " + (aiResp2.error.message || JSON.stringify(aiResp2.error)) }, 502);
@@ -1322,7 +1325,8 @@ ${context}`;
         }
         return json({ error: "not found" }, 404);
       } catch (e) {
-        return json({ error: String(e) }, 500);
+        console.error("api error", path, e);
+        return json({ error: "server error" }, 500);
       }
     }
     return env.ASSETS.fetch(request);

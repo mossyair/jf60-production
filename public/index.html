@@ -418,9 +418,13 @@ async function api(path, body){
   return r.json();
 }
 let stateLoaded = false;
-async function refresh(){
-  try {
-    const s = await api("state");
+// file links authenticate with a short-lived HttpOnly cookie, never the key in the URL
+let sessionAt = 0;
+async function ensureSession(){
+  if(Date.now()-sessionAt < 3600e3) return;
+  try{ await api("session",{}); sessionAt = Date.now(); }catch(e){}
+}
+function applyState(s){
     data.segments = s.segments; data.people = s.people; data.checklist = s.checklist;
     data.venues = s.venues || [];
     data.contacts = s.contacts || [];
@@ -438,6 +442,11 @@ async function refresh(){
     ROLE = s.level;
     stateLoaded = true;
     render();
+}
+async function refresh(){
+  try {
+    applyState(await api("state"));
+    ensureSession();
   } catch(e){ toast("Connection issue — retrying…", true); }
 }
 
@@ -451,15 +460,12 @@ async function tryEnter(){
   if(!KEY){ document.getElementById("gateErr").textContent="Enter a key."; return; }
   try {
     const s = await api("state");
-    ROLE = s.level; data.segments=s.segments; data.people=s.people; data.checklist=s.checklist;
-    data.venues=s.venues||[];
-    data.contacts=s.contacts||[];
-    data.timeline=s.timeline||[];
+    if(!s || !s.level) throw new Error("rejected");
     try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){}
-    data.team=s.team||[];
     document.getElementById("gate").style.display="none";
     document.getElementById("main").style.display="block";
-    render();
+    await ensureSession();
+    applyState(s);
   } catch(e){
     document.getElementById("gateErr").textContent = "That key wasn't accepted.";
   }
@@ -1033,7 +1039,7 @@ async function loadSegFiles(id){
     if(!files.length){ box.innerHTML=`<div class="save-hint">No files attached yet.</div>`; return; }
     box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dotted var(--line);font-size:13px;">
       <span>📄</span>
-      <a href="/api/files/download?id=${f.id}&k=${encodeURIComponent(KEY)}" style="flex:1;color:var(--sky);text-decoration:none;">${esc(f.filename)}</a>
+      <a href="/api/files/download?id=${f.id}" style="flex:1;color:var(--sky);text-decoration:none;">${esc(f.filename)}</a>
       <span style="font-size:11px;color:var(--ink-soft);">${fmtSize(f.size)}</span>
       <button class="del-btn" data-sfid="${f.id}">×</button></div>`).join('');
     box.querySelectorAll("[data-sfid]").forEach(b=>b.onclick=async()=>{ if(!confirm("Delete this file?"))return;
@@ -1111,7 +1117,7 @@ async function refreshFileList(section){
     <div class="loose-item">
       <div style="grid-column:1;font-size:16px;">📄</div>
       <div class="litext" style="cursor:default;">
-        <a href="/api/files/download?id=${f.id}&k=${encodeURIComponent(KEY)}" style="color:var(--sky);text-decoration:none;font-weight:600;">${esc(f.filename)}</a>
+        <a href="/api/files/download?id=${f.id}" style="color:var(--sky);text-decoration:none;font-weight:600;">${esc(f.filename)}</a>
         <span class="ctx">${fmtSize(f.size)}${f.segment_id?` · ${esc(segLabel(f.segment_id))}`:''}${f.uploaded_by?` · ${esc(f.uploaded_by)}`:''}</span>
       </div>
       <div class="lmeta"><button class="del-btn" data-fid="${f.id}" title="Delete">×</button></div>
@@ -1590,14 +1596,14 @@ function designBodyHtml(it){
       <div class="g-lab">${DL("Proof","הגהה")}${latest?` · v${latest.version}`:''}</div>`;
 
   if(latest && latest.file_id){
-    const src=`/api/files/download?id=${latest.file_id}&k=${encodeURIComponent(KEY)}&inline=1`;
+    const src=`/api/files/download?id=${latest.file_id}&inline=1`;
     const isImg=(latest.file_type||'').startsWith('image/');
     html += `<div class="d-proof">
       ${isImg?`<img src="${src}" alt="Proof preview" style="width:100%;display:block;max-height:280px;object-fit:contain;background:var(--parchment);">`
              :`<iframe src="${src}" title="Proof preview" style="width:100%;height:280px;border:none;display:block;"></iframe>`}
       <div style="padding:8px 12px;font-size:11.5px;color:var(--ink-soft);border-top:1px solid var(--line);display:flex;justify-content:space-between;">
         <span>${esc(latest.file_name||'proof')}</span>
-        <a href="/api/files/download?id=${latest.file_id}&k=${encodeURIComponent(KEY)}" target="_blank">open ↗</a>
+        <a href="/api/files/download?id=${latest.file_id}" target="_blank">open ↗</a>
       </div>
     </div>`;
   } else {
@@ -2503,7 +2509,7 @@ function foodBodyHtml(item){
   const dietVal = item[dietField()]||'';
   let html = '';
   if(item.file_id){
-    html += `<div class="food-source">📄 <a href="/api/files/download?id=${item.file_id}&k=${encodeURIComponent(KEY)}" target="_blank">${esc(item.file_name||(he?'קובץ תפריט':'menu file'))}</a> · <a href="#" data-toggle-preview="${item.id}">${he?'הצג תצוגה מקדימה':'show preview'}</a>
+    html += `<div class="food-source">📄 <a href="/api/files/download?id=${item.file_id}" target="_blank">${esc(item.file_name||(he?'קובץ תפריט':'menu file'))}</a> · <a href="#" data-toggle-preview="${item.id}">${he?'הצג תצוגה מקדימה':'show preview'}</a>
       <div class="food-pdf-embed" id="foodPdf-${item.id}" data-loaded="0" data-fileid="${item.file_id}" data-ctype="${esc(item.file_type||'')}"></div>
     </div>`;
   }
@@ -2654,7 +2660,7 @@ function loadFoodPdfPreview(fid){
   if(!fileId) return;
   box.dataset.loaded='1';
   const ctype = box.dataset.ctype||'';
-  const src = `/api/files/download?id=${fileId}&k=${encodeURIComponent(KEY)}&inline=1`;
+  const src = `/api/files/download?id=${fileId}&inline=1`;
   if(ctype.startsWith('image/')){
     box.innerHTML = `<img src="${src}" alt="Menu preview" style="max-width:100%;border:1px solid var(--line);border-radius:4px;margin-top:10px;display:block;">`;
   } else {

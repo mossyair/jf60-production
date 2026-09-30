@@ -8,14 +8,53 @@ var json = /* @__PURE__ */ __name2((data, status = 200) => new Response(JSON.str
   status,
   headers: { "content-type": "application/json", "cache-control": "no-store" }
 }), "json");
-function authLevel(request, env, url) {
-  const token = request.headers.get("x-token") || url.searchParams.get("k") || "";
-  if (env.ADMIN_TOKEN && token === env.ADMIN_TOKEN)
-    return "admin";
-  if (env.EDIT_TOKEN && token === env.EDIT_TOKEN)
-    return "edit";
-  if (env.VIEW_TOKEN && token === env.VIEW_TOKEN)
-    return "view";
+var LEVELS = [["admin", "ADMIN_TOKEN"], ["edit", "EDIT_TOKEN"], ["view", "VIEW_TOKEN"]];
+var SESSION_COOKIE = "jf60_dl";
+var SESSION_TTL = 12 * 3600;
+var enc = new TextEncoder();
+async function sha256(s) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)));
+}
+async function safeEqual(a, b) {
+  const [ha, hb] = await Promise.all([sha256(String(a)), sha256(String(b))]);
+  return crypto.subtle.timingSafeEqual(ha, hb);
+}
+async function hmacHex(secret, msg) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(msg)));
+  return [...sig].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function tokenLevel(token, env) {
+  if (!token)
+    return null;
+  for (const [level, name] of LEVELS) {
+    if (env[name] && await safeEqual(token, env[name]))
+      return level;
+  }
+  return null;
+}
+async function makeSessionCookie(level, env) {
+  const secret = env[LEVELS.find(([l]) => l === level)[1]];
+  const exp = Math.floor(Date.now() / 1e3) + SESSION_TTL;
+  const sig = await hmacHex(secret, `${level}.${exp}`);
+  return `${SESSION_COOKIE}=${level}.${exp}.${sig}; Path=/api/files/download; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL}`;
+}
+async function cookieLevel(request, env) {
+  const m = (request.headers.get("cookie") || "").match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([a-z]+)\\.(\\d+)\\.([0-9a-f]{64})`));
+  if (!m)
+    return null;
+  const [, level, exp, sig] = m;
+  const entry = LEVELS.find(([l]) => l === level);
+  if (!entry || !env[entry[1]] || +exp < Date.now() / 1e3)
+    return null;
+  return await safeEqual(sig, await hmacHex(env[entry[1]], `${level}.${exp}`)) ? level : null;
+}
+async function authLevel(request, env, url) {
+  const level = await tokenLevel(request.headers.get("x-token") || "", env);
+  if (level)
+    return level;
+  if (url.pathname === "/api/files/download" && request.method === "GET")
+    return await cookieLevel(request, env);
   return null;
 }
 __name(authLevel, "authLevel");
@@ -64,9 +103,14 @@ var src_default = {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path.startsWith("/api/")) {
-      const level = authLevel(request, env, url);
+      const level = await authLevel(request, env, url);
       if (!level)
         return json({ error: "unauthorized" }, 401);
+      if (path === "/api/session" && request.method === "POST") {
+        const res = json({ ok: true, level });
+        res.headers.append("set-cookie", await makeSessionCookie(level, env));
+        return res;
+      }
       const admin = level === "admin";
       if (level === "view") {
         if (path === "/api/state" && request.method === "GET") {

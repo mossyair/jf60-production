@@ -12,3 +12,5 @@ jf60-backups/
 *-full.sql
 *.export.sql
 .dev.vars*
+
+.claude/settings.local.json

@@ -10,6 +10,25 @@ var json = /* @__PURE__ */ __name2((data, status = 200) => new Response(JSON.str
 }), "json");
 var GUEST_PII_FIELDS = ["email", "phone", "city", "country", "passport_no", "passport_country", "is_israeli"];
 var GUEST_OPS_COLUMNS = ["id", "party_id", "first_name", "last_name", "desk", "ptype", "dietary", "dietary_severe", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "guest_note", "note_handled", "is_lead", "needs_review", "review_note", "status", "updated_at"];
+var UPLOAD_SECTIONS = ["content", "general", "proof", "menu"];
+var MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+var UPLOAD_TYPES = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  csv: "text/csv",
+  txt: "text/plain"
+};
+var INLINE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];
 var LEVELS = [["admin", "ADMIN_TOKEN"], ["edit", "EDIT_TOKEN"], ["view", "VIEW_TOKEN"]];
 var SESSION_COOKIE = "jf60_dl";
 var SESSION_TTL = 12 * 3600;
@@ -507,16 +526,24 @@ var src_default = {
           if (!file || typeof file === "string")
             return json({ error: "no file" }, 400);
           const section = (form.get("section") || "general").toString();
-          const segId = form.get("segment_id") ? form.get("segment_id").toString() : null;
+          if (!UPLOAD_SECTIONS.includes(section))
+            return json({ error: "bad section" }, 400);
+          if (!file.size || file.size > MAX_UPLOAD_BYTES)
+            return json({ error: "file must be under 25 MB" }, 413);
+          const name = (file.name || "upload").replace(/[\/\\\x00-\x1f\x7f]/g, "_").slice(0, 200);
+          const ext = (name.match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase();
+          const ctype = UPLOAD_TYPES[ext];
+          if (!ctype)
+            return json({ error: "file type not allowed (PDF, images, Office documents, CSV or text only)" }, 415);
+          const segId = form.get("segment_id") ? form.get("segment_id").toString().slice(0, 100) : null;
           const by = (form.get("by") || "").toString().slice(0, 60);
-          const name = (file.name || "upload").slice(0, 200);
           const key = `${section}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${name}`;
           await env.BUCKET.put(key, file.stream(), {
-            httpMetadata: { contentType: file.type || "application/octet-stream" }
+            httpMetadata: { contentType: ctype }
           });
           const r = await env.DB.prepare(
             "INSERT INTO files (r2_key, filename, content_type, size, section, segment_id, uploaded_by) VALUES (?,?,?,?,?,?,?)"
-          ).bind(key, name, file.type || "", file.size || 0, section, segId, by).run();
+          ).bind(key, name, ctype, file.size, section, segId, by).run();
           return json({ ok: true, id: r.meta.last_row_id });
         }
         if (path === "/api/files/download" && request.method === "GET") {
@@ -530,9 +557,12 @@ var src_default = {
           const obj = await env.BUCKET.get(row.r2_key);
           if (!obj)
             return json({ error: "file missing in storage" }, 404);
+          const ctype = (row.content_type || "").toLowerCase();
+          const safeInline = inline && INLINE_TYPES.includes(ctype);
           const headers = new Headers();
-          headers.set("content-type", row.content_type || "application/octet-stream");
-          headers.set("content-disposition", `${inline ? "inline" : "attachment"}; filename="${row.filename.replace(/"/g, "")}"`);
+          headers.set("content-type", safeInline ? ctype : ctype || "application/octet-stream");
+          headers.set("content-disposition", `${safeInline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(row.filename)}`);
+          headers.set("x-content-type-options", "nosniff");
           headers.set("cache-control", "private, max-age=60");
           return new Response(obj.body, { headers });
         }

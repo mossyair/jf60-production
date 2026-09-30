@@ -8,6 +8,8 @@ var json = /* @__PURE__ */ __name2((data, status = 200) => new Response(JSON.str
   status,
   headers: { "content-type": "application/json", "cache-control": "no-store" }
 }), "json");
+var GUEST_PII_FIELDS = ["email", "phone", "city", "country", "passport_no", "passport_country", "is_israeli"];
+var GUEST_OPS_COLUMNS = ["id", "party_id", "first_name", "last_name", "desk", "ptype", "dietary", "dietary_severe", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "guest_note", "note_handled", "is_lead", "needs_review", "review_note", "status", "updated_at"];
 var LEVELS = [["admin", "ADMIN_TOKEN"], ["edit", "EDIT_TOKEN"], ["view", "VIEW_TOKEN"]];
 var SESSION_COOKIE = "jf60_dl";
 var SESSION_TTL = 12 * 3600;
@@ -201,7 +203,8 @@ var src_default = {
           }
           let guests = { results: [] };
           try {
-            guests = await env.DB.prepare("SELECT * FROM guests ORDER BY last_name, first_name").all();
+            const cols = admin ? "*" : GUEST_OPS_COLUMNS.join(", ");
+            guests = await env.DB.prepare(`SELECT ${cols} FROM guests ORDER BY last_name, first_name`).all();
           } catch (e) {
           }
           let guestSessions = { results: [] };
@@ -717,6 +720,8 @@ var src_default = {
           const allowed = ["first_name", "last_name", "desk", "ptype", "email", "phone", "city", "country", "passport_no", "passport_country", "dietary", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "guest_note", "review_note", "status"];
           if (!b.id || !allowed.includes(b.field))
             return json({ error: "bad field" }, 400);
+          if (!admin && GUEST_PII_FIELDS.includes(b.field))
+            return json({ error: "admin required" }, 403);
           await env.DB.prepare(`UPDATE guests SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind((b.value ?? "").toString().slice(0, 4e3), b.id).run();
           return json({ ok: true });
         }
@@ -725,6 +730,8 @@ var src_default = {
           const allowed = ["note_handled", "needs_review", "dietary_severe", "is_israeli"];
           if (!b.id || !allowed.includes(b.field))
             return json({ error: "bad field" }, 400);
+          if (!admin && GUEST_PII_FIELDS.includes(b.field))
+            return json({ error: "admin required" }, 403);
           await env.DB.prepare(`UPDATE guests SET ${b.field}=? WHERE id=?`).bind(b.value ? 1 : 0, b.id).run();
           return json({ ok: true });
         }

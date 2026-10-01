@@ -337,7 +337,7 @@ const DATA = {"seg_he": [{"id": "d1-welcome", "title_he": "קבלת פנים, ד
 /* ============================ i18n ============================ */
 const T = {
  en:{ home:'Home', program:'Program', people:'People', logistics:'Logistics', production:'Production', inbox:'Inbox', print:'Print center', settings:'Access & activity',
-   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', ask:'Ask', askH:'Ask about the project', askPh:'e.g. What’s still open for day 2? Which transport runs have no driver?', askEmpty:'Ask anything about the program, logistics, design or guests. Answers come from the live data.', askThinking:'Looking through the data…', askClear:'Start a new conversation', askNote:'Answers can be wrong, so check before you act on them. Guests are included as numbers only, never names or contact details. Asking never changes anything; use Suggest changes for that.', askFail:'Couldn’t get an answer', askRefused:'The assistant declined to answer this one. Try rephrasing it.', askEmptyAnswer:'No answer came back. Try again.', aiAdminOnly:'Only admins can apply these. Ask an admin to suggest the same change.', suggest:'Suggest changes', aiH:'Describe a change, review it, then apply', aiAsk:'What should change?', aiPh:'e.g. Add production to-dos for the gala concert, or move the Beit Hanina visit to 16:00', aiGo:'Suggest', aiNote:'Nothing changes until you apply.', aiApply:'Apply selected', aiDiscard:'Discard', aiNone:'No changes were proposed. Try saying which session it is about.', aiFail:'Couldn’t get suggestions', aiPick:'Tick at least one change', aiDone:'Applied {n} changes', aiTodo:'To-do', aiPerson:'Person', aiNewSession:'New session', aiChange:'Change', aiReword:'Reword', aiTitle:'Title', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
+   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', addRow:'Add row', budgetNote:'The budget sheet from the classic dashboard. Click a cell to change it; Enter saves, Esc cancels. Admins only.', ask:'Ask', askH:'Ask about the project', askPh:'e.g. What’s still open for day 2? Which transport runs have no driver?', askEmpty:'Ask anything about the program, logistics, design or guests. Answers come from the live data.', askThinking:'Looking through the data…', askClear:'Start a new conversation', askNote:'Answers can be wrong, so check before you act on them. Guests are included as numbers only, never names or contact details. Asking never changes anything; use Suggest changes for that.', askFail:'Couldn’t get an answer', askRefused:'The assistant declined to answer this one. Try rephrasing it.', askEmptyAnswer:'No answer came back. Try again.', aiAdminOnly:'Only admins can apply these. Ask an admin to suggest the same change.', suggest:'Suggest changes', aiH:'Describe a change, review it, then apply', aiAsk:'What should change?', aiPh:'e.g. Add production to-dos for the gala concert, or move the Beit Hanina visit to 16:00', aiGo:'Suggest', aiNote:'Nothing changes until you apply.', aiApply:'Apply selected', aiDiscard:'Discard', aiNone:'No changes were proposed. Try saying which session it is about.', aiFail:'Couldn’t get suggestions', aiPick:'Tick at least one change', aiDone:'Applied {n} changes', aiTodo:'To-do', aiPerson:'Person', aiNewSession:'New session', aiChange:'Change', aiReword:'Reword', aiTitle:'Title', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
@@ -350,7 +350,7 @@ const T = {
    runsheet:'Run sheet', sites:'Sites', timeline:'Timeline', myday:'My day', now:'Now', next:'Next', noLead:'No lead', done:'Done', live:'Live'
  },
  he:{ home:'בית', program:'תוכנית', people:'אנשים', logistics:'לוגיסטיקה', production:'הפקה', inbox:'תיבת קבצים', print:'מרכז הדפסה', settings:'הרשאות ופעילות',
-   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', ask:'שאלה', askH:'שאלות על הפרויקט', askPh:'למשל: מה עוד פתוח ביום 2? לאילו הסעות אין נהג?', askEmpty:'אפשר לשאול כל דבר על התוכנית, הלוגיסטיקה, העיצוב או האורחים. התשובות מבוססות על הנתונים החיים.', askThinking:'עובר על הנתונים…', askClear:'שיחה חדשה', askNote:'תשובות יכולות לטעות, לכן כדאי לבדוק לפני שפועלים לפיהן. אורחים נכללים כמספרים בלבד, בלי שמות או פרטי קשר. שאלה לא משנה דבר; לשינויים יש את הצעת שינויים.', askFail:'לא התקבלה תשובה', askRefused:'העוזר סירב לענות על השאלה הזו. נסו לנסח אחרת.', askEmptyAnswer:'לא התקבלה תשובה. נסו שוב.', aiAdminOnly:'רק מנהלים יכולים להחיל את השינויים. בקשו ממנהל להציע את אותו שינוי.', suggest:'הצעת שינויים', aiH:'מתארים שינוי, בודקים ומאשרים', aiAsk:'מה לשנות?', aiPh:'למשל: להוסיף משימות הפקה לקונצרט הגאלה, או להזיז את הביקור בבית חנינא ל-16:00', aiGo:'הצעה', aiNote:'שום דבר לא משתנה עד האישור.', aiApply:'אישור הנבחרים', aiDiscard:'ביטול', aiNone:'לא הוצעו שינויים. נסו לציין על איזה מפגש מדובר.', aiFail:'לא התקבלו הצעות', aiPick:'סמנו לפחות שינוי אחד', aiDone:'הוחלו {n} שינויים', aiTodo:'משימה', aiPerson:'איש/אשת צוות', aiNewSession:'מפגש חדש', aiChange:'שינוי', aiReword:'ניסוח מחדש', aiTitle:'כותרת', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
+   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', addRow:'הוספת שורה', budgetNote:'גיליון התקציב מהדשבורד הקלאסי. לוחצים על תא כדי לשנות; Enter שומר, Esc מבטל. למנהלים בלבד.', ask:'שאלה', askH:'שאלות על הפרויקט', askPh:'למשל: מה עוד פתוח ביום 2? לאילו הסעות אין נהג?', askEmpty:'אפשר לשאול כל דבר על התוכנית, הלוגיסטיקה, העיצוב או האורחים. התשובות מבוססות על הנתונים החיים.', askThinking:'עובר על הנתונים…', askClear:'שיחה חדשה', askNote:'תשובות יכולות לטעות, לכן כדאי לבדוק לפני שפועלים לפיהן. אורחים נכללים כמספרים בלבד, בלי שמות או פרטי קשר. שאלה לא משנה דבר; לשינויים יש את הצעת שינויים.', askFail:'לא התקבלה תשובה', askRefused:'העוזר סירב לענות על השאלה הזו. נסו לנסח אחרת.', askEmptyAnswer:'לא התקבלה תשובה. נסו שוב.', aiAdminOnly:'רק מנהלים יכולים להחיל את השינויים. בקשו ממנהל להציע את אותו שינוי.', suggest:'הצעת שינויים', aiH:'מתארים שינוי, בודקים ומאשרים', aiAsk:'מה לשנות?', aiPh:'למשל: להוסיף משימות הפקה לקונצרט הגאלה, או להזיז את הביקור בבית חנינא ל-16:00', aiGo:'הצעה', aiNote:'שום דבר לא משתנה עד האישור.', aiApply:'אישור הנבחרים', aiDiscard:'ביטול', aiNone:'לא הוצעו שינויים. נסו לציין על איזה מפגש מדובר.', aiFail:'לא התקבלו הצעות', aiPick:'סמנו לפחות שינוי אחד', aiDone:'הוחלו {n} שינויים', aiTodo:'משימה', aiPerson:'איש/אשת צוות', aiNewSession:'מפגש חדש', aiChange:'שינוי', aiReword:'ניסוח מחדש', aiTitle:'כותרת', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
@@ -476,7 +476,7 @@ function sampleInbox(){ return [
 /* ============================ state ============================ */
 const STORE = 'jf60-cr-live';
 let D = seed();
-let LIVE = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
+let LIVE = null, LIVE_GRID = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
 try { KEY = sessionStorage.getItem('jf60k') || ''; NAME = sessionStorage.getItem('jf60n') || ''; } catch(e){}
 const S = { area:'home', tab:{ program:'1', people:'guests', logistics:'ops', production:'design', settings:'access' }, role:'admin', lang:'en', dayof:false, clock:{ day:'20', now:640 }, opsView:'sheet', person:'Hagai', filter:{ guests:'all', contacts:'all', ops:'all' }, q:'' };
 try { const u = JSON.parse(localStorage.getItem(STORE+'-ui')||'{}'); Object.assign(S, u); } catch(e){}
@@ -497,6 +497,7 @@ async function api(path, body){
 /* Edits change the screen right away and queue the matching API call; commit() sends the queue, then reloads */
 let PENDING = [], SAVING = Promise.resolve();
 function send(path, body){ if (LIVE) PENDING.push(typeof path === 'function' ? path : () => api(path, body)); }
+function typingInPage(){ const a = document.activeElement; return !!(a && $('page').contains(a) && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))); }
 function reopenSheet(){
   const sh = $('sheet'); if (!SHEET || !sh.classList.contains('on')) return;
   const a = document.activeElement;
@@ -509,6 +510,7 @@ async function loadLive(){
   const s = await r.json(); if (s.error) throw new Error(s.error);
   LIVE = s; S.role = ({ admin:'admin', edit:'edit', view:'viewer' })[s.level] || 'viewer';
   if (s.level !== 'view') { try { LIVE_FILES = (await api('files')).files || []; } catch(e){ LIVE_FILES = []; } }
+  if (s.level === 'admin') { try { LIVE_GRID = (await api('grid')).tabs || null; } catch(e){ LIVE_GRID = null; } }
   applyLive();
 }
 function applyLive(){
@@ -536,7 +538,7 @@ function applyLive(){
   D = base;
 }
 /* Areas that are not connected to live data yet */
-const SAMPLE = { 'people:crew':1,'people:talent':1,'people:fair':1,'logistics:ops':1,'production:budget':1,'inbox':1,'settings':1 };
+const SAMPLE = { 'people:crew':1,'people:talent':1,'people:fair':1,'logistics:ops':1,'inbox':1,'settings':1 };
 const isSample = (area, tab) => !!(SAMPLE[area] || SAMPLE[area + ':' + tab]);
 function persist(){ try { localStorage.setItem(STORE+'-ui', JSON.stringify({ area:S.area, tab:S.tab, role:S.role, lang:S.lang, dayof:S.dayof, clock:S.clock, opsView:S.opsView, person:S.person, filter:S.filter })); } catch(e){} }
 
@@ -554,7 +556,7 @@ const mins = x => { const [h,m] = x.split(':').map(Number); return h*60+m; };
 const fmt = m => { const d = ((m % 1440) + 1440) % 1440; return String(Math.floor(d/60)).padStart(2,'0') + ':' + String(d%60).padStart(2,'0'); };
 const isAdmin = () => S.role === 'admin', isEdit = () => S.role !== 'viewer', isView = () => S.role === 'viewer';
 const can = {
-  budget: () => isAdmin() || (S.role==='edit' && D.perms.seeBudget),
+  budget: () => isAdmin(),
   transport: () => isEdit(),
   delFiles: () => isEdit(),
   delContacts: () => isEdit(),
@@ -931,7 +933,7 @@ function openOp(id){
 
 /* ============================ PRODUCTION ============================ */
 function viewProduction(){
-  const tabs = [['design',t('design'),D.design.length],['milestones',t('milestones'),D.miles.length],['budget',t('budget'),56],['gifts',t('gifts'),D.gifts.length]].filter(x => x[0] !== 'budget' || can.budget());
+  const tabs = [['design',t('design'),D.design.length],['milestones',t('milestones'),D.miles.length],['budget',t('budget'),LIVE_GRID ? LIVE_GRID.reduce((n,g) => n + (g.rows||[]).length, 0) : 56],['gifts',t('gifts'),D.gifts.length]].filter(x => x[0] !== 'budget' || can.budget());
   if (!tabs.find(x=>x[0]===S.tab.production)) S.tab.production = 'design';
   const tab = S.tab.production;
   let body = '';
@@ -941,11 +943,14 @@ function viewProduction(){
     body = `${isEdit()?`<form class="addrow" id="mileForm" style="margin-bottom:12px"><label class="sr" for="mileIn">New milestone</label><input id="mileIn" placeholder="New milestone"><label class="sr" for="mileDue">Due</label><input id="mileDue" type="date" value="2026-10-12" style="flex:none"><button class="btn sm" type="submit">${t('add')}</button></form>`:''}
     <div class="panel list">${D.miles.slice().sort((a,b)=>a.due.localeCompare(b.due)).map(m => { const n = daysTo(m.due); const late = !m.done && n < 0; return `<div class="li"><input type="checkbox" data-mile="${m.id}" ${m.done?'checked':''} ${isEdit()?'':'disabled'} aria-label="Done" style="width:18px;height:18px;min-height:0;accent-color:var(--good)"><span><div class="t" style="${m.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(m.title)}</div><div class="s">${m.cat} · due ${ddmm(m.due)}</div></span><span style="display:flex;gap:8px;align-items:center">${isEdit()?`<label class="sr" for="own-${m.id}">Owner</label><select id="own-${m.id}" data-owner="${m.id}" style="min-height:32px;padding:3px 6px;font-size:12.5px"><option value="">Owner</option>${CREW.map(c=>c[0]).map(p => `<option ${p===m.owner?'selected':''}>${p}</option>`).join('')}</select>`:''}${m.done?`<span class="chip good">${t('done')}</span>`:late?`<span class="chip bad">${-n}d overdue</span>`:`<span class="chip plain">in ${n}d</span>`}</span></div>`; }).join('')}</div>`;
   } else if (tab === 'budget') {
-    const st = { none:'<span class="chip plain">No quote</span>', quoted:'<span class="chip warn">Quote on file</span>', invoiced:'<span class="chip good">Invoiced</span>' };
-    const tot = D.budget.reduce((s,b)=>s+b.amt,0);
-    body = `<div class="stats"><div class="panel stat"><div class="n num">56</div><div class="s">Lines in the sheet</div></div><div class="panel stat"><div class="n num">${9 + D.budget.filter(b=>b.state!=='none').length}</div><div class="s">With a quote on file</div></div><div class="panel stat"><div class="n num">${1 + D.budget.filter(b=>b.state==='invoiced').length}</div><div class="s">Invoiced</div></div><div class="panel stat"><div class="n num">${ils(tot)}</div><div class="s">These ${D.budget.length} lines, excl. VAT</div></div></div>
-    <div class="panel list">${D.budget.map(b => `<div class="li"><span class="num" style="min-width:84px;font-weight:700">${ils(b.amt)}</span><span><div class="t">${esc(b.title)}</div><div class="s">${esc(b.sup)} · excl. VAT${b.files.length?' · '+b.files.map(esc).join(', '):''}</div></span>${st[b.state]}</div>`).join('')}</div>
-    <p class="note">Six real lines shown; the other 50 import from the “תקציב” tab. Quotes and invoices dropped in the Inbox attach here.</p>`;
+    const tabs = LIVE_GRID || [];
+    const bi = Math.min(+S.tab.budgetTab || 0, Math.max(0, tabs.length - 1)), g = tabs[bi];
+    body = !g ? '<div class="panel empty">No budget sheet yet.</div>' : `<div class="bar"><div class="chips" role="group" aria-label="${t('budget')}">${tabs.map((x,i) => `<button type="button" class="fchip" data-btab="${i}" aria-pressed="${i===bi}">${esc(x.name)} <span class="num" style="opacity:.7">${(x.rows||[]).length}</span></button>`).join('')}</div>
+      ${isAdmin() ? `<button class="btn ghost sm" type="button" id="bAddRow">${t('addRow')}</button>` : ''}</div>
+    <div class="panel tbl-wrap"><table class="tbl" dir="auto"><thead><tr>${(g.columns||[]).map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+      ${(g.rows||[]).map((r,ri) => `<tr>${(g.columns||[]).map((c,ci) => { const v = r[ci] == null ? '' : String(r[ci]); return `<td dir="auto" class="${/^[\d₪,.\s-]+$/.test(v) ? 'num' : ''}" ${isAdmin() ? `contenteditable="plaintext-only" data-cell="${ri}:${ci}" spellcheck="false"` : ''}>${esc(v)}</td>`; }).join('')}</tr>`).join('')}
+    </tbody></table></div>
+    <p class="note">${t('budgetNote')}</p>`;
   } else {
     const cats = [...new Set(D.gifts.map(g=>g.cat))];
     body = `<div class="stats"><div class="panel stat"><div class="n num">${D.gifts.filter(g=>g.chosen).length}/${D.gifts.length}</div><div class="s">Gifts chosen</div></div></div>` + cats.map(c => `<div class="lbl" style="margin:14px 0 8px">${esc(S.lang==='he'?(D.gifts.find(g=>g.cat===c).cat_he||c):c)}</div><div class="panel list">${D.gifts.filter(g=>g.cat===c).map(g => `<label class="li" style="cursor:pointer"><input type="checkbox" data-gift="${g.id}" ${g.chosen?'checked':''} ${isEdit()?'':'disabled'} style="width:18px;height:18px;min-height:0;accent-color:var(--good)"><span class="t">${esc(L(g,'title'))}</span><span class="muted num" style="font-size:12.5px">${g.qty?'× '+esc(g.qty):''}</span></label>`).join('')}</div>`).join('');
@@ -1279,7 +1284,7 @@ function commit(rerender){
     let ok = true;
     for (const op of ops) { try { await op(); } catch(err) { ok = false; toast(t('saveFail') + (err && err.message ? ' (' + err.message + ')' : '')); break; } }
     if (ok) toast(t('saved'));
-    try { await loadLive(); render(); reopenSheet(); } catch(e){}
+    try { await loadLive(); if (!typingInPage()) render(); reopenSheet(); } catch(e){}
   });
 }
 
@@ -1311,6 +1316,18 @@ function render(){
   on('[data-run-open]', 'onclick', b => openRun(b.dataset.runOpen));
   on('[data-food]', 'onclick', b => { const f = D.food.find(x=>x.id===b.dataset.food); const o = ['open','progress','confirmed']; f.status = o[(o.indexOf(f.status)+1)%3]; send('food/field', { id:f.rid, field:'status', value:f.status }); log('Food “' + f.title + '” → ' + f.status); commit(); });
   on('[data-design]', 'onclick', b => openDesign(b.dataset.design));
+  on('[data-btab]', 'onclick', b => { S.tab.budgetTab = b.dataset.btab; render(); });
+  p.querySelectorAll('[data-cell]').forEach(td => {
+    const before = td.textContent;
+    td.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); td.blur(); } else if (e.key === 'Escape') { td.textContent = before; td.blur(); } };
+    td.onblur = () => {
+      const v = td.textContent.trim(); if (v === before.trim() || !LIVE_GRID) return;
+      const [ri, ci] = td.dataset.cell.split(':').map(Number), g = LIVE_GRID[+S.tab.budgetTab || 0];
+      const row = g.rows[ri]; while (row.length <= ci) row.push(''); row[ci] = v;
+      send('grid', { tabs:LIVE_GRID, by:NAME }); log('Budget · ' + g.name + ' · ' + (g.columns[ci]||'') + ' → ' + v); commit(false);
+    };
+  });
+  const bar = $('bAddRow'); if (bar) bar.onclick = () => { const g = LIVE_GRID[+S.tab.budgetTab || 0]; g.rows.push((g.columns||[]).map(() => '')); send('grid', { tabs:LIVE_GRID, by:NAME }); log('Budget · ' + g.name + ' · new row'); commit(); };
   on('[data-mile]', 'onchange', b => { const m = D.miles.find(x=>x.id===b.dataset.mile); m.done = b.checked; send('timeline/toggle', { id:m.rid }); log((m.done?'Completed milestone ':'Reopened milestone ') + '“' + m.title + '”'); commit(); });
   on('[data-owner]', 'onchange', s => { const m = D.miles.find(x=>x.id===s.dataset.owner); m.owner = s.value; send('timeline/assign', { id:m.rid, owner:s.value }); log('Assigned ' + (m.owner||'nobody') + ' to “' + m.title + '”'); commit(); });
   on('[data-gift]', 'onchange', b => { const g = D.gifts.find(x=>x.id===b.dataset.gift); g.chosen = b.checked; send('gift/chosen', { id:g.rid, chosen:b.checked }); log((g.chosen?'Chose gift ':'Unchose gift ') + g.title); commit(); });
@@ -1530,7 +1547,7 @@ document.addEventListener('dragover', e => { if (can.file() && e.dataTransfer &&
 document.addEventListener('drop', e => { if (e.target.closest && e.target.closest('#drop')) return; if (can.file() && e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
 
 $('page').innerHTML = '<div class="empty">Loading live data…</div>';
-setInterval(() => { if (LIVE && document.visibilityState === 'visible' && !$('sheet').classList.contains('on') && $('pal').hidden) loadLive().then(render).catch(() => {}); }, 60000);
+setInterval(() => { if (LIVE && document.visibilityState === 'visible' && !$('sheet').classList.contains('on') && $('pal').hidden && !typingInPage()) loadLive().then(render).catch(() => {}); }, 60000);
 const afterLogin = () => { api('session', {}).catch(() => {}); render(); };
 if (!KEY) showGate();
 else loadLive().then(afterLogin).catch(err => showGate(String(err && err.message) === 'unauthorized' ? 'That key wasn’t accepted.' : 'Couldn’t load the live data. Try again.'));

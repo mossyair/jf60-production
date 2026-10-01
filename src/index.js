@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -119,6 +120,109 @@ Rules:
 - NEVER include payment terms, cancellation policy, minimum spend, service fees, or tip/gratuity information \u2014 menu content only.
 - Keep each item's "name" to the dish name plus a short description if the source gives one. The user message specifies which language to write the output in.
 - If the document is not a menu, or has no readable menu content, respond with exactly: []`;
+// ---- AI questions (Control Room): answers from the live data, never changes it ----
+// Guests are sent as counts only: no names, emails, phones or passport details.
+var AI_ASK_MODEL = "claude-opus-5-5";
+var AI_ASK_SYSTEM = `You answer questions from the production team of the Jerusalem Foundation's 60th anniversary conference ("Jerusalem — Yesterday, Today and Tomorrow"), held 20–22 October 2026 in Jerusalem. The current production data is attached as JSON.
+
+Answer from that data only. If it doesn't contain the answer, say so plainly and, if useful, say where in the Control Room it would be recorded. Reply in the language of the question (Hebrew or English).
+
+How to read the data:
+- day 1 = Tue 20.10, day 2 = Wed 21.10, day 3 = Thu 22.10. A time after midnight (00:15) belongs to the evening before.
+- Session, food and to-do status: open, progress (in progress), confirmed. Transport status: no_driver, to_confirm, booked, needs_decision. Design status: content_missing, in_design, awaiting_approval, approved, changes, no_design, unresolved.
+- todos and people_per_session link to sessions by segment_id. done = 1 means done.
+- guest_summary has counts only. Individual guests aren't included, so for questions about a named guest, point to People → Guests.
+
+Keep answers short and easy to scan: a sentence or two, or a short list using "- " bullets. Plain text only, no headings, tables or bold. Name sessions, times and venues as the data does.
+
+You can't change anything. If someone asks you to make a change, tell them to use "Suggest changes", which turns a request into changes an admin can review and apply.`;
+async function buildAskContext(env, level) {
+  const q = /* @__PURE__ */ __name(async (sql) => {
+    try {
+      return (await env.DB.prepare(sql).all()).results;
+    } catch (e) {
+      return [];
+    }
+  }, "q");
+  const ctx = {};
+  ctx.sessions = await q("SELECT id, day, time, end_time, title, title_he, venue, venue_he, descr, status, notes, brief_av, notes_speaker, notes_logistics FROM segments ORDER BY day, time, sort_order");
+  ctx.transport_runs = await q("SELECT id, day, depart_time, arrive_time, title, destination, status, driver, company, vehicles, notes FROM transport_runs ORDER BY day, sort_order");
+  if (level !== "view") {
+    ctx.todos = await q("SELECT segment_id, text, done, owner FROM checklist");
+    ctx.people_per_session = await q("SELECT segment_id, name, confirmed FROM people");
+    ctx.milestones = await q("SELECT due_date, title, category, owner, done FROM timeline ORDER BY due_date");
+    ctx.food = await q("SELECT id, day, time, end_time, title, venue, meal_type, status, caterer, headcount, dietary_note, notes FROM food_items ORDER BY day, sort_order");
+    ctx.design_print = await q("SELECT title, category, status, deadline, qty, supplier, notes FROM design_items ORDER BY sort_order");
+    ctx.gifts = await q("SELECT title, category, chosen, qty, status FROM gift_items ORDER BY sort_order");
+    ctx.contacts = await q("SELECT name, role, venue FROM contacts");
+    ctx.team = await q("SELECT name, role FROM team");
+    const g = await q("SELECT desk, hotel, dietary, dietary_severe, needs_review, passport_no FROM guests WHERE status='active'");
+    const tally = /* @__PURE__ */ __name((key) => g.reduce((m, r) => {
+      const k = (r[key] || "").toString().trim() || "(none recorded)";
+      m[k] = (m[k] || 0) + 1;
+      return m;
+    }, {}), "tally");
+    ctx.guest_summary = {
+      total: g.length,
+      by_hotel: tally("hotel"),
+      by_desk: tally("desk"),
+      by_dietary_need: tally("dietary"),
+      severe_allergies: g.filter((r) => r.dietary_severe).length,
+      flagged_for_review: g.filter((r) => r.needs_review).length
+    };
+    if (level === "admin")
+      ctx.guest_summary.missing_passport_number = g.filter((r) => !r.passport_no).length;
+  }
+  return ctx;
+}
+__name(buildAskContext, "buildAskContext");
+async function handleAsk(request, env, level) {
+  if (!env.ANTHROPIC_API_KEY)
+    return json({ error: "AI not configured — set ANTHROPIC_API_KEY secret" }, 500);
+  const b = await readBody(request);
+  const question = (b.question || "").toString().slice(0, 2e3).trim();
+  if (!question)
+    return json({ error: "empty question" }, 400);
+  const messages = [];
+  for (const turn of (Array.isArray(b.history) ? b.history : []).slice(-6)) {
+    const tq = (turn && turn.q || "").toString().slice(0, 2e3).trim();
+    const ta = (turn && turn.a || "").toString().slice(0, 6e3).trim();
+    if (tq && ta)
+      messages.push({ role: "user", content: tq }, { role: "assistant", content: ta });
+  }
+  messages.push({ role: "user", content: question });
+  const ctx = await buildAskContext(env, level);
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  let msg;
+  try {
+    msg = await client.beta.messages.create({
+      model: AI_ASK_MODEL,
+      max_tokens: 16e3,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      system: [
+        { type: "text", text: AI_ASK_SYSTEM },
+        { type: "text", text: "Current production data (JSON):\n" + JSON.stringify(ctx), cache_control: { type: "ephemeral" } }
+      ],
+      messages
+    });
+  } catch (e) {
+    if (e instanceof Anthropic.RateLimitError)
+      return json({ error: "The assistant is busy. Try again in a minute." }, 429);
+    if (e instanceof Anthropic.APIError) {
+      console.error("ai ask", e.status, e.message);
+      return json({ error: "The assistant couldn't answer right now." }, 502);
+    }
+    throw e;
+  }
+  if (msg.stop_reason === "refusal")
+    return json({ answer: "", refused: true });
+  const answer = msg.content.filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+  return json({ answer, truncated: msg.stop_reason === "max_tokens" });
+}
+__name(handleAsk, "handleAsk");
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -169,6 +273,8 @@ var src_default = {
             return json({ error: "server error" }, 500);
           }
         }
+        if (path === "/api/ai/ask" && request.method === "POST")
+          return await handleAsk(request, env, "view");
         return json({ error: "forbidden" }, 403);
       }
       try {
@@ -1069,9 +1175,11 @@ var src_default = {
           await env.DB.prepare(`UPDATE food_items SET ${targetCol}=? WHERE id=?`).bind(menuJson, b.food_id).run();
           return json({ ok: true, menu: clean });
         }
+        if (path === "/api/ai/ask" && request.method === "POST") {
+          return await handleAsk(request, env, level);
+        }
+        // editors may propose changes; applying them stays admin-only (/api/ai/apply)
         if (path === "/api/ai/propose" && request.method === "POST") {
-          if (!admin)
-            return json({ error: "admin required" }, 403);
           if (!env.ANTHROPIC_API_KEY)
             return json({ error: "AI not configured \u2014 set ANTHROPIC_API_KEY secret" }, 500);
           const b = await readBody(request);

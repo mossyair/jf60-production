@@ -131,6 +131,8 @@ How to read the data:
 - day 1 = Tue 20.10, day 2 = Wed 21.10, day 3 = Thu 22.10. A time after midnight (00:15) belongs to the evening before.
 - Session, food and to-do status: open, progress (in progress), confirmed. Transport status: no_driver, to_confirm, booked, needs_decision. Design status: content_missing, in_design, awaiting_approval, approved, changes, no_design, unresolved.
 - todos and people_per_session link to sessions by segment_id. done = 1 means done.
+- crew_schedule: day is the date in October (19-22); start_min/end_min are minutes from midnight (past 1440 means after midnight); crew_json lists people as n (name, or a number for a headcount like "2" runners) and r (role), with n "?" meaning nobody is assigned yet; flag is an open issue.
+- talent_contracts (admins only): stage is contacted, quote, signed or invoiced; fee is in ILS including VAT.
 - guest_summary has counts only. Individual guests aren't included, so for questions about a named guest, point to People → Guests.
 
 Keep answers short and easy to scan: a sentence or two, or a short list using "- " bullets. Plain text only, no headings, tables or bold. Name sessions, times and venues as the data does.
@@ -156,6 +158,9 @@ async function buildAskContext(env, level) {
     ctx.gifts = await q("SELECT title, category, chosen, qty, status FROM gift_items ORDER BY sort_order");
     ctx.contacts = await q("SELECT name, role, venue FROM contacts");
     ctx.team = await q("SELECT name, role FROM team");
+    ctx.crew_schedule = await q("SELECT day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min");
+    if (level === "admin")
+      ctx.talent_contracts = await q("SELECT title, stage, fee, notes FROM talent_items ORDER BY sort_order");
     const g = await q("SELECT desk, hotel, dietary, dietary_severe, needs_review, passport_no FROM guests WHERE status='active'");
     const tally = /* @__PURE__ */ __name((key) => g.reduce((m, r) => {
       const k = (r[key] || "").toString().trim() || "(none recorded)";
@@ -367,6 +372,18 @@ var src_default = {
             runStops = await env.DB.prepare("SELECT * FROM run_stops ORDER BY run_id, sort_order").all();
           } catch (e) {
           }
+          let crewShifts = { results: [] };
+          try {
+            crewShifts = await env.DB.prepare("SELECT * FROM crew_shifts ORDER BY day, start_min, sort_order").all();
+          } catch (e) {
+          }
+          let talentItems = { results: [] };
+          if (admin) {
+            try {
+              talentItems = await env.DB.prepare("SELECT * FROM talent_items ORDER BY sort_order").all();
+            } catch (e) {
+            }
+          }
           return json({
             level,
             segments: segs.results,
@@ -384,7 +401,9 @@ var src_default = {
             design_proofs: designProofs.results,
             transport_runs: runs.results,
             run_stops: runStops.results,
-            gift_items: giftItems.results
+            gift_items: giftItems.results,
+            crew_shifts: crewShifts.results,
+            talent_items: talentItems.results
           });
         }
         if (path === "/api/segment/status" && request.method === "POST") {
@@ -1432,6 +1451,48 @@ ${context}`;
         if (path === "/api/timeline/toggle" && request.method === "POST") {
           const b = await readBody(request);
           await env.DB.prepare("UPDATE timeline SET done = 1 - done WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/crew/field" && request.method === "POST") {
+          const b = await readBody(request);
+          const anyEditor = ["done"];
+          const adminOnly = ["crew_json", "flag", "note", "title", "site", "kind", "day", "start_min", "end_min"];
+          if (!b.id || ![...anyEditor, ...adminOnly].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          if (adminOnly.includes(b.field) && !admin)
+            return json({ error: "admin required" }, 403);
+          let value = b.value;
+          if (b.field === "done")
+            value = b.value ? 1 : 0;
+          else if (b.field === "start_min" || b.field === "end_min")
+            value = Math.max(0, Math.min(2880, parseInt(b.value) || 0));
+          else if (b.field === "crew_json") {
+            let arr;
+            try {
+              arr = JSON.parse(b.value);
+            } catch (e) {
+              arr = null;
+            }
+            if (!Array.isArray(arr))
+              return json({ error: "crew must be a list" }, 400);
+            value = JSON.stringify(arr.slice(0, 30).map((c) => ({ n: String(c && c.n || "?").slice(0, 60), r: String(c && c.r || "").slice(0, 60) })));
+          } else
+            value = (value ?? "").toString().slice(0, 1e3);
+          await env.DB.prepare(`UPDATE crew_shifts SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/talent/field" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          if (!b.id || !["stage", "fee", "title", "notes"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          let value = (b.value ?? "").toString().slice(0, 1e3);
+          if (b.field === "stage" && !["contacted", "quote", "signed", "invoiced"].includes(value))
+            return json({ error: "bad stage" }, 400);
+          if (b.field === "fee")
+            value = value.trim() === "" ? null : parseInt(value.replace(/[^\d]/g, "")) || null;
+          await env.DB.prepare(`UPDATE talent_items SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/timeline/delete" && request.method === "POST") {

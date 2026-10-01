@@ -429,8 +429,8 @@ const OPS_BASE = [
  ['22',1410,1740,'Overnight strike','Tower of David','strike',[C('?','Build lead')],'Strike lead not named']];
 const TALENT_BASE = [['Panel host · Train Theater','quote',8000],['Performance + workshop · Jerusalem Theater','contacted',28000],['Keynote speaker · Jerusalem Theater','quote',25000],['Yoga · day 2','contacted',400],['Run tour · day 2','contacted',2000],['Round-table keynote','contacted',3000],['Arabic lesson for donors','contacted',600],['Yoga · day 3','contacted',400],['British Trail run','contacted',2000],['TED-style build · Science Museum','quote',null],['Main performance · gala','quote',null],['Additional booking','contacted',null]];
 const BUDGET_BASE = [['Coffee & pastries','Peacock + Talbiye',23500],['Sound','Schuster',15000],['Sound technician · 3 days','Schuster',9000],['Double-decker bus','TBC',10000],['Dedicated cleaner','TBC',4000],['Water & soda for rides','TBC',3000]];
-const CREW = [['Hagai','Sound · site manager'],['Uri','Transport · Tower of David'],['Natali','Furniture'],['Carmi','Food'],['Moss','Food · producer'],['Yair','Design & print'],['Kosta','Site manager · Ein Yael'],['Yarden','Site manager · Cinematheque'],['Elnatan','Site manager · unconfirmed']];
-const LEADERS = [['Mishkenot Sha’ananim','Yaara'],['King David','Maichuk'],['Inbal','Tali Sasson'],['Dan Panorama','Si Agai']];
+let CREW = [['Hagai','Sound · site manager'],['Uri','Transport · Tower of David'],['Natali','Furniture'],['Carmi','Food'],['Moss','Food · producer'],['Yair','Design & print'],['Kosta','Site manager · Ein Yael'],['Yarden','Site manager · Cinematheque'],['Elnatan','Site manager · unconfirmed']];
+let LEADERS = [['Mishkenot Sha’ananim','Yaara'],['King David','Maichuk'],['Inbal','Tali Sasson'],['Dan Panorama','Si Agai']];
 const CONTACTS_BASE = [['Schuster','Supplier','Sound, AV & lighting'],['Peacock','Supplier','Coffee & pastries'],['Talbiye','Supplier','Coffee & pastries'],['Nir Bavli','Supplier','Catering · Ein Yael'],['Mishkenot Sha’ananim','Venue','Days 1–3 base'],['Train Theater','Venue','Day 1 plenary'],['Jerusalem Theater','Venue','Opening evening'],['HaMiffal','Venue','Art fair & dinner'],['Cinematheque Jerusalem','Venue','Day 3 morning'],['Bloomfield Science Museum','Venue','Think tank'],['Tower of David','Venue','Closing gala']];
 const HOTELS = ['Mishkenot Sha’ananim','Inbal','King David','Dan Panorama'];
 const MOODBOARD_URL = '__MOODBOARD_URL__';
@@ -476,7 +476,7 @@ function sampleInbox(){ return [
 /* ============================ state ============================ */
 const STORE = 'jf60-cr-live';
 let D = seed();
-let LIVE = null, LIVE_GRID = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
+let LIVE = null, LIVE_HAS = {}, LIVE_GRID = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
 try { KEY = sessionStorage.getItem('jf60k') || ''; NAME = sessionStorage.getItem('jf60n') || ''; } catch(e){}
 const S = { area:'home', tab:{ program:'1', people:'guests', logistics:'ops', production:'design', settings:'access' }, role:'admin', lang:'en', dayof:false, clock:{ day:'20', now:640 }, opsView:'sheet', person:'Hagai', filter:{ guests:'all', contacts:'all', ops:'all' }, q:'' };
 try { const u = JSON.parse(localStorage.getItem(STORE+'-ui')||'{}'); Object.assign(S, u); } catch(e){}
@@ -534,12 +534,20 @@ function applyLive(){
   }
   const gs = (s.guests||[]).filter(g => (g.status||'active') === 'active');
   if (gs.length) base.guests = gs.map(g => ({ id:'gu'+g.id, rid:g.id, name:[g.first_name, g.last_name].filter(Boolean).join(' '), desk:g.desk||'', hotel:g.hotel||'', dietary:g.dietary||'', severe:!!g.dietary_severe, passport:!!g.passport_no, review:!!g.needs_review, email:g.email||'', phone:g.phone||'', status:'active' }));
+  LIVE_HAS = { ops:(s.crew_shifts||[]).length > 0, talent:(s.talent_items||[]).length > 0, team:(s.team||[]).length > 0 };
+  if (LIVE_HAS.ops) base.ops = s.crew_shifts.map(x => { let crew = []; try { crew = JSON.parse(x.crew_json || '[]'); } catch(e){} return { id:x.id, rid:x.id, day:String(x.day), s:+x.start_min, e:+x.end_min, title:x.title, site:x.site||'', kind:x.kind||'setup', crew, flag:x.flag||'', note:x.note||'', done:!!x.done }; });
+  if (LIVE_HAS.talent) base.talent = s.talent_items.map(x => ({ id:x.id, rid:x.id, title:x.title, stage:x.stage||'contacted', fee:x.fee == null ? null : +x.fee }));
+  if (LIVE_HAS.team) {
+    const lead = /^Hotel group leader · /;
+    CREW = s.team.filter(m => !lead.test(m.role||'')).map(m => [m.name, m.role||'']);
+    LEADERS = s.team.filter(m => lead.test(m.role||'')).map(m => [(m.role||'').replace(lead, ''), m.name]);
+  }
   if ((s.gift_items||[]).length) base.gifts = s.gift_items.map(g => ({ id:'g'+g.id, rid:g.id, cat:g.category||'', cat_he:g.category_he||'', title:g.title, title_he:g.title_he||'', chosen:!!g.chosen, qty:g.qty||'' }));
   D = base;
 }
 /* Areas that are not connected to live data yet */
-const SAMPLE = { 'people:crew':1,'people:talent':1,'people:fair':1,'logistics:ops':1,'inbox':1,'settings':1 };
-const isSample = (area, tab) => !!(SAMPLE[area] || SAMPLE[area + ':' + tab]);
+const SAMPLE = { 'people:crew':'team','people:talent':'talent','people:fair':1,'logistics:ops':'ops','inbox':1,'settings':1 };
+const isSample = (area, tab) => { const v = SAMPLE[area] || SAMPLE[area + ':' + tab]; return !!v && !(typeof v === 'string' && LIVE_HAS[v]); };
 function persist(){ try { localStorage.setItem(STORE+'-ui', JSON.stringify({ area:S.area, tab:S.tab, role:S.role, lang:S.lang, dayof:S.dayof, clock:S.clock, opsView:S.opsView, person:S.person, filter:S.filter })); } catch(e){} }
 
 /* ============================ helpers ============================ */
@@ -916,7 +924,7 @@ function viewOps(){
     ${S.opsView!=='me'?`<div class="chips" role="group" aria-label="Filter">${[['all','All'],['crew','Setup & strike'],['guest','Guest program'],['open','Open issues']].map(([k,l]) => `<button type="button" class="fchip" data-of="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>`:''}</div>${v}`;
 }
 function openOp(id){
-  const o = D.ops.find(x => x.id === id);
+  const o = D.ops.find(x => x.id === id); if (!o) return; SHEET = () => openOp(id);
   const lead = o.crew.find(c => c.r === SMR || c.r === 'Build lead');
   openSheet(`<div class="sh-h"><div><div class="lbl"><span class="dot k-${o.kind}" style="margin-inline-end:6px"></span>${o.day}.10 · ${fmt(o.s)}–${fmt(o.e)}${o.e>1440?' · overnight':''}</div><h2>${esc(o.title)}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
   <div class="sh-b"><dl class="kv"><dt>Site</dt><dd>${esc(o.site)}</dd><dt>${t('status')}</dt><dd>${({live:t('live'),past:'Finished',next:'Upcoming',done:t('done')})[opStatus(o)]}</dd></dl>
@@ -926,9 +934,9 @@ function openOp(id){
   ${o.note?`<div class="box"><h3>From the sheet</h3><div style="font-size:13.5px">${esc(o.note)}</div></div>`:''}
   ${isEdit()?`<button class="btn" type="button" id="opDone">${o.done?'Mark not done':'Mark done'}</button>`:''}</div>`);
   const sh = $('sheet');
-  const r = sh.querySelector('#opResolve'); if (r) r.onclick = () => { log('Resolved: ' + o.flag); o.flag = ''; commit(); openOp(id); };
-  const l = sh.querySelector('#opLead'); if (l) l.onchange = () => { lead.n = l.value; if (lead.n !== '?' && /unconfirmed|not named/i.test(o.flag)) o.flag = ''; if (lead.n === '?' && !o.flag) o.flag = lead.r + ' unassigned'; log((lead.n==='?'?'Cleared lead for ':'Assigned ' + lead.n + ' to ') + '“' + o.title + '”'); commit(); openOp(id); };
-  const d = sh.querySelector('#opDone'); if (d) d.onclick = () => { o.done = !o.done; log((o.done?'Marked done: ':'Reopened: ') + o.title); commit(); openOp(id); };
+  const r = sh.querySelector('#opResolve'); if (r) r.onclick = () => { log('Resolved: ' + o.flag); o.flag = ''; send('crew/field', { id:o.rid, field:'flag', value:'' }); commit(); openOp(id); };
+  const l = sh.querySelector('#opLead'); if (l) l.onchange = () => { lead.n = l.value; if (lead.n !== '?' && /unconfirmed|not named/i.test(o.flag)) o.flag = ''; if (lead.n === '?' && !o.flag) o.flag = lead.r + ' unassigned'; send('crew/field', { id:o.rid, field:'crew_json', value:JSON.stringify(o.crew) }); send('crew/field', { id:o.rid, field:'flag', value:o.flag }); log((lead.n==='?'?'Cleared lead for ':'Assigned ' + lead.n + ' to ') + '“' + o.title + '”'); commit(); openOp(id); };
+  const d = sh.querySelector('#opDone'); if (d) d.onclick = () => { o.done = !o.done; send('crew/field', { id:o.rid, field:'done', value:o.done }); log((o.done?'Marked done: ':'Reopened: ') + o.title); commit(); openOp(id); };
 }
 
 /* ============================ PRODUCTION ============================ */
@@ -1301,7 +1309,7 @@ function render(){
   on('[data-t]', 'onclick', b => { S.tab[b.dataset.t] = b.dataset.k; render(); });
   on('[data-ev]', 'onclick', b => openEvent(b.dataset.ev));
   on('[data-op]', 'onclick', b => openOp(b.dataset.op));
-  on('[data-opdone]', 'onclick', b => { const o = D.ops.find(x=>x.id===b.dataset.opdone); o.done = !o.done; log((o.done?'Marked done: ':'Reopened: ') + o.title); commit(); });
+  on('[data-opdone]', 'onclick', b => { const o = D.ops.find(x=>x.id===b.dataset.opdone); o.done = !o.done; send('crew/field', { id:o.rid, field:'done', value:o.done }); log((o.done?'Marked done: ':'Reopened: ') + o.title); commit(); });
   on('[data-opsv]', 'onclick', b => { S.opsView = b.dataset.opsv; render(); });
   on('[data-of]', 'onclick', b => { S.filter.ops = b.dataset.of; render(); });
   on('[data-gf]', 'onclick', b => { S.filter.guests = b.dataset.gf; render(); });
@@ -1309,7 +1317,7 @@ function render(){
   on('[data-guest]', 'onclick', b => openGuest(b.dataset.guest));
   p.querySelectorAll('[data-guest]').forEach(r => r.onkeydown = e => { if (e.key === 'Enter') openGuest(r.dataset.guest); });
   on('[data-crew]', 'onclick', b => { S.person = b.dataset.crew; S.opsView = 'me'; go('logistics','ops'); });
-  on('[data-tmove]', 'onclick', b => { const x = D.talent.find(y=>y.id===b.dataset.tmove); const o = ['contacted','quote','signed','invoiced']; x.stage = o[Math.max(0, Math.min(3, o.indexOf(x.stage) + +b.dataset.dir))]; log('Moved “' + x.title + '” to ' + x.stage); commit(); });
+  on('[data-tmove]', 'onclick', b => { const x = D.talent.find(y=>y.id===b.dataset.tmove); const o = ['contacted','quote','signed','invoiced']; x.stage = o[Math.max(0, Math.min(3, o.indexOf(x.stage) + +b.dataset.dir))]; send('talent/field', { id:x.rid, field:'stage', value:x.stage }); log('Moved “' + x.title + '” to ' + x.stage); commit(); });
   on('[data-fair]', 'onclick', b => { const o = D.fair.find(x=>x.id===b.dataset.fair); o.confirmed = !o.confirmed; if (o.confirmed) o.contacted = true; log((o.confirmed?'Confirmed ':'Unconfirmed ') + o.name); commit(); });
   on('[data-delc]', 'onclick', b => { const c = D.contacts.find(x=>x.id===b.dataset.delc); if (c && c.rid) send('contact/delete', { id:c.rid }); D.contacts = D.contacts.filter(x=>x!==c); log('Removed contact ' + c.name); commit(); });
   on('[data-run]', 'onclick', b => { const r = D.runs.find(x=>x.id===b.dataset.run); const o = ['no_driver','to_confirm','booked','needs_decision']; r.status = o[(o.indexOf(r.status)+1)%o.length]; send('run/field', { id:r.rid, field:'status', value:r.status }); log('Transport ' + fmt(mins(r.t)) + ' ' + r.title + ' → ' + r.status.replace('_',' ')); commit(); });

@@ -496,10 +496,22 @@ function applyLive(){
   const tl = (s.timeline||[]).filter(m => /^\d{4}-\d\d-\d\d$/.test(m.due_date||''));
   if (tl.length) base.miles = tl.map(m => ({ id:'m'+m.id, due:m.due_date, title:m.title, cat:m.category||'General', done:!!m.done, owner:m.owner||'' }));
   if ((s.contacts||[]).length) base.contacts = s.contacts.map(c => ({ id:'k'+c.id, name:c.name, type:c.venue?'Venue':'Supplier', role:c.role||c.venue||'', phone:c.phone||'' }));
+  // runs after midnight (00:15) belong to the end of the day before
+  const late = t => { const h = +(t||'0').slice(0,2); return h < 5 ? String(h+24) + (t||'00:00').slice(2) : (t||'00:00'); };
+  if ((s.food_items||[]).length) base.food = s.food_items.map(f => ({ id:'f'+f.id, day:+f.day, t:late(f.time), title:f.title, title_he:f.title_he||'', status:f.status||'open', menu:!!(f.file_id || (f.menu_json && f.menu_json !== '[]')) }));
+  if ((s.transport_runs||[]).length) base.runs = s.transport_runs.map(r => ({ id:'r'+r.id, day:+r.day, t:late(r.depart_time), title:r.title, title_he:r.title_he||'', status:r.status||'to_confirm' }));
+  if ((s.design_items||[]).length) {
+    const proofs = s.design_proofs || [];
+    base.design = s.design_items.map(d => ({ id:'d'+d.id, title:d.title, title_he:d.title_he||'', cat:d.category||'print', status:d.status||'content_missing', due:d.deadline||'2026-10-20',
+      proofs: proofs.filter(p => p.item_id === d.id).sort((a,b) => a.version - b.version).map(p => ({ v:p.version, by:p.uploaded_by||'', decision:p.decision||'pending', comment:p.comment||'' })) }));
+  }
+  const gs = (s.guests||[]).filter(g => (g.status||'active') === 'active');
+  if (gs.length) base.guests = gs.map(g => ({ id:'gu'+g.id, name:[g.first_name, g.last_name].filter(Boolean).join(' '), desk:g.desk||'', hotel:g.hotel||'', dietary:g.dietary||'', severe:!!g.dietary_severe, passport:!!g.passport_no, review:!!g.needs_review, email:g.email||'', phone:g.phone||'', status:'active' }));
+  if ((s.gift_items||[]).length) base.gifts = s.gift_items.map(g => ({ id:'g'+g.id, cat:g.category||'', cat_he:g.category_he||'', title:g.title, title_he:g.title_he||'', chosen:!!g.chosen, qty:g.qty||'' }));
   D = base;
 }
 /* Areas that are not connected to live data yet */
-const SAMPLE = { 'people:guests':1,'people:crew':1,'people:talent':1,'people:fair':1,'logistics:ops':1,'logistics:transport':1,'logistics:food':1,'production:design':1,'production:budget':1,'production:gifts':1,'inbox':1,'settings':1 };
+const SAMPLE = { 'people:crew':1,'people:talent':1,'people:fair':1,'logistics:ops':1,'production:budget':1,'inbox':1,'settings':1 };
 const isSample = (area, tab) => !!(SAMPLE[area] || SAMPLE[area + ':' + tab]);
 function persist(){ try { localStorage.setItem(STORE+'-ui', JSON.stringify({ area:S.area, tab:S.tab, role:S.role, lang:S.lang, dayof:S.dayof, clock:S.clock, opsView:S.opsView, person:S.person, filter:S.filter })); } catch(e){} }
 
@@ -756,7 +768,7 @@ function viewPeople(){
     <div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Desk</th><th>Hotel</th><th>Dietary</th>${isAdmin()?'<th>Passport</th>':''}<th></th></tr></thead><tbody>
       ${list.map(g => `<tr class="click" data-guest="${g.id}" tabindex="0"><td>${esc(g.name)}</td><td>${esc(g.desk)}</td><td>${g.hotel?esc(g.hotel):'<span style="color:var(--bad)">Not recorded</span>'}</td><td>${g.severe?`<span class="chip bad">${esc(g.dietary)}</span>`:esc(g.dietary)||'<span class="muted">—</span>'}</td>${isAdmin()?`<td>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing</span>'}</td>`:''}<td>${g.review?'<span class="chip info">Review</span>':''}</td></tr>`).join('')}
     </tbody></table></div>
-    <p class="note">Guest names are placeholders in this prototype; the counts match the live registry. Editors see names, hotels and dietary needs. Passports, phones and emails stay admin only.</p>`;
+    <p class="note">Editors see names, hotels and dietary needs. Passports, phones and emails stay admin only.</p>`;
   } else if (tab === 'crew') {
     body = `<div class="cols even"><section class="panel"><div class="sec-h"><h2>Production crew</h2></div><div class="list">${CREW.map(([n,r]) => { const k = D.ops.filter(o => o.crew.some(c => c.n === n)).length; return `<button type="button" class="li" data-crew="${n}" style="grid-template-columns:36px minmax(0,1fr) auto"><span class="av">${n[0]}</span><span><div class="t">${n}</div><div class="s">${r}</div></span><span class="muted num" style="font-size:12.5px">${k} shifts</span></button>`; }).join('')}</div></section>
     <section class="panel"><div class="sec-h"><h2>Hotel group leaders</h2></div><div class="list">${LEADERS.map(([h,n]) => `<div class="li" style="grid-template-columns:minmax(0,1fr) auto"><span>${h}</span><span class="t">${n}</span></div>`).join('')}</div></section></div>`;
@@ -793,7 +805,7 @@ function openGuest(id){
     <div class="row2"><label class="fld">Hotel<select id="gHotel" ${isEdit()?'':'disabled'}><option value="">Not recorded</option>${[...HOTELS,'Own arrangement'].map(h => `<option ${h===g.hotel?'selected':''}>${h}</option>`).join('')}</select></label>
     <label class="fld">Dietary<input id="gDiet" value="${esc(g.dietary)}" ${isEdit()?'':'disabled'} placeholder="None recorded"></label></div>
     <label class="todo"><input type="checkbox" id="gSev" ${g.severe?'checked':''} ${isEdit()?'':'disabled'}> Severe allergy · tell every caterer</label>
-    <div class="box"><h3>Contact & travel documents</h3>${isAdmin() ? `<dl class="kv"><dt>Email</dt><dd class="muted">[email]</dd><dt>Phone</dt><dd class="muted">[phone]</dd><dt>Passport</dt><dd>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing · needed for VAT</span>'}</dd></dl>` : '<div class="ro">Admin only</div>'}</div>
+    <div class="box"><h3>Contact & travel documents</h3>${isAdmin() ? `<dl class="kv"><dt>Email</dt><dd>${esc(g.email)||'<span class="muted">—</span>'}</dd><dt>Phone</dt><dd class="num">${esc(g.phone)||'<span class="muted">—</span>'}</dd><dt>Passport</dt><dd>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing · needed for VAT</span>'}</dd></dl>` : '<div class="ro">Admin only</div>'}</div>
     <div class="box"><h3>Sessions <span class="num">${sess.length}</span></h3><div class="muted" style="font-size:13px">Attending all main sessions. RSVPs per session feed the headcount for catering and transport.</div></div>
     ${g.review ? `<div class="box" style="border-color:var(--info)"><h3>Flagged in the last import</h3><div style="font-size:13.5px">Details changed in the registration sheet.</div>${isEdit()?'<button class="btn ghost sm" type="button" id="gClear">Reviewed · clear flag</button>':''}</div>` : ''}
   </div>`);

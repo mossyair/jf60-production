@@ -311,6 +311,7 @@
         <h1><span class="num">60</span>th Anniversary Conference</h1>
         <div class="conf-theme" id="confTheme">Jerusalem — Yesterday, Today and Tomorrow</div>
         <div class="sub">20–22 October 2026 <span id="roleWrap"></span></div>
+        <div style="font-size:13px;margin-top:6px;"><a href="/control" id="toControl" style="color:var(--ink-soft);font-weight:600;">Try the Control Room →</a></div>
       </div>
       <div class="header-stats">
         <div class="hstat open"><div class="n" id="cOpen">–</div><div class="l">Open</div></div>
@@ -466,15 +467,20 @@ async function tryEnter(){
     document.getElementById("gate").style.display="none";
     document.getElementById("main").style.display="block";
     await ensureSession();
+    if (uiPref()==="control") { location.href="/control"; return; }
     applyState(s);
   } catch(e){
     document.getElementById("gateErr").textContent = "That key wasn't accepted.";
   }
 }
+// Control Room switch: each person's choice is remembered in their browser
+function uiPref(){ try { return localStorage.getItem("jf60-ui")||"classic"; } catch(e){ return "classic"; } }
+document.getElementById("toControl").addEventListener("click", ()=>{ try { localStorage.setItem("jf60-ui","control"); } catch(e){} });
 // auto-resume within a session
 (function(){
   try {
     const k = sessionStorage.getItem("jf60k"); const n = sessionStorage.getItem("jf60n");
+    if(k && uiPref()==="control"){ location.replace("/control"); return; }
     if(k){ document.getElementById("gateKey").value=k; if(n) document.getElementById("gateName").value=n; }
   } catch(e){}
 })();

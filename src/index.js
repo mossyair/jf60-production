@@ -228,6 +228,165 @@ async function handleAsk(request, env, level) {
   return json({ answer, truncated: msg.stop_reason === "max_tokens" });
 }
 __name(handleAsk, "handleAsk");
+// ---- Inbox (Control Room): Claude reads a dropped file and suggests where it belongs ----
+var INBOX_TYPES = ["quote", "invoice", "contract", "menu", "proof", "guests", "rider", "transport", "runsheet", "exhibitors", "bio", "map", "other"];
+var INBOX_ADMIN_TYPES = ["guests", "invoice", "contract"];
+var INBOX_SYSTEM = `You sort documents that the production team of the Jerusalem Foundation's 60th anniversary conference (20–22 October 2026, Jerusalem) drops into their Control Room inbox. Read the document, say what it is and what it contains, and pick the item it belongs to.
+
+Types: quote (supplier price quote), invoice (invoice or receipt), contract (signed talent or supplier contract), menu (catering menu), proof (design artwork for sign-off), guests (guest registration list), rider (tech rider or AV brief for a session), transport (driver or vehicle list), runsheet (run sheet or crew schedule), exhibitors (organizations fair list), bio (speaker bio or headshot), map (floor plan or site map), other.
+
+target_id: the id of the matching item from the candidate lists (menu: food; proof: design; contract: talent; rider, bio, map: sessions), or "" when nothing fits or the type has no list.
+fields: up to 6 key facts as label/value pairs (supplier, amount, date, item, version, rows), values in the document's language.
+summary: one or two plain sentences in English saying what the document is.
+confidence: 0-100, how sure you are of the type.`;
+var INBOX_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "confidence", "summary", "fields", "target_id"],
+  properties: {
+    type: { type: "string", enum: INBOX_TYPES },
+    confidence: { type: "integer" },
+    summary: { type: "string" },
+    fields: { type: "array", items: { type: "object", additionalProperties: false, required: ["label", "value"], properties: { label: { type: "string" }, value: { type: "string" } } } },
+    target_id: { type: "string" }
+  }
+};
+async function handleInboxRead(request, env, admin) {
+  if (!env.ANTHROPIC_API_KEY)
+    return json({ error: "AI not configured — set ANTHROPIC_API_KEY secret" }, 500);
+  if (!env.BUCKET)
+    return json({ error: "R2 bucket not bound" }, 500);
+  const b = await readBody(request);
+  const fileRow = await env.DB.prepare("SELECT * FROM files WHERE id=?").bind(b.file_id).first();
+  if (!fileRow)
+    return json({ error: "file not found" }, 404);
+  const name = fileRow.filename || "file";
+  const ext = ((name.match(/\.([a-z0-9]+)$/i) || [])[1] || "").toLowerCase();
+  const ct = fileRow.content_type || "";
+  const content = [];
+  if (ct === "application/pdf" || /^image\/(png|jpeg|gif|webp)$/.test(ct)) {
+    const obj = await env.BUCKET.get(fileRow.r2_key);
+    if (!obj)
+      return json({ error: "file missing in storage" }, 404);
+    const bytes = await obj.arrayBuffer();
+    if (bytes.byteLength > 20 * 1024 * 1024)
+      return json({ error: "file too large to read (20MB limit)" }, 413);
+    const data = arrayBufferToBase64(bytes);
+    content.push(ct === "application/pdf" ? { type: "document", source: { type: "base64", media_type: "application/pdf", data } } : { type: "image", source: { type: "base64", media_type: ct, data } });
+  } else if (ct === "text/csv" || ct === "text/plain") {
+    const obj = await env.BUCKET.get(fileRow.r2_key);
+    if (!obj)
+      return json({ error: "file missing in storage" }, 404);
+    content.push({ type: "text", text: "Document contents:\n" + (await obj.text()).slice(0, 2e5) });
+  } else if (b.text) {
+    content.push({ type: "text", text: "Document contents (converted to text in the browser):\n" + b.text.toString().slice(0, 2e5) });
+  }
+  const q = /* @__PURE__ */ __name(async (sql) => {
+    try {
+      return (await env.DB.prepare(sql).all()).results;
+    } catch (e) {
+      return [];
+    }
+  }, "q");
+  const candidates = {
+    sessions: await q("SELECT id, day, time, title, venue FROM segments ORDER BY day, time"),
+    food: await q("SELECT id, day, time, title, venue FROM food_items ORDER BY day, sort_order"),
+    design: await q("SELECT id, title, category FROM design_items ORDER BY sort_order"),
+    talent: await q("SELECT id, title FROM talent_items ORDER BY sort_order")
+  };
+  content.push({ type: "text", text: `File name: ${name}${content.length ? "" : " (its contents could not be read; judge from the name)"}\n\nCandidate items (JSON):\n${JSON.stringify(candidates)}` });
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  let msg;
+  try {
+    msg = await client.beta.messages.create({
+      model: AI_ASK_MODEL,
+      max_tokens: 16e3,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low", format: { type: "json_schema", schema: INBOX_SCHEMA } },
+      system: INBOX_SYSTEM,
+      messages: [{ role: "user", content }]
+    });
+  } catch (e) {
+    if (e instanceof Anthropic.RateLimitError)
+      return json({ error: "The assistant is busy. Try again in a minute." }, 429);
+    if (e instanceof Anthropic.APIError) {
+      console.error("inbox read", e.status, e.message);
+      return json({ error: "The assistant couldn't read this file." }, 502);
+    }
+    throw e;
+  }
+  let out = { type: "other", confidence: 0, summary: "The assistant couldn't read this file. Pick a type, or keep it as a plain file.", fields: [], target_id: "" };
+  if (msg.stop_reason !== "refusal") {
+    try {
+      const parsed = JSON.parse(msg.content.filter((c) => c.type === "text").map((c) => c.text).join(""));
+      if (INBOX_TYPES.includes(parsed.type))
+        out = parsed;
+    } catch (e) {
+    }
+  }
+  const ids = { menu: candidates.food, proof: candidates.design, contract: candidates.talent, rider: candidates.sessions, bio: candidates.sessions, map: candidates.sessions };
+  const target = (ids[out.type] || []).some((x) => String(x.id) === String(out.target_id)) ? String(out.target_id) : "";
+  const fields = (Array.isArray(out.fields) ? out.fields : []).slice(0, 6).map((f) => ({ label: String(f.label || "").slice(0, 60), value: String(f.value || "").slice(0, 200) }));
+  const r = await env.DB.prepare(
+    "INSERT INTO inbox_items (file_id, name, ext, state, type, confidence, summary, fields_json, target, created_by) VALUES (?,?,?,'review',?,?,?,?,?,?)"
+  ).bind(fileRow.id, name, ext.toUpperCase().slice(0, 4), out.type, Math.max(0, Math.min(100, parseInt(out.confidence) || 0)), String(out.summary || "").slice(0, 600), JSON.stringify(fields), target, (b.by || "").toString().slice(0, 60)).run();
+  return json({ ok: true, id: r.meta.last_row_id });
+}
+__name(handleInboxRead, "handleInboxRead");
+async function handleInboxApply(request, env, admin) {
+  const b = await readBody(request);
+  const item = await env.DB.prepare("SELECT * FROM inbox_items WHERE id=?").bind(b.id).first();
+  if (!item || item.state !== "review")
+    return json({ error: "not found" }, 404);
+  const type = b.plain ? "other" : INBOX_TYPES.includes(b.type) ? b.type : item.type;
+  if (!b.plain && INBOX_ADMIN_TYPES.includes(type) && !admin)
+    return json({ error: "admin required" }, 403);
+  const target = (b.target ?? item.target ?? "").toString();
+  const by = (b.by || "").toString().slice(0, 60);
+  let filedTo = "Files";
+  const file = /* @__PURE__ */ __name((section, segId) => env.DB.prepare("UPDATE files SET section=?, segment_id=? WHERE id=?").bind(section, segId, item.file_id).run(), "file");
+  if (!b.plain) {
+    if (type === "menu" && target) {
+      const f = await env.DB.prepare("SELECT title FROM food_items WHERE id=?").bind(target).first();
+      if (!f)
+        return json({ error: "food item not found" }, 404);
+      await file("menu", target);
+      filedTo = "Food · " + f.title;
+    } else if (type === "proof" && target) {
+      const d = await env.DB.prepare("SELECT title FROM design_items WHERE id=?").bind(target).first();
+      if (!d)
+        return json({ error: "design item not found" }, 404);
+      await file("proof", target);
+      const last = await env.DB.prepare("SELECT COALESCE(MAX(version),0) AS v FROM design_proofs WHERE item_id=?").bind(target).first();
+      const v = (last?.v || 0) + 1;
+      await env.DB.prepare("INSERT INTO design_proofs (item_id, file_id, version, decision, uploaded_by) VALUES (?,?,?,'pending',?)").bind(target, item.file_id, v, by).run();
+      await env.DB.prepare("UPDATE design_items SET status='awaiting_approval', updated_at=datetime('now') WHERE id=?").bind(target).run();
+      filedTo = "Design · " + d.title + " · v" + v;
+    } else if (type === "contract" && target) {
+      const t = await env.DB.prepare("SELECT title FROM talent_items WHERE id=?").bind(target).first();
+      if (!t)
+        return json({ error: "talent item not found" }, 404);
+      await env.DB.prepare("UPDATE talent_items SET stage='signed', updated_at=datetime('now') WHERE id=?").bind(target).run();
+      await file("general", null);
+      filedTo = "Contracts · " + t.title + " · signed";
+    } else if (["rider", "bio", "map"].includes(type) && target) {
+      const s2 = await env.DB.prepare("SELECT title, brief_av FROM segments WHERE id=?").bind(target).first();
+      if (!s2)
+        return json({ error: "session not found" }, 404);
+      await file("content", target);
+      if (type === "rider" && !s2.brief_av)
+        await env.DB.prepare("UPDATE segments SET brief_av=? WHERE id=?").bind("See " + item.name + " (tech rider).", target).run();
+      filedTo = "Session · " + s2.title;
+    } else {
+      filedTo = { quote: "Files · quotes", invoice: "Files · invoices", guests: "Files · guest lists (import them in the classic dashboard)", transport: "Files · transport", runsheet: "Files · run sheets", exhibitors: "Files · organizations fair" }[type] || "Files";
+    }
+  }
+  await env.DB.prepare("UPDATE inbox_items SET state='filed', type=?, target=?, filed_to=?, filed_by=?, filed_at=datetime('now') WHERE id=?").bind(type, target, filedTo, by, item.id).run();
+  return json({ ok: true, filed_to: filedTo });
+}
+__name(handleInboxApply, "handleInboxApply");
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -377,6 +536,11 @@ var src_default = {
             crewShifts = await env.DB.prepare("SELECT * FROM crew_shifts ORDER BY day, start_min, sort_order").all();
           } catch (e) {
           }
+          let inboxItems = { results: [] };
+          try {
+            inboxItems = await env.DB.prepare("SELECT * FROM inbox_items WHERE state IN ('review','filed') ORDER BY id DESC LIMIT 100").all();
+          } catch (e) {
+          }
           let talentItems = { results: [] };
           if (admin) {
             try {
@@ -403,7 +567,8 @@ var src_default = {
             run_stops: runStops.results,
             gift_items: giftItems.results,
             crew_shifts: crewShifts.results,
-            talent_items: talentItems.results
+            talent_items: talentItems.results,
+            inbox_items: inboxItems.results
           });
         }
         if (path === "/api/segment/status" && request.method === "POST") {
@@ -1451,6 +1616,17 @@ ${context}`;
         if (path === "/api/timeline/toggle" && request.method === "POST") {
           const b = await readBody(request);
           await env.DB.prepare("UPDATE timeline SET done = 1 - done WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/inbox/read" && request.method === "POST") {
+          return await handleInboxRead(request, env, admin);
+        }
+        if (path === "/api/inbox/apply" && request.method === "POST") {
+          return await handleInboxApply(request, env, admin);
+        }
+        if (path === "/api/inbox/dismiss" && request.method === "POST") {
+          const b = await readBody(request);
+          await env.DB.prepare("UPDATE inbox_items SET state='dismissed' WHERE id=? AND state='review'").bind(b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/crew/field" && request.method === "POST") {

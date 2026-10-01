@@ -300,6 +300,7 @@ body{margin:0}
     <div class="topbar">
       <button class="search" id="openPal" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span id="searchTxt">Search or ask anything…</span><kbd>⌘K</kbd></button>
       <button class="btn ghost sm" id="dropTop" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span id="addFileTxt">Add file</span></button>
+      <button class="btn ghost sm" id="suggestTop" type="button" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg><span id="suggestTxt">Suggest changes</span></button>
       <button class="toggle" id="dayofBtn" type="button" aria-pressed="false"><span class="sw"></span><span id="dayofTxt">Day-of mode</span></button>
       <div class="count"><b class="num" id="daysN">–</b> <span id="daysTxt">days to 20.10</span></div>
     </div>
@@ -335,7 +336,7 @@ const DATA = {"seg_he": [{"id": "d1-welcome", "title_he": "קבלת פנים, ד
 /* ============================ i18n ============================ */
 const T = {
  en:{ home:'Home', program:'Program', people:'People', logistics:'Logistics', production:'Production', inbox:'Inbox', print:'Print center', settings:'Access & activity',
-   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
+   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', suggest:'Suggest changes', aiH:'Describe a change, review it, then apply', aiAsk:'What should change?', aiPh:'e.g. Add production to-dos for the gala concert, or move the Beit Hanina visit to 16:00', aiGo:'Suggest', aiNote:'Nothing changes until you apply.', aiApply:'Apply selected', aiDiscard:'Discard', aiNone:'No changes were proposed. Try saying which session it is about.', aiFail:'Couldn’t get suggestions', aiPick:'Tick at least one change', aiDone:'Applied {n} changes', aiTodo:'To-do', aiPerson:'Person', aiNewSession:'New session', aiChange:'Change', aiReword:'Reword', aiTitle:'Title', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
@@ -348,7 +349,7 @@ const T = {
    runsheet:'Run sheet', sites:'Sites', timeline:'Timeline', myday:'My day', now:'Now', next:'Next', noLead:'No lead', done:'Done', live:'Live'
  },
  he:{ home:'בית', program:'תוכנית', people:'אנשים', logistics:'לוגיסטיקה', production:'הפקה', inbox:'תיבת קבצים', print:'מרכז הדפסה', settings:'הרשאות ופעילות',
-   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
+   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', suggest:'הצעת שינויים', aiH:'מתארים שינוי, בודקים ומאשרים', aiAsk:'מה לשנות?', aiPh:'למשל: להוסיף משימות הפקה לקונצרט הגאלה, או להזיז את הביקור בבית חנינא ל-16:00', aiGo:'הצעה', aiNote:'שום דבר לא משתנה עד האישור.', aiApply:'אישור הנבחרים', aiDiscard:'ביטול', aiNone:'לא הוצעו שינויים. נסו לציין על איזה מפגש מדובר.', aiFail:'לא התקבלו הצעות', aiPick:'סמנו לפחות שינוי אחד', aiDone:'הוחלו {n} שינויים', aiTodo:'משימה', aiPerson:'איש/אשת צוות', aiNewSession:'מפגש חדש', aiChange:'שינוי', aiReword:'ניסוח מחדש', aiTitle:'כותרת', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
@@ -599,6 +600,7 @@ function shell(){
   $('daysTxt').textContent = t('days'); $('markSub').textContent = t('sub'); $('markT').textContent = t('control'); $('dayofTxt').textContent = t('dayof'); $('classicLink').textContent = t('classic');
   $('palIn').placeholder = t('search');
   $('dropTop').hidden = !can.file();
+  $('suggestTop').hidden = !(LIVE && isAdmin()); $('suggestTxt').textContent = t('suggest');
   $('dayofBtn').setAttribute('aria-pressed', S.dayof);
   $('clockSlot').innerHTML = (S.dayof || (S.area==='logistics' && S.tab.logistics==='ops')) ? clockBar() : '';
   wireClock();
@@ -1124,6 +1126,7 @@ function viewSettings(){
 /* ============================ PALETTE / ASK ============================ */
 function palItems(q){
   q = q.trim().toLowerCase(); const out = [];
+  if (q && LIVE && isAdmin()) out.push({ k:'Suggest', l:'Suggest changes: “' + q + '”', fn:() => openSuggest(q) });
   if (q) out.push({ k:'Ask', l:'Ask: “' + q + '”', fn:() => answer(q) });
   const add = (k, l, fn) => { if (!q || l.toLowerCase().includes(q)) out.push({ k, l, fn }); };
   AREAS.filter(allowed).forEach(a => add('Go to', t(a), () => go(a)));
@@ -1169,6 +1172,61 @@ function answer(q){
     a = H(`${g.length} crew items have no lead: ${list}. Hagai has ${hg} shifts, Uri ${ur}.`, `ל-${g.length} משמרות צוות אין אחראי: ${list}. לחגי ${hg} משמרות, לאורי ${ur}.`); }
   else a = H('In the app this question goes to Claude with the event’s data. Try “what’s missing for day 1?”, “which runs have no driver?” or “what’s overdue?”.', 'באפליקציה השאלה נשלחת ל-Claude עם נתוני האירוע. נסו “מה חסר ביום 1?”, “לאילו הסעות אין נהג?” או “מה באיחור?”.');
   drawPal(`<span data-notr>${esc(a)}</span>`);
+}
+
+/* ============================ SUGGEST CHANGES (admins) ============================
+   A request in plain words becomes a list of proposed changes (/api/ai/propose).
+   Nothing is written until an admin ticks the changes and presses Apply (/api/ai/apply). */
+function opLabel(op){
+  const ev = id => D.ev.find(e => e.id === id);
+  const evT = id => { const e = ev(id); return e ? '“' + L(e,'title') + '”' : id; };
+  if (op.type === 'add_check') return { k:t('aiTodo'), v:evT(op.segment_id) + ': ' + op.text };
+  if (op.type === 'add_person') return { k:t('aiPerson'), v:evT(op.segment_id) + ': ' + op.name };
+  if (op.type === 'add_event') return { k:t('aiNewSession'), v:dayName(op.day) + ' ' + op.time + '–' + op.end_time + ' · ' + op.title + (op.venue ? ' · ' + op.venue : '') };
+  if (op.type === 'edit_event') {
+    const e = ev(op.segment_id), ch = [];
+    if (op.title != null) ch.push(t('aiTitle') + ' → ' + op.title);
+    if (op.venue != null) ch.push(t('venue') + ' → ' + op.venue);
+    if (op.day != null) ch.push(dayName(op.day));
+    if (op.time != null || op.end_time != null) ch.push((op.time || (e && e.s) || '') + '–' + (op.end_time || (e && e.e) || ''));
+    return { k:t('aiChange'), v:evT(op.segment_id) + ': ' + ch.join(' · ') };
+  }
+  if (op.type === 'edit_check') { const c = D.todos.find(x => x.rid === op.check_id); return { k:t('aiReword'), v:(c ? '“' + L(c,'text') + '” → ' : '') + op.text }; }
+  return { k:op.type, v:JSON.stringify(op) };
+}
+function openSuggest(prefill){
+  if (!LIVE || !isAdmin()) return;
+  closePal();
+  let proposal = null, busy = false;
+  const draw = () => {
+    openSheet(`<div class="sh-h"><div><div class="lbl">${t('suggest')}</div><h2>${t('aiH')}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
+    <div class="sh-b">
+      <form id="aiForm" class="box" style="gap:10px"><label class="fld">${t('aiAsk')}<textarea id="aiIn" maxlength="2000" placeholder="${esc(t('aiPh'))}">${esc(prefill)}</textarea></label>
+        <div style="display:flex;gap:8px;align-items:center"><button class="btn" type="submit" id="aiGo" ${busy?'disabled':''}>${busy && !proposal ? '<span class="spin" aria-hidden="true"></span>' : ''}${t('aiGo')}</button><span class="muted" style="font-size:12.5px">${t('aiNote')}</span></div></form>
+      ${proposal ? (proposal.ops.length ? `<div class="box"><h3>${esc(proposal.summary)} <span class="num">${proposal.ops.length}</span></h3>
+        ${proposal.ops.map((op,i) => { const l = opLabel(op); return `<label class="todo" style="align-items:flex-start"><input type="checkbox" data-aiop="${i}" checked style="margin-top:3px"><span><span class="chip plain" style="margin-inline-end:6px">${esc(l.k)}</span>${esc(l.v)}</span></label>`; }).join('')}
+        <div style="display:flex;gap:8px;margin-top:4px"><button class="btn good" type="button" id="aiApply" ${busy?'disabled':''}>${t('aiApply')}</button><button class="btn ghost" type="button" id="aiDiscard">${t('aiDiscard')}</button></div></div>`
+        : `<div class="box"><div style="font-size:13.5px">${esc(proposal.summary)}</div><div class="muted" style="font-size:13px">${t('aiNone')}</div></div>`) : ''}
+    </div>`, true);
+    SHEET = null;
+    const ta = $('aiIn'); if (!proposal) setTimeout(() => ta.focus(), 0);
+    $('aiForm').onsubmit = async ev => {
+      ev.preventDefault(); const v = ta.value.trim(); if (!v || busy) return;
+      prefill = v; busy = true; proposal = null; draw();
+      try { const r = await api('ai/propose', { instruction:v }); proposal = { summary:r.summary || '', ops:Array.isArray(r.ops) ? r.ops : [] }; }
+      catch(err){ toast(t('aiFail') + (err && err.message ? ' (' + err.message + ')' : '')); }
+      busy = false; draw();
+    };
+    const ap = $('aiApply'); if (ap) ap.onclick = async () => {
+      const pick = [...document.querySelectorAll('[data-aiop]')].filter(c => c.checked).map(c => proposal.ops[+c.dataset.aiop]);
+      if (!pick.length) { toast(t('aiPick')); return; }
+      busy = true; draw();
+      try { const r = await api('ai/apply', { ops:pick }); toast(t('aiDone').replace('{n}', r.applied != null ? r.applied : pick.length)); closeSheet(); await loadLive(); render(); }
+      catch(err){ busy = false; toast(t('saveFail') + (err && err.message ? ' (' + err.message + ')' : '')); draw(); }
+    };
+    const dc = $('aiDiscard'); if (dc) dc.onclick = () => { proposal = null; draw(); };
+  };
+  draw();
 }
 
 /* ============================ sheet / toast / files ============================ */
@@ -1281,7 +1339,7 @@ const HE = {
  'Drop a quote, signed contract or invoice in the Inbox and the card moves by itself.':'גררו הצעת מחיר, חוזה חתום או חשבונית לתיבה והכרטיס יתקדם לבד.',
  'Panel host':'הנחיית פאנל','Train Theater':'תיאטרון הקרון','Performance + workshop':'מופע + סדנה','Jerusalem Theater':'תיאטרון ירושלים','Keynote speaker':'דובר מרכזי','Yoga':'יוגה','day 2':'יום 2','day 3':'יום 3','Run tour':'סיור ריצה','Round-table keynote':'דובר מרכזי לשולחנות עגולים','Arabic lesson for donors':'שיעור ערבית לתורמים','British Trail run':'ריצה במסלול הבריטי','TED-style build':'בניית טד','Science Museum':'מוזיאון המדע','Main performance':'הופעה מרכזית','gala':'גאלה','Additional booking':'הזמנה נוספת',
  'Organizations':'ארגונים','Confirmed':'אישרו','Need a power point':'צריכים נקודת חשמל','Organization':'ארגון','Field':'תחום','Power':'חשמל','Community':'קהילה','Education':'חינוך','Environment':'סביבה','Culture':'תרבות','Welfare':'רווחה','Sport':'ספורט',
- 'Information form':'טופס מידע','Signed in as':'מחובר/ת כ','Classic dashboard':'הדשבורד הקלאסי','Open classic dashboard':'פתיחת הדשבורד הקלאסי','Use the classic dashboard':'מעבר לדשבורד הקלאסי','Control Room':'חדר בקרה','Your name':'השם שלך','Access key':'מפתח גישה','Open':'פתיחה','Loading live data…':'טוען נתונים חיים…','sample':'דוגמה','Sample data':'נתוני דוגמה','not connected yet':'עוד לא מחובר','Live: changes here save to the same data as the classic dashboard. Sections marked Sample use example data and aren’t saved.':'חי: שינויים כאן נשמרים באותם נתונים של הדשבורד הקלאסי. אזורים שמסומנים כדוגמה משתמשים בנתוני דוגמה ולא נשמרים.','Google Forms':'Google Forms','Open responses ↗':'פתיחת התשובות ↗','Responses so far':'תשובות עד עכשיו','organizations have filled it in':'ארגונים מילאו אותו','Organizations fair':'יריד ארגונים','Cinematheque, 22.10':'סינמטק, 22.10','The form collects what we need from each organization for the fair at the Cinematheque.':'הטופס אוסף את מה שאנחנו צריכים מכל ארגון ליריד בסינמטק.',
+ 'Information form':'טופס מידע','Suggest':'הצעה','Signed in as':'מחובר/ת כ','Classic dashboard':'הדשבורד הקלאסי','Open classic dashboard':'פתיחת הדשבורד הקלאסי','Use the classic dashboard':'מעבר לדשבורד הקלאסי','Control Room':'חדר בקרה','Your name':'השם שלך','Access key':'מפתח גישה','Open':'פתיחה','Loading live data…':'טוען נתונים חיים…','sample':'דוגמה','Sample data':'נתוני דוגמה','not connected yet':'עוד לא מחובר','Live: changes here save to the same data as the classic dashboard. Sections marked Sample use example data and aren’t saved.':'חי: שינויים כאן נשמרים באותם נתונים של הדשבורד הקלאסי. אזורים שמסומנים כדוגמה משתמשים בנתוני דוגמה ולא נשמרים.','Google Forms':'Google Forms','Open responses ↗':'פתיחת התשובות ↗','Responses so far':'תשובות עד עכשיו','organizations have filled it in':'ארגונים מילאו אותו','Organizations fair':'יריד ארגונים','Cinematheque, 22.10':'סינמטק, 22.10','The form collects what we need from each organization for the fair at the Cinematheque.':'הטופס אוסף את מה שאנחנו צריכים מכל ארגון ליריד בסינמטק.',
  'JF60 design moodboard':'מודבורד עיצוב JF60','Look and feel per venue and day':'שפה עיצובית לכל אתר ויום','23 pages':'23 עמודים','the reference for every design & print item':'הרפרנס לכל פריטי העיצוב והדפוס','Open PDF ↗':'פתיחת PDF ↗',
  'Totals match the “יריד דוכנים” tab (42 · 40 · 37). Organization names are placeholders here.':'המספרים תואמים ללשונית “יריד דוכנים” (42 · 40 · 37). שמות הארגונים כאן הם דוגמה.',
  'Venue':'אתר','Supplier':'ספק','Crew':'צוות','Filter contacts':'סינון אנשי קשר','Sound, AV & lighting':'סאונד, הגברה ותאורה','Coffee & pastries':'קפה ומאפה','Catering':'קייטרינג','Days 1–3 base':'בסיס ימים 1–3','Day 1 plenary':'מליאה יום 1','Opening evening':'ערב פתיחה','Art fair & dinner':'יריד אמנות וארוחת ערב','Day 3 morning':'בוקר יום 3','Think tank':'חשיבה משותפת','Closing gala':'גאלת סיום',
@@ -1422,6 +1480,7 @@ document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('pal').hidden ? openPal() : closePal(); }
   else if (e.key === 'Escape') { if (!$('pal').hidden) closePal(); else closeSheet(); } });
 $('dropTop').onclick = () => $('fileIn').click();
+$('suggestTop').onclick = () => openSuggest('');
 $('fileIn').onchange = defaultPick;
 $('dayofBtn').onclick = () => { S.dayof = !S.dayof; if (S.dayof) S.area = 'home'; render(); toast(S.dayof ? 'Day-of mode on · Home follows the clock' : 'Day-of mode off'); };
 document.querySelectorAll('#classicLink,[data-classic]').forEach(a => a.addEventListener('click', () => { try { localStorage.setItem('jf60-ui', 'classic'); } catch(e){} }));

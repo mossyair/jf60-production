@@ -159,6 +159,7 @@ async function buildAskContext(env, level) {
     ctx.contacts = await q("SELECT name, role, venue FROM contacts");
     ctx.team = await q("SELECT name, role FROM team");
     ctx.crew_schedule = await q("SELECT day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min");
+    ctx.organizations_fair = await q("SELECT name, domain, note, contacted, confirmed, form_done, power FROM fair_orgs ORDER BY sort_order");
     if (level === "admin")
       ctx.talent_contracts = await q("SELECT title, stage, fee, notes FROM talent_items ORDER BY sort_order");
     const g = await q("SELECT desk, hotel, dietary, dietary_severe, needs_review, passport_no FROM guests WHERE status='active'");
@@ -541,6 +542,11 @@ var src_default = {
             inboxItems = await env.DB.prepare("SELECT * FROM inbox_items WHERE state IN ('review','filed') ORDER BY id DESC LIMIT 100").all();
           } catch (e) {
           }
+          let fairOrgs = { results: [] };
+          try {
+            fairOrgs = await env.DB.prepare("SELECT * FROM fair_orgs ORDER BY sort_order, name").all();
+          } catch (e) {
+          }
           let talentItems = { results: [] };
           if (admin) {
             try {
@@ -568,6 +574,7 @@ var src_default = {
             gift_items: giftItems.results,
             crew_shifts: crewShifts.results,
             talent_items: talentItems.results,
+            fair_orgs: fairOrgs.results,
             inbox_items: inboxItems.results
           });
         }
@@ -1655,6 +1662,40 @@ ${context}`;
           } else
             value = (value ?? "").toString().slice(0, 1e3);
           await env.DB.prepare(`UPDATE crew_shifts SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/fair/field" && request.method === "POST") {
+          const b = await readBody(request);
+          const flags = ["contacted", "confirmed", "form_done", "power"];
+          const text = ["contact", "phone", "email", "note"];
+          const adminOnly = ["name", "domain"];
+          if (!b.id || ![...flags, ...text, ...adminOnly].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          if (adminOnly.includes(b.field) && !admin)
+            return json({ error: "admin required" }, 403);
+          let value = flags.includes(b.field) ? b.value ? 1 : 0 : (b.value ?? "").toString().slice(0, 1e3);
+          if (b.field === "name" && !value.trim())
+            return json({ error: "name required" }, 400);
+          await env.DB.prepare(`UPDATE fair_orgs SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/fair/add" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          const name = (b.name || "").toString().trim().slice(0, 200);
+          if (!name)
+            return json({ error: "name required" }, 400);
+          const id = "f" + Date.now().toString(36);
+          const max = await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0) AS m FROM fair_orgs").first();
+          await env.DB.prepare("INSERT INTO fair_orgs (id, name, domain, sort_order) VALUES (?,?,?,?)").bind(id, name, (b.domain || "").toString().slice(0, 100), (max && max.m || 0) + 1).run();
+          return json({ ok: true, id });
+        }
+        if (path === "/api/fair/delete" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          await env.DB.prepare("DELETE FROM fair_orgs WHERE id=?").bind(b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/talent/field" && request.method === "POST") {

@@ -469,11 +469,19 @@ async function tryEnter(){
     document.getElementById("main").style.display="block";
     await ensureSession();
     if (uiPref()==="control") { location.href="/control"; return; }
+    accessHello(s.level);
     applyState(s);
   } catch(e){
     document.getElementById("gateErr").textContent = "That key wasn't accepted.";
   }
 }
+// Sign-in log: one visit per tab, pinged every 5 minutes while it is open
+function accessHello(level){
+  let v=null; try{ v=JSON.parse(sessionStorage.getItem("jf60v")||"null"); }catch(e){}
+  if(v && v.id && v.name===NAME && v.level===level) return;
+  api("access/hello",{ name:NAME, ui:"classic" }).then(r=>{ if(r&&r.id) try{ sessionStorage.setItem("jf60v", JSON.stringify({ id:r.id, name:NAME, level })); }catch(e){} }).catch(()=>{});
+}
+setInterval(()=>{ if(!KEY || document.visibilityState!=="visible") return; let v=null; try{ v=JSON.parse(sessionStorage.getItem("jf60v")||"null"); }catch(e){} if(v&&v.id) api("access/ping",{ id:v.id }).catch(()=>{}); }, 300000);
 // Control Room switch: each person's choice is remembered in their browser
 function uiPref(){ try { return localStorage.getItem("jf60-ui")||"classic"; } catch(e){ return "classic"; } }
 document.getElementById("toControl").addEventListener("click", ()=>{ try { localStorage.setItem("jf60-ui","control"); } catch(e){} });

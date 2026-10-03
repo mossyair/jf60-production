@@ -159,6 +159,7 @@ async function buildAskContext(env, level) {
     ctx.contacts = await q("SELECT name, role, venue FROM contacts");
     ctx.team = await q("SELECT name, role FROM team");
     ctx.crew_schedule = await q("SELECT day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min");
+    ctx.furniture = await q("SELECT setup, segment_ids, item, qty, qty_note, size, stays_until, notes FROM furniture_items ORDER BY sort_order");
     ctx.organizations_fair = await q("SELECT name, domain, note, contacted, confirmed, form_done, power FROM fair_orgs ORDER BY sort_order");
     if (level === "admin")
       ctx.talent_contracts = await q("SELECT title, stage, fee, notes FROM talent_items ORDER BY sort_order");
@@ -542,6 +543,11 @@ var src_default = {
             inboxItems = await env.DB.prepare("SELECT * FROM inbox_items WHERE state IN ('review','filed') ORDER BY id DESC LIMIT 100").all();
           } catch (e) {
           }
+          let furnitureItems = { results: [] };
+          try {
+            furnitureItems = await env.DB.prepare("SELECT * FROM furniture_items ORDER BY sort_order, id").all();
+          } catch (e) {
+          }
           let fairOrgs = { results: [] };
           try {
             fairOrgs = await env.DB.prepare("SELECT * FROM fair_orgs ORDER BY sort_order, name").all();
@@ -575,6 +581,7 @@ var src_default = {
             crew_shifts: crewShifts.results,
             talent_items: talentItems.results,
             fair_orgs: fairOrgs.results,
+            furniture_items: furnitureItems.results,
             inbox_items: inboxItems.results
           });
         }
@@ -1662,6 +1669,22 @@ ${context}`;
           } else
             value = (value ?? "").toString().slice(0, 1e3);
           await env.DB.prepare(`UPDATE crew_shifts SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/furniture/field" && request.method === "POST") {
+          const b = await readBody(request);
+          const anyEditor = ["qty", "qty_note", "notes"];
+          const adminOnly = ["item", "size", "setup", "segment_ids", "stays_until"];
+          if (!b.id || ![...anyEditor, ...adminOnly].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          if (adminOnly.includes(b.field) && !admin)
+            return json({ error: "admin required" }, 403);
+          let value = (b.value ?? "").toString().slice(0, 1e3);
+          if (b.field === "qty")
+            value = value.trim() === "" ? null : Math.max(0, Math.min(1e5, parseInt(value.replace(/[^\d]/g, "")) || 0));
+          if (b.field === "item" && !value.trim())
+            return json({ error: "item required" }, 400);
+          await env.DB.prepare(`UPDATE furniture_items SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/fair/field" && request.method === "POST") {

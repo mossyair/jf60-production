@@ -138,6 +138,42 @@ How to read the data:
 Keep answers short and easy to scan: a sentence or two, or a short list using "- " bullets. Plain text only, no headings, tables or bold. Name sessions, times and venues as the data does.
 
 You can't change anything. If someone asks you to make a change, tell them to use "Suggest changes", which turns a request into changes an admin can review and apply.`;
+function deviceLabel(ua) {
+  ua = ua || "";
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS X|Macintosh/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "Other";
+  const br = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+  return br ? os + " \xB7 " + br : os;
+}
+__name(deviceLabel, "deviceLabel");
+async function handleAccess(path, request, env, level) {
+  try {
+    if (path === "/api/access/hello" && request.method === "POST") {
+      const b = await readBody(request);
+      const ui = b.ui === "classic" ? "classic" : "control";
+      const country = request.cf && request.cf.country || "";
+      const r = await env.DB.prepare("INSERT INTO access_log (name, level, ui, device, country) VALUES (?,?,?,?,?)").bind((b.name || "").toString().trim().slice(0, 80), level, ui, deviceLabel(request.headers.get("user-agent")), country).run();
+      await env.DB.prepare("DELETE FROM access_log WHERE started_at < datetime('now','-180 days')").run();
+      return json({ ok: true, id: r.meta && r.meta.last_row_id });
+    }
+    if (path === "/api/access/ping" && request.method === "POST") {
+      const b = await readBody(request);
+      await env.DB.prepare("UPDATE access_log SET last_at=datetime('now') WHERE id=? AND level=? AND started_at > datetime('now','-1 day')").bind(parseInt(b.id) || 0, level).run();
+      return json({ ok: true });
+    }
+    if (path === "/api/access/log" && request.method === "GET") {
+      if (level !== "admin")
+        return json({ error: "admin required" }, 403);
+      const days = Math.max(1, Math.min(180, parseInt(new URL(request.url).searchParams.get("days")) || 7));
+      const rows = await env.DB.prepare("SELECT id, started_at, last_at, name, level, ui, device, country FROM access_log WHERE started_at >= datetime('now', ?) ORDER BY started_at DESC LIMIT 2000").bind("-" + days + " days").all();
+      return json({ rows: rows.results });
+    }
+  } catch (e) {
+    console.error("access log", e);
+    return json({ ok: false });
+  }
+  return null;
+}
+__name(handleAccess, "handleAccess");
 async function buildAskContext(env, level) {
   const q = /* @__PURE__ */ __name(async (sql) => {
     try {
@@ -403,6 +439,11 @@ var src_default = {
         return res;
       }
       const admin = level === "admin";
+      if (path.startsWith("/api/access/")) {
+        const res = await handleAccess(path, request, env, level);
+        if (res)
+          return res;
+      }
       if (level === "view") {
         if (path === "/api/state" && request.method === "GET") {
           try {

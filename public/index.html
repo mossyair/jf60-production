@@ -2962,7 +2962,7 @@ function exportTabCSV(tab){
 }
 
 // ---- CONTACTS (phone list) ----
-function contactsForVenue(venue){ return data.contacts.filter(c=>c.venue===venue); }
+function contactsForVenue(venue){ return data.contacts.filter(c=>c.venue && (c.venue===venue || (venue||"").includes(c.venue))); }
 
 let contactEditId = null;
 function renderContacts(){

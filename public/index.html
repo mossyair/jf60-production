@@ -382,7 +382,7 @@ const T = {
        dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
        dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
        dDuplicate:"Duplicate (split)", dDelete:"Delete event", dNoContacts:"No structured contacts for this site yet — add them in the Contacts tab.",
-       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grebelsky", dLogistics:"Logistics", dFurniture:"Furniture (rental brief)", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
+       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grebelsky", dLogistics:"Logistics", dFurniture:"Furniture (rental brief)", dFurnNone:"No furniture booked for this session.", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
   he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", guests:"אורחים", food:"אוכל ושתייה", design:"עיצוב ודפוס", transport:"הסעות", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
        search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
        admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
@@ -391,7 +391,7 @@ const T = {
        dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
        dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
        dDuplicate:"שכפל (פיצול)", dDelete:"מחק אירוע", dNoContacts:"אין עדיין אנשי קשר מובנים לאתר זה — הוסיפו בלשונית אנשי קשר.",
-       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גְרֶבֶלְסְקִי", dLogistics:"לוגיסטיקה", dFurniture:"ריהוט (מפרט השכרה)", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
+       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גְרֶבֶלְסְקִי", dLogistics:"לוגיסטיקה", dFurniture:"ריהוט (מפרט השכרה)", dFurnNone:"לא הוזמן ריהוט למפגש הזה.", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
 };
 let LANG = (function(){ try{ return sessionStorage.getItem("jf60lang")||"en"; }catch(e){ return "en"; } })();
 function t(k){ return (T[LANG]&&T[LANG][k])||T.en[k]||k; }
@@ -886,7 +886,7 @@ function renderDrawer(id){
           </div>`).join('')}
         <div class="save-hint" id="briefHint"></div>
       </div>
-      ${(() => { const fu = (data.furniture||[]).filter(f => (f.segment_ids||'').split(',').map(x=>x.trim()).includes(id)); if (!fu.length) return '';
+      ${(() => { const fu = (data.furniture||[]).filter(f => (f.segment_ids||'').split(',').map(x=>x.trim()).includes(id)); if (!fu.length) return `<div class="field"><label>🪑 ${t("dFurniture")}</label><div style="font-size:13px;opacity:.7;">${t("dFurnNone")}</div></div>`;
         const setups = fu.map(f=>f.setup).filter((v,i,a)=>a.indexOf(v)===i);
         return `<div class="field"><label>🪑 ${t("dFurniture")}</label>${setups.map(st => { const its = fu.filter(f=>f.setup===st);
           return `<div dir="rtl" style="text-align:right;font-size:12px;font-weight:700;margin:6px 0 2px;">${esc(st)}${its[0].stays_until?' · '+esc(its[0].stays_until):''}</div>` + its.map(f => `<div dir="rtl" style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line,#e5e0d6);"><span>${esc(f.item)}${f.size?' · '+esc(f.size):''}${f.notes?' <span style="opacity:.65">· '+esc(f.notes)+'</span>':''}</span><b>${f.qty==null?'—':f.qty}${f.qty_note?' · '+esc(f.qty_note):''}</b></div>`).join(''); }).join('')}</div>`; })()}

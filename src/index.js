@@ -1728,6 +1728,27 @@ ${context}`;
           await env.DB.prepare(`UPDATE furniture_items SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
+        if (path === "/api/furniture/add" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          const item = (b.item || "").toString().trim().slice(0, 200);
+          const seg = (b.segment_id || "").toString().trim().slice(0, 80);
+          if (!item || !seg)
+            return json({ error: "item and session required" }, 400);
+          const qtyRaw = (b.qty ?? "").toString().replace(/[^\d]/g, "");
+          const id = "fu" + Date.now().toString(36);
+          const max = await env.DB.prepare("SELECT COALESCE(MAX(sort_order),0) AS m FROM furniture_items").first();
+          await env.DB.prepare("INSERT INTO furniture_items (id, setup, segment_ids, item, qty, size, notes, sort_order) VALUES (?,?,?,?,?,?,?,?)").bind(id, (b.setup || "").toString().trim().slice(0, 200) || "Added in the app", seg, item, qtyRaw === "" ? null : Math.min(1e5, parseInt(qtyRaw)), (b.size || "").toString().slice(0, 100), (b.notes || "").toString().slice(0, 500), (max && max.m || 0) + 1).run();
+          return json({ ok: true, id });
+        }
+        if (path === "/api/furniture/delete" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          await env.DB.prepare("DELETE FROM furniture_items WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
         if (path === "/api/fair/field" && request.method === "POST") {
           const b = await readBody(request);
           const flags = ["contacted", "confirmed", "form_done", "power"];

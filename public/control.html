@@ -284,6 +284,17 @@ body{margin:0}
 .gate-box h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0}
 .ro-banner{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--info-bg);color:var(--info);border-radius:10px;padding:9px 14px;margin-top:14px;font-size:13px}
 .ro-banner a{color:inherit;font-weight:700}
+/* first-visit guided tour */
+#tour{position:fixed;inset:0;z-index:200;pointer-events:none}
+#tour .spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(20,18,15,.55);outline:2px solid #E9B48A;transition:all .25s ease;pointer-events:none}
+#tour .spot.none{width:0;height:0;left:50%;top:40%;outline:0}
+#tour .card{position:fixed;width:min(360px,calc(100vw - 32px));background:var(--surface);color:var(--ink);border-radius:14px;padding:18px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.25);pointer-events:auto;transition:top .25s ease,left .25s ease}
+#tour .card h3{font-family:Georgia,serif;font-weight:500;font-size:19px;margin:0 0 6px}
+#tour .card p{font-size:14px;line-height:1.5;margin:0 0 6px;color:var(--ink)}
+#tour .card .tip{font-size:12.5px;color:var(--muted)}
+#tour .row{display:flex;align-items:center;gap:8px;margin-top:12px}
+#tour .dots{flex:1;font-size:12px;color:var(--muted)}
+#tour .skip{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12.5px;padding:4px}
 </style>
 </head><body>
 
@@ -295,6 +306,7 @@ body{margin:0}
       <div><div class="lbl" id="lblRole" style="margin-bottom:5px">Signed in as</div><div id="roleTxt" style="font-size:13px"></div></div>
       <div><div class="lbl" id="lblLang" style="margin-bottom:5px">Language</div><div class="tiny-seg" id="langSeg"></div></div>
       <a class="linkbtn" id="classicLink" href="/" style="font-size:12.5px">Classic dashboard</a>
+      <button class="linkbtn" id="tourBtn" type="button" style="font-size:12.5px;text-align:start">Take the tour</button>
     </div>
   </nav>
 
@@ -339,7 +351,7 @@ const DATA = {"seg_he": [{"id": "d1-welcome", "title_he": "קבלת פנים, ד
 /* ============================ i18n ============================ */
 const T = {
  en:{ home:'Home', program:'Program', people:'People', logistics:'Logistics', production:'Production', inbox:'Inbox', print:'Print center', settings:'Access & activity',
-   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', inboxNote:'Claude reads each file and suggests what it is and where it belongs. Nothing is filed until someone presses Apply; “Just keep the file” stores it with the event’s files. Files are sent to Claude to be read.', inboxFail:'Couldn’t read {f}', filedTo:'Filed to', dismissed:'Dismissed', addRow:'Add row', visits:'Sign-ins', visitsNone:'No sign-ins recorded yet.', visitsFail:'Couldn’t load the sign-in log.', visitsNote:'Recorded since 4.10 · Israel time · names are what people type when they sign in', noName:'(no name given)', under5:'under 5 min', min:'min', hr:'h', lvlAdmin:'Admin', lvlEdit:'Edit', lvlView:'View', lastDays:'Last {n} days', person:'Person', keyLvl:'Key', daysActive:'Days active', visitsN:'Visits', lastSeen:'Last seen', signedIn:'Signed in', appCol:'App', duration:'Time in app', deviceCol:'Device', furniture:'Furniture', qty:'Quantity', furnNote:'From the furniture rental brief (2b Vibes). Change a quantity and it saves.', furnNone:'No furniture booked for this session.', venueContacts:'Venue contacts', ctSpeaker:'Speaker', ctFoundation:'Foundation', ctVenue:'Venue', ctSupplier:'Supplier', ctCrew:'Crew', furnItem:'Item', furnSize:'Size', furnDel:'Remove “{i}” from the furniture list?', furnShared:'It is also listed under another session and will be removed there too.', yes:'Yes', remove:'Remove', organization:'Organization', contact:'Contact', form:'Form', newOrg:'New organization', removeOrg:'Remove from the fair:', fairLeft:'{n} still to answer.', fairFormNote:'Tick Form for each organization that has answered.', budgetNote:'The budget sheet from the classic dashboard. Click a cell to change it; Enter saves, Esc cancels. Admins only.', ask:'Ask', askH:'Ask about the project', askPh:'e.g. What’s still open for day 2? Which transport runs have no driver?', askEmpty:'Ask anything about the program, logistics, design or guests. Answers come from the live data.', askThinking:'Looking through the data…', askClear:'Start a new conversation', askNote:'Answers can be wrong, so check before you act on them. Guests are included as numbers only, never names or contact details. Asking never changes anything; use Suggest changes for that.', askFail:'Couldn’t get an answer', askRefused:'The assistant declined to answer this one. Try rephrasing it.', askEmptyAnswer:'No answer came back. Try again.', aiAdminOnly:'Only admins can apply these. Ask an admin to suggest the same change.', suggest:'Suggest changes', aiH:'Describe a change, review it, then apply', aiAsk:'What should change?', aiPh:'e.g. Add production to-dos for the gala concert, or move the Beit Hanina visit to 16:00', aiGo:'Suggest', aiNote:'Nothing changes until you apply.', aiApply:'Apply selected', aiDiscard:'Discard', aiNone:'No changes were proposed. Try saying which session it is about.', aiFail:'Couldn’t get suggestions', aiPick:'Tick at least one change', aiDone:'Applied {n} changes', aiTodo:'To-do', aiPerson:'Person', aiNewSession:'New session', aiChange:'Change', aiReword:'Reword', aiTitle:'Title', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
+   preview:'Preview as', lang:'Language', search:'Search or ask anything…', addFile:'Add file', days:'days to 20.10', sub:'Jerusalem Foundation', control:'Control Room', dayof:'Day-of mode', reset:'Reset demo', signedAs:'Signed in as', classic:'Classic dashboard', inboxNote:'Claude reads each file and suggests what it is and where it belongs. Nothing is filed until someone presses Apply; “Just keep the file” stores it with the event’s files. Files are sent to Claude to be read.', inboxFail:'Couldn’t read {f}', filedTo:'Filed to', dismissed:'Dismissed', addRow:'Add row', visits:'Sign-ins', visitsNone:'No sign-ins recorded yet.', visitsFail:'Couldn’t load the sign-in log.', visitsNote:'Recorded since 4.10 · Israel time · names are what people type when they sign in', noName:'(no name given)', under5:'under 5 min', min:'min', hr:'h', lvlAdmin:'Admin', lvlEdit:'Edit', lvlView:'View', lastDays:'Last {n} days', person:'Person', keyLvl:'Key', daysActive:'Days active', visitsN:'Visits', lastSeen:'Last seen', signedIn:'Signed in', appCol:'App', duration:'Time in app', deviceCol:'Device', furniture:'Furniture', qty:'Quantity', furnNote:'From the furniture rental brief (2b Vibes). Change a quantity and it saves.', furnNone:'No furniture booked for this session.', tourBtn:'Take the tour', venueContacts:'Venue contacts', ctSpeaker:'Speaker', ctFoundation:'Foundation', ctVenue:'Venue', ctSupplier:'Supplier', ctCrew:'Crew', furnItem:'Item', furnSize:'Size', furnDel:'Remove “{i}” from the furniture list?', furnShared:'It is also listed under another session and will be removed there too.', yes:'Yes', remove:'Remove', organization:'Organization', contact:'Contact', form:'Form', newOrg:'New organization', removeOrg:'Remove from the fair:', fairLeft:'{n} still to answer.', fairFormNote:'Tick Form for each organization that has answered.', budgetNote:'The budget sheet from the classic dashboard. Click a cell to change it; Enter saves, Esc cancels. Admins only.', ask:'Ask', askH:'Ask about the project', askPh:'e.g. What’s still open for day 2? Which transport runs have no driver?', askEmpty:'Ask anything about the program, logistics, design or guests. Answers come from the live data.', askThinking:'Looking through the data…', askClear:'Start a new conversation', askNote:'Answers can be wrong, so check before you act on them. Guests are included as numbers only, never names or contact details. Asking never changes anything; use Suggest changes for that.', askFail:'Couldn’t get an answer', askRefused:'The assistant declined to answer this one. Try rephrasing it.', askEmptyAnswer:'No answer came back. Try again.', aiAdminOnly:'Only admins can apply these. Ask an admin to suggest the same change.', suggest:'Suggest changes', aiH:'Describe a change, review it, then apply', aiAsk:'What should change?', aiPh:'e.g. Add production to-dos for the gala concert, or move the Beit Hanina visit to 16:00', aiGo:'Suggest', aiNote:'Nothing changes until you apply.', aiApply:'Apply selected', aiDiscard:'Discard', aiNone:'No changes were proposed. Try saying which session it is about.', aiFail:'Couldn’t get suggestions', aiPick:'Tick at least one change', aiDone:'Applied {n} changes', aiTodo:'To-do', aiPerson:'Person', aiNewSession:'New session', aiChange:'Change', aiReword:'Reword', aiTitle:'Title', saved:'Saved', saveFail:'Couldn’t save · showing the latest data again', sampleRo:'Example section · this change isn’t saved', ro:'Read-only for now · make this change in the classic dashboard',
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
@@ -352,7 +364,7 @@ const T = {
    runsheet:'Run sheet', sites:'Sites', timeline:'Timeline', myday:'My day', now:'Now', next:'Next', noLead:'No lead', done:'Done', live:'Live'
  },
  he:{ home:'בית', program:'תוכנית', people:'אנשים', logistics:'לוגיסטיקה', production:'הפקה', inbox:'תיבת קבצים', print:'מרכז הדפסה', settings:'הרשאות ופעילות',
-   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', inboxNote:'Claude קורא כל קובץ ומציע מה הוא ולאן הוא שייך. שום דבר לא מתויק עד שמישהו לוחץ על תיוק; “שמירה כקובץ בלבד” שומר אותו עם קבצי האירוע. הקבצים נשלחים ל-Claude לקריאה.', inboxFail:'לא ניתן לקרוא את {f}', filedTo:'תויק אל', dismissed:'הוסר', addRow:'הוספת שורה', visits:'כניסות', visitsNone:'עוד לא נרשמו כניסות.', visitsFail:'לא ניתן לטעון את יומן הכניסות.', visitsNote:'נרשם מאז 4.10 · שעון ישראל · השמות הם מה שאנשים מקלידים בכניסה', noName:'(בלי שם)', under5:'פחות מ-5 דק׳', min:'דק׳', hr:'שע׳', lvlAdmin:'מנהל', lvlEdit:'עריכה', lvlView:'צפייה', lastDays:'{n} הימים האחרונים', person:'אדם', keyLvl:'מפתח', daysActive:'ימי פעילות', visitsN:'כניסות', lastSeen:'נראה לאחרונה', signedIn:'כניסה', appCol:'ממשק', duration:'זמן באפליקציה', deviceCol:'מכשיר', furniture:'ריהוט', qty:'כמות', furnNote:'מתוך מפרט הריהוט להשכרה (2b Vibes). שינוי כמות נשמר מיד.', furnNone:'לא הוזמן ריהוט למפגש הזה.', venueContacts:'אנשי קשר במקום', ctSpeaker:'דובר/ת', ctFoundation:'צוות הקרן', ctVenue:'מקום', ctSupplier:'ספק', ctCrew:'צוות', furnItem:'פריט', furnSize:'מידות', furnDel:'להסיר את “{i}” מרשימת הריהוט?', furnShared:'הפריט מופיע גם במפגש אחר ויוסר גם משם.', yes:'כן', remove:'הסרה', organization:'ארגון', contact:'איש קשר', form:'טופס', newOrg:'ארגון חדש', removeOrg:'להסיר מהיריד את', fairLeft:'עוד {n} לא ענו.', fairFormNote:'מסמנים טופס לכל ארגון שענה.', budgetNote:'גיליון התקציב מהדשבורד הקלאסי. לוחצים על תא כדי לשנות; Enter שומר, Esc מבטל. למנהלים בלבד.', ask:'שאלה', askH:'שאלות על הפרויקט', askPh:'למשל: מה עוד פתוח ביום 2? לאילו הסעות אין נהג?', askEmpty:'אפשר לשאול כל דבר על התוכנית, הלוגיסטיקה, העיצוב או האורחים. התשובות מבוססות על הנתונים החיים.', askThinking:'עובר על הנתונים…', askClear:'שיחה חדשה', askNote:'תשובות יכולות לטעות, לכן כדאי לבדוק לפני שפועלים לפיהן. אורחים נכללים כמספרים בלבד, בלי שמות או פרטי קשר. שאלה לא משנה דבר; לשינויים יש את הצעת שינויים.', askFail:'לא התקבלה תשובה', askRefused:'העוזר סירב לענות על השאלה הזו. נסו לנסח אחרת.', askEmptyAnswer:'לא התקבלה תשובה. נסו שוב.', aiAdminOnly:'רק מנהלים יכולים להחיל את השינויים. בקשו ממנהל להציע את אותו שינוי.', suggest:'הצעת שינויים', aiH:'מתארים שינוי, בודקים ומאשרים', aiAsk:'מה לשנות?', aiPh:'למשל: להוסיף משימות הפקה לקונצרט הגאלה, או להזיז את הביקור בבית חנינא ל-16:00', aiGo:'הצעה', aiNote:'שום דבר לא משתנה עד האישור.', aiApply:'אישור הנבחרים', aiDiscard:'ביטול', aiNone:'לא הוצעו שינויים. נסו לציין על איזה מפגש מדובר.', aiFail:'לא התקבלו הצעות', aiPick:'סמנו לפחות שינוי אחד', aiDone:'הוחלו {n} שינויים', aiTodo:'משימה', aiPerson:'איש/אשת צוות', aiNewSession:'מפגש חדש', aiChange:'שינוי', aiReword:'ניסוח מחדש', aiTitle:'כותרת', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
+   preview:'תצוגה כ', lang:'שפה', search:'חיפוש או שאלה…', addFile:'הוספת קובץ', days:'ימים ל-20.10', sub:'הקרן לירושלים', control:'חדר בקרה', dayof:'מצב יום אירוע', reset:'איפוס הדגמה', signedAs:'מחובר/ת כ', classic:'הדשבורד הקלאסי', inboxNote:'Claude קורא כל קובץ ומציע מה הוא ולאן הוא שייך. שום דבר לא מתויק עד שמישהו לוחץ על תיוק; “שמירה כקובץ בלבד” שומר אותו עם קבצי האירוע. הקבצים נשלחים ל-Claude לקריאה.', inboxFail:'לא ניתן לקרוא את {f}', filedTo:'תויק אל', dismissed:'הוסר', addRow:'הוספת שורה', visits:'כניסות', visitsNone:'עוד לא נרשמו כניסות.', visitsFail:'לא ניתן לטעון את יומן הכניסות.', visitsNote:'נרשם מאז 4.10 · שעון ישראל · השמות הם מה שאנשים מקלידים בכניסה', noName:'(בלי שם)', under5:'פחות מ-5 דק׳', min:'דק׳', hr:'שע׳', lvlAdmin:'מנהל', lvlEdit:'עריכה', lvlView:'צפייה', lastDays:'{n} הימים האחרונים', person:'אדם', keyLvl:'מפתח', daysActive:'ימי פעילות', visitsN:'כניסות', lastSeen:'נראה לאחרונה', signedIn:'כניסה', appCol:'ממשק', duration:'זמן באפליקציה', deviceCol:'מכשיר', furniture:'ריהוט', qty:'כמות', furnNote:'מתוך מפרט הריהוט להשכרה (2b Vibes). שינוי כמות נשמר מיד.', furnNone:'לא הוזמן ריהוט למפגש הזה.', tourBtn:'סיור באפליקציה', venueContacts:'אנשי קשר במקום', ctSpeaker:'דובר/ת', ctFoundation:'צוות הקרן', ctVenue:'מקום', ctSupplier:'ספק', ctCrew:'צוות', furnItem:'פריט', furnSize:'מידות', furnDel:'להסיר את “{i}” מרשימת הריהוט?', furnShared:'הפריט מופיע גם במפגש אחר ויוסר גם משם.', yes:'כן', remove:'הסרה', organization:'ארגון', contact:'איש קשר', form:'טופס', newOrg:'ארגון חדש', removeOrg:'להסיר מהיריד את', fairLeft:'עוד {n} לא ענו.', fairFormNote:'מסמנים טופס לכל ארגון שענה.', budgetNote:'גיליון התקציב מהדשבורד הקלאסי. לוחצים על תא כדי לשנות; Enter שומר, Esc מבטל. למנהלים בלבד.', ask:'שאלה', askH:'שאלות על הפרויקט', askPh:'למשל: מה עוד פתוח ביום 2? לאילו הסעות אין נהג?', askEmpty:'אפשר לשאול כל דבר על התוכנית, הלוגיסטיקה, העיצוב או האורחים. התשובות מבוססות על הנתונים החיים.', askThinking:'עובר על הנתונים…', askClear:'שיחה חדשה', askNote:'תשובות יכולות לטעות, לכן כדאי לבדוק לפני שפועלים לפיהן. אורחים נכללים כמספרים בלבד, בלי שמות או פרטי קשר. שאלה לא משנה דבר; לשינויים יש את הצעת שינויים.', askFail:'לא התקבלה תשובה', askRefused:'העוזר סירב לענות על השאלה הזו. נסו לנסח אחרת.', askEmptyAnswer:'לא התקבלה תשובה. נסו שוב.', aiAdminOnly:'רק מנהלים יכולים להחיל את השינויים. בקשו ממנהל להציע את אותו שינוי.', suggest:'הצעת שינויים', aiH:'מתארים שינוי, בודקים ומאשרים', aiAsk:'מה לשנות?', aiPh:'למשל: להוסיף משימות הפקה לקונצרט הגאלה, או להזיז את הביקור בבית חנינא ל-16:00', aiGo:'הצעה', aiNote:'שום דבר לא משתנה עד האישור.', aiApply:'אישור הנבחרים', aiDiscard:'ביטול', aiNone:'לא הוצעו שינויים. נסו לציין על איזה מפגש מדובר.', aiFail:'לא התקבלו הצעות', aiPick:'סמנו לפחות שינוי אחד', aiDone:'הוחלו {n} שינויים', aiTodo:'משימה', aiPerson:'איש/אשת צוות', aiNewSession:'מפגש חדש', aiChange:'שינוי', aiReword:'ניסוח מחדש', aiTitle:'כותרת', saved:'נשמר', saveFail:'השמירה נכשלה · מוצגים שוב הנתונים העדכניים', sampleRo:'אזור דוגמה · השינוי לא נשמר', ro:'לקריאה בלבד בינתיים · את השינוי עושים בדשבורד הקלאסי',
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
@@ -623,7 +635,7 @@ function shell(){
   $('roleTxt').textContent = (NAME ? NAME + ' · ' : '') + t(S.role==='edit'?'editor':S.role);
   $('daysN').textContent = Math.max(0, daysTo('2026-10-20'));
   seg($('langSeg'), [['en','EN'],['he','עב']], S.lang, k => { if (k === S.lang) return; S.lang = k; closeSheet(); if (!$('pal').hidden) closePal(); render(); });
-  $('lblRole').textContent = t('signedAs'); $('lblLang').textContent = t('lang'); $('searchTxt').textContent = t('search'); $('addFileTxt').textContent = t('addFile');
+  $('tourBtn').textContent = t('tourBtn'); $('lblRole').textContent = t('signedAs'); $('lblLang').textContent = t('lang'); $('searchTxt').textContent = t('search'); $('addFileTxt').textContent = t('addFile');
   $('daysTxt').textContent = t('days'); $('markSub').textContent = t('sub'); $('markT').textContent = t('control'); $('dayofTxt').textContent = t('dayof'); $('classicLink').textContent = t('classic');
   $('palIn').placeholder = t('search');
   $('dropTop').hidden = !can.file();
@@ -1254,6 +1266,7 @@ function palItems(q){
   if (q && LIVE && isEdit()) out.push({ k:'Suggest', l:'Suggest changes: “' + q + '”', fn:() => openSuggest(q) });
   const add = (k, l, fn) => { if (!q || l.toLowerCase().includes(q)) out.push({ k, l, fn }); };
   AREAS.filter(allowed).forEach(a => add('Go to', t(a), () => go(a)));
+  add('Help', t('tourBtn'), () => tourStart());
   D.ev.forEach(e => add('Session', dayName(e.day) + ' · ' + e.s + ' ' + L(e,'title'), () => { go('program', String(e.day)); openEvent(e.id); }));
   if (!isView()) {
     D.runs.forEach(r => add('Transport', dayName(r.day) + ' · ' + fmt(mins(r.t)) + ' ' + L(r,'title'), () => { go('logistics','transport'); openRun(r.id); }));
@@ -1677,7 +1690,91 @@ function accessHello(){
   api('access/hello', { name:NAME, ui:'control' }).then(r => { if (r && r.id) try { sessionStorage.setItem('jf60v', JSON.stringify({ id:r.id, name:NAME, level:LIVE.level })); } catch(e){} }).catch(() => {});
 }
 setInterval(() => { if (!LIVE || document.visibilityState !== 'visible') return; let v = null; try { v = JSON.parse(sessionStorage.getItem('jf60v') || 'null'); } catch(e){} if (v && v.id) api('access/ping', { id:v.id }).catch(() => {}); }, 300000);
-const afterLogin = () => { api('session', {}).catch(() => {}); accessHello(); render(); };
+/* ---- first-visit guided tour ---- */
+const TOUR = [
+  { en:['Welcome to the Control Room','One live place for the whole conference: program, people, logistics, production and files. It uses the same data as the classic dashboard, so anything you change here is saved for everyone, right away.','Use Next, or the arrow keys. Esc closes the tour.'],
+    he:['ברוכים הבאים לחדר הבקרה','מקום אחד חי לכל הכנס: תוכנית, אנשים, לוגיסטיקה, הפקה וקבצים. הנתונים משותפים עם הדשבורד הקלאסי, כך שכל שינוי שעושים כאן נשמר מיד לכולם.','ממשיכים בכפתור הבא או בחיצים. Esc סוגר את הסיור.'] },
+  { sel:'#navList', en:['The sections','Home shows what needs attention. Program has every session. People covers guests, crew, talent, the organizations fair and contacts. Logistics is crew schedule, transport and food. Production is design, milestones, budget and gifts.',''],
+    he:['האזורים','בית מראה מה דורש טיפול. בתוכנית כל המפגשים. באנשים: אורחים, צוות, תוכן, יריד הארגונים ואנשי קשר. בלוגיסטיקה: לו״ז צוות, הסעות ואוכל. בהפקה: עיצוב, אבני דרך, תקציב ומתנות.',''] },
+  { sel:'#page .ready', go:['home'], en:['Readiness at a glance','Each bar is how far one part of the production has come, for example transport runs with a driver or design items approved. Click a bar to jump to it.',''],
+    he:['מוכנות במבט אחד','כל פס מראה כמה התקדם תחום אחד בהפקה, למשל הסעות עם נהג או פריטי עיצוב שאושרו. לחיצה על פס מובילה אליו.',''] },
+  { sel:'#page section:has(.att)', role:'edit', go:['home'], en:['Needs attention','The open problems, worst first: runs without a driver, crew slots without a lead, proofs waiting for sign-off. Start your day here and click a line to fix it.',''],
+    he:['דורש טיפול','הבעיות הפתוחות, החמורות קודם: הסעות בלי נהג, משמרות בלי אחראי, הגהות שמחכות לאישור. כדאי להתחיל כאן כל יום וללחוץ על שורה כדי לטפל בה.',''] },
+  { sel:'#page [data-ev]', go:['program','1'], en:['Every session has a page','The program is split by day. Click any session to open its drawer.',''],
+    he:['לכל מפגש יש דף','התוכנית מחולקת לפי ימים. לחיצה על מפגש פותחת את המגירה שלו.',''] },
+  { sel:'#sheet', drawer:true, en:['The session drawer','Everything about one session in one place: transport, food, crew, to-dos, the AV brief, furniture, venue contacts, notes and files. Edits save as you go; you will see “Saved”.',''],
+    he:['מגירת המפגש','כל מה שקשור למפגש אחד במקום אחד: הסעות, אוכל, צוות, משימות, בריף טכני, ריהוט, אנשי קשר במקום, הערות וקבצים. כל שינוי נשמר מיד, ומופיע “נשמר”.',''],
+    view:{ en:['The session page','Viewers see the guest-facing details: time, venue and description.',''], he:['דף המפגש','בצפייה רואים את הפרטים לאורחים: שעה, מקום ותיאור.',''] } },
+  { sel:'#openPal', en:['Search or jump','Type a session, a person or a section to jump straight there. ⌘K (Ctrl+K) opens it from anywhere.',''],
+    he:['חיפוש וקפיצה','מקלידים מפגש, אדם או אזור וקופצים ישר אליו. ⌘K (או Ctrl+K) פותח את החיפוש מכל מקום.',''] },
+  { sel:'#askTop', en:['Ask','Ask a question about the project in plain words, in English or Hebrew. The answer comes from the live data. Asking never changes anything.','Guests are included as numbers only, never names.'],
+    he:['שאלה','שואלים שאלה על הפרויקט במילים פשוטות, בעברית או באנגלית. התשובה מבוססת על הנתונים החיים. שאלה לא משנה כלום.','אורחים נכללים כמספרים בלבד, בלי שמות.'] },
+  { sel:'#suggestTop', role:'edit', en:['Suggest changes','Describe a change, like “move the Beit Hanina visit to 16:00”. Claude turns it into concrete edits you review before anything happens.','Only admins can apply suggestions.'],
+    he:['הצעת שינויים','מתארים שינוי, למשל “להזיז את הביקור בבית חנינא ל-16:00”. Claude הופך אותו לשינויים מוגדרים שבודקים לפני שמשהו קורה.','רק מנהלים יכולים לאשר הצעות.'] },
+  { sel:'#dropTop', role:'edit', en:['Add a file','Drop a quote, menu, proof, contract or list here (or anywhere on the page). Claude reads it and suggests where it belongs; it waits in the Inbox until someone presses Apply.',''],
+    he:['הוספת קובץ','גוררים לכאן הצעת מחיר, תפריט, הגהה, חוזה או רשימה (או לכל מקום בעמוד). Claude קורא ומציע לאן הקובץ שייך, והוא מחכה בתיבת הקבצים עד שמישהו מאשר.',''] },
+  { sel:'nav.side [data-area=print]', role:'edit', en:['Print center','Run of show, driver sheets, hotel lists, the caterer sheet and the AV brief for Schuster, built from the live data so they are always current.',''],
+    he:['מרכז הדפסה','לו״ז רץ, דפי נהגים, רשימות מלונות, דף לקייטרינג ובריף טכני לשוסטר, נבנים מהנתונים החיים ולכן תמיד מעודכנים.',''] },
+  { sel:'#dayofBtn', en:['Day-of mode','During 20–22.10, switch this on and Home follows the clock: what is happening now, what is next and what is running late.',''],
+    he:['מצב יום אירוע','ב-20–22.10 מדליקים את זה, והבית עוקב אחרי השעון: מה קורה עכשיו, מה הבא ומה מתעכב.',''] },
+  { sel:'nav.side [data-area=settings]', role:'admin', en:['Access & activity','Sign-ins shows who opened the app, when and for how long. Only admins see this section.',''],
+    he:['הרשאות ופעילות','בכניסות רואים מי נכנס לאפליקציה, מתי ולכמה זמן. רק מנהלים רואים את האזור הזה.',''] },
+  { sel:'nav.side .foot', en:['Language and the classic dashboard','Switch between English and Hebrew here. The classic dashboard is still available; both show the same data. This tour is here too, whenever you want it again.',''],
+    he:['שפה והדשבורד הקלאסי','כאן מחליפים בין עברית לאנגלית. הדשבורד הקלאסי עדיין זמין, ושניהם מציגים את אותם נתונים. גם הסיור הזה נמצא כאן, אם תרצו לעבור עליו שוב.',''] },
+  { end:true }
+];
+const TOUR_END = { view:{ en:['You are all set','Your key is view-only: you can browse the program and ask questions. To make changes, ask an admin for an edit key.',''], he:['הכול מוכן','המפתח שלך לצפייה בלבד: אפשר לעיין בתוכנית ולשאול שאלות. לשינויים צריך מפתח עריכה ממנהל.',''] },
+  edit:{ en:['You are all set','Your key can edit: tick to-dos, change statuses, fill briefs, add files and suggest changes. A few things, like budget and applying suggestions, are admin-only.',''], he:['הכול מוכן','המפתח שלך מאפשר עריכה: לסמן משימות, לשנות סטטוסים, למלא בריפים, להוסיף קבצים ולהציע שינויים. כמה דברים, כמו תקציב ואישור הצעות, שמורים למנהלים.',''] },
+  admin:{ en:['You are all set','You have full access, including the budget, talent, applying suggestions and the sign-in log.',''], he:['הכול מוכן','יש לך גישה מלאה, כולל תקציב, תוכן וחוזים, אישור הצעות ויומן הכניסות.',''] } };
+let tourI = -1, tourSteps = [];
+const tourRank = { viewer:0, edit:1, admin:2 };
+const tourVisible = sel => { const el = sel && document.querySelector(sel); if (!el || el.hidden) return null; const r = el.getBoundingClientRect(); return r.width && r.height ? el : null; };
+function tourStart(){
+  tourSteps = TOUR.filter(st => !st.role || tourRank[S.role] >= tourRank[st.role === 'edit' ? 'edit' : st.role]);
+  tourI = 0; if (!$('tour')) { const d = document.createElement('div'); d.id = 'tour'; d.setAttribute('data-notr', ''); d.innerHTML = '<div class="spot none"></div><div class="card" role="dialog" aria-modal="true" aria-labelledby="tourH"></div>'; document.body.appendChild(d); }
+  $('tour').hidden = false; tourShow();
+}
+function tourClose(done){ if ($('tour')) $('tour').hidden = true; tourI = -1; closeSheet(); if (done) try { localStorage.setItem('jf60-tour', 'done'); } catch(e){} }
+function tourShow(dir){
+  dir = dir || 1; if (tourI < 0) tourI = 0;
+  const st = tourSteps[tourI]; if (!st) return tourClose(true);
+  if (st.go) go(st.go[0], st.go[1]); else if (!st.drawer && $('sheet').classList.contains('on')) closeSheet();
+  if (st.drawer) { const first = D.ev.find(e => e.day === 1) || D.ev[0]; if (first) { if (S.area !== 'program') go('program', String(first.day)); openEvent(first.id); } }
+  setTimeout(() => {
+    const lang = S.lang === 'he' ? 'he' : 'en';
+    let txt = st.end ? TOUR_END[S.role === 'viewer' ? 'view' : S.role][lang] : (isView() && st.view ? st.view[lang] : st[lang]);
+    const el = st.end ? null : tourVisible(st.sel);
+    if (!st.end && st.sel && !el) { tourI += dir; return tourShow(dir); } // skip a step whose element isn't on screen (e.g. phone layout)
+    const spot = $('tour').querySelector('.spot'), card = $('tour').querySelector('.card');
+    const n = tourSteps.length, last = tourI === n - 1;
+    card.dir = lang === 'he' ? 'rtl' : 'ltr';
+    card.innerHTML = `<h3 id="tourH">${esc(txt[0])}</h3><p>${esc(txt[1])}</p>${txt[2] ? `<p class="tip">${esc(txt[2])}</p>` : ''}
+      <div class="row"><span class="dots">${tourI + 1} / ${n}</span>${last ? '' : `<button type="button" class="skip" id="tourSkip">${lang === 'he' ? 'דילוג' : 'Skip tour'}</button>`}${tourI > 0 ? `<button type="button" class="btn ghost sm" id="tourBack">${lang === 'he' ? 'הקודם' : 'Back'}</button>` : ''}<button type="button" class="btn sm" id="tourNext">${last ? (lang === 'he' ? 'סיום' : 'Done') : (lang === 'he' ? 'הבא' : 'Next')}</button></div>`;
+    const vw = innerWidth, vh = innerHeight, cw = card.offsetWidth, ch = card.offsetHeight;
+    if (el) {
+      el.scrollIntoView({ block:'nearest' });
+      const r = el.getBoundingClientRect(), pad = 6;
+      const h = Math.min(r.height, vh * 0.7);
+      spot.className = 'spot'; Object.assign(spot.style, { left:(r.left - pad) + 'px', top:(r.top - pad) + 'px', width:(r.width + pad * 2) + 'px', height:(h + pad * 2) + 'px' });
+      let top = r.top + h + 14, left = r.left;
+      if (top + ch > vh - 12) top = r.top - ch - 14;
+      if (top < 12) { top = Math.max(12, Math.min(vh - ch - 12, r.top)); left = r.right + 14 + cw < vw ? r.right + 14 : r.left - cw - 14; }
+      card.style.top = Math.max(12, Math.min(vh - ch - 12, top)) + 'px'; card.style.left = Math.max(12, Math.min(vw - cw - 12, left)) + 'px';
+    } else {
+      spot.className = 'spot none'; spot.removeAttribute('style');
+      card.style.top = Math.max(12, (vh - ch) / 2 - 40) + 'px'; card.style.left = Math.max(12, (vw - cw) / 2) + 'px';
+    }
+    $('tourNext').onclick = () => { tourI++; tourShow(1); };
+    if ($('tourBack')) $('tourBack').onclick = () => { tourI--; tourShow(-1); };
+    if ($('tourSkip')) $('tourSkip').onclick = () => tourClose(true);
+    $('tourNext').focus();
+  }, st.go || st.drawer ? 260 : 30);
+}
+document.addEventListener('keydown', e => { if (tourI < 0) return; if (e.key === 'Escape') { e.stopPropagation(); tourClose(true); } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const fwd = (e.key === 'ArrowRight') !== (S.lang === 'he'); if (fwd) { tourI++; tourShow(1); } else if (tourI > 0) { tourI--; tourShow(-1); } } }, true);
+addEventListener('resize', () => { if (tourI >= 0) tourShow(1); });
+$('tourBtn').onclick = () => tourStart();
+const tourDone = () => { try { return localStorage.getItem('jf60-tour') === 'done'; } catch(e){ return true; } };
+const afterLogin = () => { api('session', {}).catch(() => {}); accessHello(); render(); if (!tourDone()) setTimeout(() => { if (tourI < 0) tourStart(); }, 700); };
 if (!KEY) showGate();
 else loadLive().then(afterLogin).catch(err => showGate(String(err && err.message) === 'unauthorized' ? 'That key wasn’t accepted.' : 'Couldn’t load the live data. Try again.'));
 })();

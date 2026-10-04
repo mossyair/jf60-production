@@ -200,6 +200,8 @@ async function buildAskContext(env, level) {
     ctx.organizations_fair = await q("SELECT name, domain, note, contacted, confirmed, form_done, power FROM fair_orgs ORDER BY sort_order");
     if (level === "admin")
       ctx.talent_contracts = await q("SELECT title, stage, fee, notes FROM talent_items ORDER BY sort_order");
+    if (level === "admin")
+      ctx.catering_quotes = await q("SELECT food_id, supplier, menu, price, linens, dishes, note, chosen FROM catering_quotes ORDER BY sort_order");
     const g = await q("SELECT desk, hotel, dietary, dietary_severe, needs_review, passport_no FROM guests WHERE status='active'");
     const tally = /* @__PURE__ */ __name((key) => g.reduce((m, r) => {
       const k = (r[key] || "").toString().trim() || "(none recorded)";
@@ -600,6 +602,13 @@ var src_default = {
             dayGuests = await env.DB.prepare(`SELECT ${admin ? "*" : "id, first_name, last_name, desk, sessions, note, updated_at"} FROM day_guests ORDER BY last_name, first_name`).all();
           } catch (e) {
           }
+          let cateringQuotes = { results: [] };
+          if (admin) {
+            try {
+              cateringQuotes = await env.DB.prepare("SELECT * FROM catering_quotes ORDER BY sort_order, id").all();
+            } catch (e) {
+            }
+          }
           let talentItems = { results: [] };
           if (admin) {
             try {
@@ -629,6 +638,7 @@ var src_default = {
             talent_items: talentItems.results,
             fair_orgs: fairOrgs.results,
             day_guests: dayGuests.results,
+            catering_quotes: cateringQuotes.results,
             furniture_items: furnitureItems.results,
             inbox_items: inboxItems.results
           });
@@ -1801,6 +1811,16 @@ ${context}`;
             return json({ error: "admin required" }, 403);
           const b = await readBody(request);
           await env.DB.prepare("DELETE FROM fair_orgs WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/quote/field" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          if (!b.id || !["chosen", "note"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          const value = b.field === "chosen" ? b.value ? 1 : 0 : (b.value ?? "").toString().slice(0, 1e3);
+          await env.DB.prepare(`UPDATE catering_quotes SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/dayguest/field" && request.method === "POST") {

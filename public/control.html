@@ -355,6 +355,7 @@ const T = {
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
+   quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
    dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
    booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
    staff:'Staff', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Jerusalem Foundation board', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
@@ -371,6 +372,7 @@ const T = {
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
+   quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
    dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
    booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
    staff:'צוות', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן לירושלים', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
@@ -497,7 +499,7 @@ function sampleInbox(){ return [
 /* ============================ state ============================ */
 const STORE = 'jf60-cr-live';
 let D = seed();
-let LIVE_VISITS = null, LIVE_FURN = [], LIVE = null, LIVE_HAS = {}, LIVE_GRID = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
+let LIVE_VISITS = null, LIVE_FURN = [], LIVE_QUOTES = [], LIVE = null, LIVE_HAS = {}, LIVE_GRID = null, LIVE_FILES = [], KEY = '', NAME = '', SHEET = null;
 try { KEY = sessionStorage.getItem('jf60k') || ''; NAME = sessionStorage.getItem('jf60n') || ''; } catch(e){}
 const S = { area:'home', tab:{ program:'1', people:'guests', logistics:'ops', production:'design', settings:'visits' }, role:'admin', lang:'en', dayof:false, clock:{ day:'20', now:640 }, opsView:'sheet', person:'Hagai', filter:{ guests:'all', contacts:'all', ops:'all' }, q:'' };
 try { const u = JSON.parse(localStorage.getItem(STORE+'-ui')||'{}'); Object.assign(S, u); } catch(e){}
@@ -561,6 +563,7 @@ function applyLive(){
   if (gs.length) base.guests = gs.map(g => ({ id:'gu'+g.id, rid:g.id, name:[g.first_name, g.last_name].filter(Boolean).join(' '), desk:g.desk||'', hotel:g.hotel||'', dietary:g.dietary||'', severe:!!g.dietary_severe, passport:!!g.passport_no, review:!!g.needs_review, email:g.email||'', phone:g.phone||'', room:g.room_type||'', cin:g.checkin||'', cout:g.checkout||'', conf:g.booking_conf||'', early:g.early_late||'', status:'active' }));
   base.day = (s.day_guests||[]).map(x => ({ id:'dg'+x.id, rid:x.id, first:x.first_name||'', last:x.last_name||'', name:[x.first_name, x.last_name].filter(Boolean).join(' '), desk:x.desk||'', email:x.email||'', phone:x.phone||'', sessions:(x.sessions||'').split(',').map(v => v.trim()).filter(Boolean), note:x.note||'' }));
   LIVE_FURN = s.furniture_items || [];
+  LIVE_QUOTES = s.catering_quotes || [];
   LIVE_HAS = { inbox:Array.isArray(s.inbox_items), ops:(s.crew_shifts||[]).length > 0, talent:(s.talent_items||[]).length > 0, team:(s.team||[]).length > 0, fair:(s.fair_orgs||[]).length > 0 };
   if (LIVE_HAS.ops) base.ops = s.crew_shifts.map(x => { let crew = []; try { crew = JSON.parse(x.crew_json || '[]'); } catch(e){} return { id:x.id, rid:x.id, day:String(x.day), s:+x.start_min, e:+x.end_min, title:x.title, site:x.site||'', kind:x.kind||'setup', crew, flag:x.flag||'', note:x.note||'', done:!!x.done }; });
   if (LIVE_HAS.talent) base.talent = s.talent_items.map(x => ({ id:x.id, rid:x.id, title:x.title, stage:x.stage||'contacted', fee:x.fee == null ? null : +x.fee }));
@@ -826,7 +829,7 @@ function openEvent(id){
     <div class="box"><h3>${t('gettingThere')}</h3>${runs.length ? runs.map(r => `<div class="mini"><span>${fmt(mins(r.t))} · ${esc(L(r,'title'))}</span>${runChip(r.status)}</div>`).join('') : '<div class="muted" style="font-size:13px">No transfer around this time</div>'}</div>
     ${venueBox(e)}
     ${(() => { const dg = (D.day||[]).filter(g => g.sessions.includes(e.id)); return dg.length ? `<div class="box"><h3>${t('dgEv')} <span class="num">${dg.length}</span></h3>${dg.map(g => `<div class="mini"><span>${esc(g.name)}${g.desk ? ` <span class="muted" style="font-size:12px">· ${esc(g.desk)}</span>` : ''}</span>${g.note ? `<span class="muted" style="font-size:12px" dir="auto">${esc(g.note)}</span>` : ''}</div>`).join('')}</div>` : ''; })()}
-    <div class="box"><h3>${t('food')}</h3>${food.length ? food.map(f => `<div class="mini"><span>${f.t} · ${esc(L(f,'title'))}${f.menu?' · menu ✓':''}</span>${stChip(f.status)}</div>`).join('') : '<div class="muted" style="font-size:13px">No catering linked</div>'}</div>
+    <div class="box"><h3>${t('food')}</h3>${food.length ? food.map(f => `<div class="mini"><span>${f.t} · ${esc(L(f,'title'))}${f.menu?' · menu ✓':''}</span>${stChip(f.status)}</div>` + (isAdmin() ? LIVE_QUOTES.filter(q => q.food_id === f.rid).map(q => `<div class="mini" data-notr dir="auto" style="font-size:12.5px"><span>${q.chosen ? '✓ ' : ''}<b>${esc(q.supplier)}</b> · ${esc(q.menu)}</span><span class="num muted">${esc(q.price)}</span></div>`).join('') : '')).join('') : '<div class="muted" style="font-size:13px">No catering linked</div>'}</div>
     <div class="box"><h3>${t('crewT')}</h3>${ops.length ? ops.map(o => `<div class="mini"><span>${fmt(o.s)} · ${esc(o.title)}</span>${o.crew.filter(c=>c.r===SMR||c.r==='Build lead').map(c => c.n==='?'?`<span class="chip bad">${t('noLead')}</span>`:`<span class="chip plain">${esc(c.n)}</span>`).join(' ')}</div>`).join('') : '<div class="muted" style="font-size:13px">No crew items linked</div>'}</div>
     <div class="box"><h3>${t('todos')} <span class="num">${todos.filter(x=>x.done).length}/${todos.length}</span></h3>
       ${todos.map(x => `<div class="todo"><input type="checkbox" id="td-${x.id}" data-todo="${x.id}" ${x.done?'checked':''} ${isEdit()?'':'disabled'}><label for="td-${x.id}" style="${x.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(L(x,'text'))}</label>${isAdmin()?`<button class="del" type="button" data-deltodo="${x.id}" aria-label="Remove to-do">✕</button>`:''}</div>`).join('') || '<div class="muted" style="font-size:13px">No to-dos</div>'}
@@ -975,6 +978,13 @@ function openAddContact(){
   $('cForm').onsubmit = ev => { ev.preventDefault(); { const nm = $('cName').value.trim(); send('contact/add', { name:nm, role:$('cRole').value.trim(), venue:$('cType').value === 'Venue' ? nm : '', by:NAME }); } D.contacts.push({ id:'k'+Date.now(), name:$('cName').value.trim(), type:$('cType').value, role:$('cRole').value.trim() }); log('Added contact ' + $('cName').value.trim()); closeSheet(); commit(); };
 }
 
+function quotesPanel(){
+  if (!isAdmin() || !LIVE_QUOTES.length) return '';
+  const linked = q => D.food.some(f => f.rid === q.food_id);
+  const groups = D.food.map(f => [L(f,'title') + ' · ' + dayName(f.day) + ' ' + f.t, LIVE_QUOTES.filter(q => q.food_id === f.rid)]).concat([[t('qUnlinked'), LIVE_QUOTES.filter(q => !linked(q))]]).filter(g => g[1].length);
+  return `<section class="panel" style="padding:14px 16px;margin-top:14px"><div class="sec-h" style="padding:0;margin-bottom:6px"><h2>${t('quotesT')} <span class="muted num" style="font-size:13px">${LIVE_QUOTES.length}</span></h2></div><p class="note" style="margin:0 0 10px">${t('quotesNote')}</p>
+    ${groups.map(([label, qs]) => `<div class="lbl" style="margin:12px 0 6px">${esc(label)}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>${t('qChosen')}</th><th>${t('qSupplier')}</th><th>${t('qMenu')}</th><th>${t('qPrice')}</th><th>${t('qLinens')}</th><th>${t('qDishes')}</th></tr></thead><tbody data-notr>${qs.map(q => `<tr><td><input type="checkbox" data-qchosen="${q.id}" ${q.chosen?'checked':''} aria-label="${t('qChosen')} ${esc(q.supplier)}" style="width:18px;height:18px;min-height:0;accent-color:var(--good)"></td><td dir="auto"><b>${esc(q.supplier)}</b>${q.note?`<div class="muted" style="font-size:12px">${esc(q.note)}</div>`:''}</td><td dir="auto">${esc(q.menu)}</td><td dir="auto" class="num">${esc(q.price)}</td><td dir="auto" style="font-size:12.5px">${esc(q.linens)}</td><td dir="auto" style="font-size:12.5px">${esc(q.dishes)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</section>`;
+}
 /* ============================ LOGISTICS ============================ */
 function viewLogistics(){
   const tab = S.tab.logistics;
@@ -986,7 +996,7 @@ function viewLogistics(){
   } else {
     const byNeed = {}; D.guests.filter(g=>g.dietary).forEach(g => { byNeed[g.dietary] = (byNeed[g.dietary]||0) + 1; });
     body = `<section class="panel" style="padding:14px 16px;margin-bottom:14px"><div class="lbl" style="margin-bottom:8px">Dietary · from the guest registry</div><div class="chips">${Object.keys(byNeed).sort().map(k => `<span class="chip ${D.guests.some(g=>g.dietary===k&&g.severe)?'bad':'plain'}">${esc(k)} · ${byNeed[k]}</span>`).join('')}</div></section>` +
-      [1,2,3].map(d => `<div class="lbl" style="margin:14px 0 8px">${dayName(d)}</div><div class="panel list">${D.food.filter(f=>f.day===d).map(f => `<div class="li"><span class="time num">${f.t}</span><span><div class="t">${esc(L(f,'title'))}</div>${f.menu?'<div class="s" style="color:var(--good)">Menu on file · read by AI</div>':''}</span>${isEdit()?`<button type="button" class="chipbtn" data-food="${f.id}" aria-label="Change status">${stChip(f.status)}</button>`:stChip(f.status)}</div>`).join('')}</div>`).join('');
+      [1,2,3].map(d => `<div class="lbl" style="margin:14px 0 8px">${dayName(d)}</div><div class="panel list">${D.food.filter(f=>f.day===d).map(f => `<div class="li"><span class="time num">${f.t}</span><span><div class="t">${esc(L(f,'title'))}</div>${f.menu?'<div class="s" style="color:var(--good)">Menu on file · read by AI</div>':''}${isAdmin() && LIVE_QUOTES.some(q => q.food_id === f.rid) ? `<div class="s" data-notr dir="auto">${LIVE_QUOTES.filter(q => q.food_id === f.rid).map(q => (q.chosen ? '✓ ' : '') + esc(q.supplier)).join(' · ')}</div>` : ''}</span>${isEdit()?`<button type="button" class="chipbtn" data-food="${f.id}" aria-label="Change status">${stChip(f.status)}</button>`:stChip(f.status)}</div>`).join('')}</div>`).join('') + quotesPanel();
   }
   return `<div class="page-h"><div><div class="lbl">${t('logistics')}</div><h1>${t('logH')}</h1></div></div>
   <div class="tabs" role="tablist">${tabs.map(([k,l,n]) => `<button role="tab" type="button" data-t="logistics" data-k="${k}" aria-selected="${tab===k}">${l}<span class="c num">${n}</span></button>`).join('')}</div>${body}`;
@@ -1506,6 +1516,7 @@ function render(){
   on('[data-delc]', 'onclick', b => { const c = D.contacts.find(x=>x.id===b.dataset.delc); if (c && c.rid) send('contact/delete', { id:c.rid }); D.contacts = D.contacts.filter(x=>x!==c); log('Removed contact ' + c.name); commit(); });
   on('[data-run]', 'onclick', b => { const r = D.runs.find(x=>x.id===b.dataset.run); const o = ['no_driver','to_confirm','booked','needs_decision']; r.status = o[(o.indexOf(r.status)+1)%o.length]; send('run/field', { id:r.rid, field:'status', value:r.status }); log('Transport ' + fmt(mins(r.t)) + ' ' + r.title + ' → ' + r.status.replace('_',' ')); commit(); });
   on('[data-run-open]', 'onclick', b => openRun(b.dataset.runOpen));
+  on('[data-qchosen]', 'onchange', c => { const q = LIVE_QUOTES.find(x => String(x.id) === c.dataset.qchosen); if (!q) return; q.chosen = c.checked ? 1 : 0; send('quote/field', { id:q.id, field:'chosen', value:c.checked }); log('Catering quote · ' + q.supplier + (c.checked ? ' chosen' : ' unchosen')); commit(); });
   on('[data-food]', 'onclick', b => { const f = D.food.find(x=>x.id===b.dataset.food); const o = ['open','progress','confirmed']; f.status = o[(o.indexOf(f.status)+1)%3]; send('food/field', { id:f.rid, field:'status', value:f.status }); log('Food “' + f.title + '” → ' + f.status); commit(); });
   on('[data-design]', 'onclick', b => openDesign(b.dataset.design));
   on('[data-btab]', 'onclick', b => { S.tab.budgetTab = b.dataset.btab; render(); });

@@ -2054,8 +2054,10 @@ function guestBodyHtml(g){
         <div style="display:flex;gap:6px;">
           <input class="g-in" data-gf="checkin" data-gid="${g.id}" value="${esc(g.checkin||'')}" placeholder="YYYY-MM-DD">
           <input class="g-in" data-gf="checkout" data-gid="${g.id}" value="${esc(g.checkout||'')}" placeholder="YYYY-MM-DD">
-        </div>`
-      :`<div class="g-val">${esc(g.hotel||DL('Own arrangement','סידור עצמאי'))}<br>${esc(g.room_type||'')}<br>${fmtDay(g.checkin)} → ${fmtDay(g.checkout)}</div>`}
+        </div>
+        <input class="g-in" data-gf="booking_conf" data-gid="${g.id}" value="${esc(g.booking_conf||'')}" placeholder="${DL('Booking confirmation','אישור הזמנה')}" style="margin-top:6px;">
+        <input class="g-in" data-gf="early_late" data-gid="${g.id}" value="${esc(g.early_late||'')}" placeholder="${DL('Early check-in / late check-out','צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר')}" style="margin-top:6px;">`
+      :`<div class="g-val">${esc(g.hotel||DL('Own arrangement','סידור עצמאי'))}<br>${esc(g.room_type||'')}<br>${fmtDay(g.checkin)} → ${fmtDay(g.checkout)}${g.booking_conf?'<br>'+DL('Confirmation','אישור')+': '+esc(g.booking_conf):''}${g.early_late?'<br>'+esc(g.early_late):''}</div>`}
       ${nights?`<div class="save-hint" style="margin-top:5px;">${nights}</div>`:''}
       ${g.accommodation_note?`<div class="save-hint" style="margin-top:5px;">Own: ${esc(g.accommodation_note)}</div>`:''}
     </div>
@@ -3311,7 +3313,7 @@ function ownerBadge(owner){
 }
 async function assignTask(kind, id, current){
   // build a simple picker: team members + free text
-  const names = data.team.map(m=>m.name);
+  const names = data.team.filter(m=>m.org!=="Jerusalem Foundation").map(m=>m.name);
   let msg = "Assign to:\n";
   names.forEach((n,i)=>{ msg += `${i+1}. ${n}\n`; });
   msg += `\nType a number, or type any name, or leave blank to unassign.`;
@@ -3326,7 +3328,7 @@ async function assignTask(kind, id, current){
   }catch(e){ toast("Couldn't assign",true); }
 }
 async function manageTeam(){
-  const list = data.team.map(m=>`• ${m.name}${m.role?" ("+m.role+")":""}`).join("\n") || "(nobody yet)";
+  const list = data.team.filter(m=>m.org!=="Jerusalem Foundation").map(m=>`• ${m.name}${m.role?" ("+m.role+")":""}`).join("\n") || "(nobody yet)";
   const ans = prompt(`Team members:\n${list}\n\nType a name to ADD, or type "del NAME" to remove.`, "");
   if(ans===null || !ans.trim()) return;
   const v = ans.trim();

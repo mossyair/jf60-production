@@ -10,7 +10,7 @@ var json = /* @__PURE__ */ __name2((data, status = 200) => new Response(JSON.str
   headers: { "content-type": "application/json", "cache-control": "no-store" }
 }), "json");
 var GUEST_PII_FIELDS = ["email", "phone", "city", "country", "passport_no", "passport_country", "is_israeli"];
-var GUEST_OPS_COLUMNS = ["id", "party_id", "first_name", "last_name", "desk", "ptype", "dietary", "dietary_severe", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "guest_note", "note_handled", "is_lead", "needs_review", "review_note", "status", "updated_at"];
+var GUEST_OPS_COLUMNS = ["id", "party_id", "first_name", "last_name", "desk", "ptype", "dietary", "dietary_severe", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "booking_conf", "early_late", "guest_note", "note_handled", "is_lead", "needs_review", "review_note", "status", "updated_at"];
 var UPLOAD_SECTIONS = ["content", "general", "proof", "menu"];
 var MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 var UPLOAD_TYPES = {
@@ -193,12 +193,15 @@ async function buildAskContext(env, level) {
     ctx.design_print = await q("SELECT title, category, status, deadline, qty, supplier, notes FROM design_items ORDER BY sort_order");
     ctx.gifts = await q("SELECT title, category, chosen, qty, status FROM gift_items ORDER BY sort_order");
     ctx.contacts = await q("SELECT name, role, venue FROM contacts");
-    ctx.team = await q("SELECT name, role FROM team");
+    ctx.team = await q("SELECT name, role, org FROM team");
+    ctx.day_guests = await q("SELECT first_name, last_name, desk, sessions, note FROM day_guests");
     ctx.crew_schedule = await q("SELECT day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min");
     ctx.furniture = await q("SELECT setup, segment_ids, item, qty, qty_note, size, stays_until, notes FROM furniture_items ORDER BY sort_order");
     ctx.organizations_fair = await q("SELECT name, domain, note, contacted, confirmed, form_done, power FROM fair_orgs ORDER BY sort_order");
     if (level === "admin")
       ctx.talent_contracts = await q("SELECT title, stage, fee, notes FROM talent_items ORDER BY sort_order");
+    if (level === "admin")
+      ctx.catering_quotes = await q("SELECT food_id, supplier, menu, price, linens, dishes, note, chosen FROM catering_quotes ORDER BY sort_order");
     const g = await q("SELECT desk, hotel, dietary, dietary_severe, needs_review, passport_no FROM guests WHERE status='active'");
     const tally = /* @__PURE__ */ __name((key) => g.reduce((m, r) => {
       const k = (r[key] || "").toString().trim() || "(none recorded)";
@@ -594,6 +597,18 @@ var src_default = {
             fairOrgs = await env.DB.prepare("SELECT * FROM fair_orgs ORDER BY sort_order, name").all();
           } catch (e) {
           }
+          let dayGuests = { results: [] };
+          try {
+            dayGuests = await env.DB.prepare(`SELECT ${admin ? "*" : "id, first_name, last_name, desk, sessions, note, updated_at"} FROM day_guests ORDER BY last_name, first_name`).all();
+          } catch (e) {
+          }
+          let cateringQuotes = { results: [] };
+          if (admin) {
+            try {
+              cateringQuotes = await env.DB.prepare("SELECT * FROM catering_quotes ORDER BY sort_order, id").all();
+            } catch (e) {
+            }
+          }
           let talentItems = { results: [] };
           if (admin) {
             try {
@@ -622,6 +637,8 @@ var src_default = {
             crew_shifts: crewShifts.results,
             talent_items: talentItems.results,
             fair_orgs: fairOrgs.results,
+            day_guests: dayGuests.results,
+            catering_quotes: cateringQuotes.results,
             furniture_items: furnitureItems.results,
             inbox_items: inboxItems.results
           });
@@ -1093,7 +1110,7 @@ var src_default = {
         }
         if (path === "/api/guest/field" && request.method === "POST") {
           const b = await readBody(request);
-          const allowed = ["first_name", "last_name", "desk", "ptype", "email", "phone", "city", "country", "passport_no", "passport_country", "dietary", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "guest_note", "review_note", "status"];
+          const allowed = ["first_name", "last_name", "desk", "ptype", "email", "phone", "city", "country", "passport_no", "passport_country", "dietary", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "booking_conf", "early_late", "guest_note", "review_note", "status"];
           if (!b.id || !allowed.includes(b.field))
             return json({ error: "bad field" }, 400);
           if (!admin && GUEST_PII_FIELDS.includes(b.field))
@@ -1632,8 +1649,21 @@ ${context}`;
           const b = await readBody(request);
           if (!b.name || !b.name.trim())
             return json({ error: "name required" }, 400);
-          const r = await env.DB.prepare("INSERT INTO team (name, role) VALUES (?,?)").bind(b.name.trim().slice(0, 120), (b.role || "").slice(0, 120)).run();
+          const org = b.org === "Jerusalem Foundation" ? "Jerusalem Foundation" : "Production";
+          const r = await env.DB.prepare("INSERT INTO team (name, role, org) VALUES (?,?,?)").bind(b.name.trim().slice(0, 120), (b.role || "").slice(0, 120), org).run();
           return json({ ok: true, id: r.meta.last_row_id });
+        }
+        if (path === "/api/team/field" && request.method === "POST") {
+          const b = await readBody(request);
+          if (!b.id || !["name", "role", "org"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          let value = (b.value ?? "").toString().trim().slice(0, 120);
+          if (b.field === "name" && !value)
+            return json({ error: "name required" }, 400);
+          if (b.field === "org" && !["Production", "Jerusalem Foundation"].includes(value))
+            return json({ error: "bad org" }, 400);
+          await env.DB.prepare(`UPDATE team SET ${b.field}=? WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
         }
         if (path === "/api/team/delete" && request.method === "POST") {
           const b = await readBody(request);
@@ -1781,6 +1811,55 @@ ${context}`;
             return json({ error: "admin required" }, 403);
           const b = await readBody(request);
           await env.DB.prepare("DELETE FROM fair_orgs WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/quote/field" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          if (!b.id || !["chosen", "note"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          const value = b.field === "chosen" ? b.value ? 1 : 0 : (b.value ?? "").toString().slice(0, 1e3);
+          await env.DB.prepare(`UPDATE catering_quotes SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/dayguest/field" && request.method === "POST") {
+          const b = await readBody(request);
+          const text = ["first_name", "last_name", "desk", "sessions", "note"];
+          const pii = ["email", "phone"];
+          if (!b.id || ![...text, ...pii].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          if (pii.includes(b.field) && !admin)
+            return json({ error: "admin required" }, 403);
+          const value = (b.value ?? "").toString().slice(0, 1e3);
+          if (b.field === "first_name" && !value.trim())
+            return json({ error: "name required" }, 400);
+          await env.DB.prepare(`UPDATE day_guests SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/dayguest/add" && request.method === "POST") {
+          const b = await readBody(request);
+          const first = (b.first_name || "").toString().trim().slice(0, 120);
+          if (!first)
+            return json({ error: "first name required" }, 400);
+          const r = await env.DB.prepare(
+            "INSERT INTO day_guests (first_name, last_name, desk, email, phone, sessions, note) VALUES (?,?,?,?,?,?,?)"
+          ).bind(
+            first,
+            (b.last_name || "").toString().slice(0, 120),
+            (b.desk || "").toString().slice(0, 40),
+            admin ? (b.email || "").toString().slice(0, 200) : "",
+            admin ? (b.phone || "").toString().slice(0, 60) : "",
+            (b.sessions || "").toString().slice(0, 1e3),
+            (b.note || "").toString().slice(0, 1e3)
+          ).run();
+          return json({ ok: true, id: r.meta.last_row_id });
+        }
+        if (path === "/api/dayguest/delete" && request.method === "POST") {
+          if (!admin)
+            return json({ error: "admin required" }, 403);
+          const b = await readBody(request);
+          await env.DB.prepare("DELETE FROM day_guests WHERE id=?").bind(b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/talent/field" && request.method === "POST") {

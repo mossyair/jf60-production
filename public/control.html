@@ -355,6 +355,9 @@ const T = {
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
+   dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
+   booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
+   staff:'Staff', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Jerusalem Foundation board', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
    peopleH:'Everyone in one directory', guests:'Guests', crew:'Crew', talent:'Talent & contracts', fair:'Organizations fair', contacts:'Contacts',
    logH:'Moving people, feeding people', ops:'Crew schedule', transport:'Transport', food:'Food & drink',
    prodH:'Everything being made, bought and scheduled', design:'Design & print', milestones:'Milestones', budget:'Budget', gifts:'Gifts',
@@ -368,6 +371,9 @@ const T = {
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
+   dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
+   booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
+   staff:'צוות', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן לירושלים', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
    peopleH:'כל האנשים במקום אחד', guests:'אורחים', crew:'צוות הפקה', talent:'תוכן וחוזים', fair:'יריד ארגונים', contacts:'אנשי קשר',
    logH:'להזיז אנשים, להאכיל אנשים', ops:'לו״ז צוות', transport:'הסעות', food:'אוכל ושתייה',
    prodH:'כל מה שמיוצר, נקנה ומתוזמן', design:'עיצוב ודפוס', milestones:'אבני דרך', budget:'תקציב', gifts:'מתנות',
@@ -444,6 +450,7 @@ const OPS_BASE = [
 const TALENT_BASE = [['Panel host · Train Theater','quote',8000],['Performance + workshop · Jerusalem Theater','contacted',28000],['Keynote speaker · Jerusalem Theater','quote',25000],['Yoga · day 2','contacted',400],['Run tour · day 2','contacted',2000],['Round-table keynote','contacted',3000],['Arabic lesson for donors','contacted',600],['Yoga · day 3','contacted',400],['British Trail run','contacted',2000],['TED-style build · Science Museum','quote',null],['Main performance · gala','quote',null],['Additional booking','contacted',null]];
 const BUDGET_BASE = [['Coffee & pastries','Peacock + Talbiye',23500],['Sound','Schuster',15000],['Sound technician · 3 days','Schuster',9000],['Double-decker bus','TBC',10000],['Dedicated cleaner','TBC',4000],['Water & soda for rides','TBC',3000]];
 let CREW = [['Hagai','Sound · site manager'],['Uri','Transport · Tower of David'],['Natali','Furniture'],['Carmi','Food'],['Moss','Food · producer'],['Yair','Design & print'],['Kosta','Site manager · Ein Yael'],['Yarden','Site manager · Cinematheque'],['Elnatan','Site manager · unconfirmed']];
+let JF_STAFF = [];
 let LEADERS = [['Mishkenot Sha’ananim','Yaara'],['King David','Maichuk'],['Inbal','Tali Sasson'],['Dan Panorama','Si Agai']];
 const CONTACTS_BASE = [['Schuster','Supplier','Sound, AV & lighting'],['Peacock','Supplier','Coffee & pastries'],['Talbiye','Supplier','Coffee & pastries'],['Nir Bavli','Supplier','Catering · Ein Yael'],['Mishkenot Sha’ananim','Venue','Days 1–3 base'],['Train Theater','Venue','Day 1 plenary'],['Jerusalem Theater','Venue','Opening evening'],['HaMiffal','Venue','Art fair & dinner'],['Cinematheque Jerusalem','Venue','Day 3 morning'],['Bloomfield Science Museum','Venue','Think tank'],['Tower of David','Venue','Closing gala']];
 const HOTELS = ['Mishkenot Sha’ananim','Inbal','King David','Dan Panorama'];
@@ -551,7 +558,8 @@ function applyLive(){
       proofs: proofs.filter(p => p.item_id === d.id).sort((a,b) => a.version - b.version).map(p => ({ rid:p.id, file:p.file_id, v:p.version, by:p.uploaded_by||'', decision:p.decision||'pending', comment:p.comment||'' })) }));
   }
   const gs = (s.guests||[]).filter(g => (g.status||'active') === 'active');
-  if (gs.length) base.guests = gs.map(g => ({ id:'gu'+g.id, rid:g.id, name:[g.first_name, g.last_name].filter(Boolean).join(' '), desk:g.desk||'', hotel:g.hotel||'', dietary:g.dietary||'', severe:!!g.dietary_severe, passport:!!g.passport_no, review:!!g.needs_review, email:g.email||'', phone:g.phone||'', status:'active' }));
+  if (gs.length) base.guests = gs.map(g => ({ id:'gu'+g.id, rid:g.id, name:[g.first_name, g.last_name].filter(Boolean).join(' '), desk:g.desk||'', hotel:g.hotel||'', dietary:g.dietary||'', severe:!!g.dietary_severe, passport:!!g.passport_no, review:!!g.needs_review, email:g.email||'', phone:g.phone||'', room:g.room_type||'', cin:g.checkin||'', cout:g.checkout||'', conf:g.booking_conf||'', early:g.early_late||'', status:'active' }));
+  base.day = (s.day_guests||[]).map(x => ({ id:'dg'+x.id, rid:x.id, first:x.first_name||'', last:x.last_name||'', name:[x.first_name, x.last_name].filter(Boolean).join(' '), desk:x.desk||'', email:x.email||'', phone:x.phone||'', sessions:(x.sessions||'').split(',').map(v => v.trim()).filter(Boolean), note:x.note||'' }));
   LIVE_FURN = s.furniture_items || [];
   LIVE_HAS = { inbox:Array.isArray(s.inbox_items), ops:(s.crew_shifts||[]).length > 0, talent:(s.talent_items||[]).length > 0, team:(s.team||[]).length > 0, fair:(s.fair_orgs||[]).length > 0 };
   if (LIVE_HAS.ops) base.ops = s.crew_shifts.map(x => { let crew = []; try { crew = JSON.parse(x.crew_json || '[]'); } catch(e){} return { id:x.id, rid:x.id, day:String(x.day), s:+x.start_min, e:+x.end_min, title:x.title, site:x.site||'', kind:x.kind||'setup', crew, flag:x.flag||'', note:x.note||'', done:!!x.done }; });
@@ -561,9 +569,10 @@ function applyLive(){
     base.fairForm = base.fair.filter(o => o.form).length;
   }
   if (LIVE_HAS.team) {
-    const lead = /^Hotel group leader · /;
-    CREW = s.team.filter(m => !lead.test(m.role||'')).map(m => [m.name, m.role||'']);
-    LEADERS = s.team.filter(m => lead.test(m.role||'')).map(m => [(m.role||'').replace(lead, ''), m.name]);
+    const lead = /^Hotel group leader · /, prod = s.team.filter(m => (m.org||'Production') !== 'Jerusalem Foundation');
+    CREW = prod.filter(m => !lead.test(m.role||'')).map(m => [m.name, m.role||'']);
+    LEADERS = prod.filter(m => lead.test(m.role||'')).map(m => [(m.role||'').replace(lead, ''), m.name]);
+    JF_STAFF = s.team.filter(m => m.org === 'Jerusalem Foundation');
   }
   if (LIVE_HAS.inbox) {
     const toClient = (type, tg) => !tg ? '' : type === 'menu' ? 'f' + tg : type === 'proof' ? 'd' + tg : tg;
@@ -816,6 +825,7 @@ function openEvent(id){
     ${isView() ? `<div class="box"><h3>For guests</h3><div style="font-size:13.5px">Viewers see the public description, venue and times.</div></div>` : `
     <div class="box"><h3>${t('gettingThere')}</h3>${runs.length ? runs.map(r => `<div class="mini"><span>${fmt(mins(r.t))} · ${esc(L(r,'title'))}</span>${runChip(r.status)}</div>`).join('') : '<div class="muted" style="font-size:13px">No transfer around this time</div>'}</div>
     ${venueBox(e)}
+    ${(() => { const dg = (D.day||[]).filter(g => g.sessions.includes(e.id)); return dg.length ? `<div class="box"><h3>${t('dgEv')} <span class="num">${dg.length}</span></h3>${dg.map(g => `<div class="mini"><span>${esc(g.name)}${g.desk ? ` <span class="muted" style="font-size:12px">· ${esc(g.desk)}</span>` : ''}</span>${g.note ? `<span class="muted" style="font-size:12px" dir="auto">${esc(g.note)}</span>` : ''}</div>`).join('')}</div>` : ''; })()}
     <div class="box"><h3>${t('food')}</h3>${food.length ? food.map(f => `<div class="mini"><span>${f.t} · ${esc(L(f,'title'))}${f.menu?' · menu ✓':''}</span>${stChip(f.status)}</div>`).join('') : '<div class="muted" style="font-size:13px">No catering linked</div>'}</div>
     <div class="box"><h3>${t('crewT')}</h3>${ops.length ? ops.map(o => `<div class="mini"><span>${fmt(o.s)} · ${esc(o.title)}</span>${o.crew.filter(c=>c.r===SMR||c.r==='Build lead').map(c => c.n==='?'?`<span class="chip bad">${t('noLead')}</span>`:`<span class="chip plain">${esc(c.n)}</span>`).join(' ')}</div>`).join('') : '<div class="muted" style="font-size:13px">No crew items linked</div>'}</div>
     <div class="box"><h3>${t('todos')} <span class="num">${todos.filter(x=>x.done).length}/${todos.length}</span></h3>
@@ -853,7 +863,7 @@ function openAddSession(){
 
 /* ============================ PEOPLE ============================ */
 function viewPeople(){
-  const tabs = [['guests',t('guests'),D.guests.length],['crew',t('crew'),CREW.length],['talent',t('talent'),D.talent.length],['fair',t('fair'),D.fair.length],['contacts',t('contacts'),D.contacts.length]].filter(x => isAdmin() || x[0] !== 'talent');
+  const tabs = [['guests',t('guests'),D.guests.length],...(LIVE?[['day',t('dayGuests'),D.day.length]]:[]),['crew',t('staff'),CREW.length+LEADERS.length+JF_STAFF.length],['talent',t('talent'),D.talent.length],['fair',t('fair'),D.fair.length],['contacts',t('contacts'),D.contacts.length]].filter(x => isAdmin() || x[0] !== 'talent');
   if (!tabs.find(x=>x[0]===S.tab.people)) S.tab.people = 'guests';
   const tab = S.tab.people;
   let body = '';
@@ -871,9 +881,21 @@ function viewPeople(){
       ${list.map(g => `<tr class="click" data-guest="${g.id}" tabindex="0"><td>${esc(g.name)}</td><td>${esc(g.desk)}</td><td>${g.hotel?esc(g.hotel):'<span style="color:var(--bad)">Not recorded</span>'}</td><td>${g.severe?`<span class="chip bad">${esc(g.dietary)}</span>`:esc(g.dietary)||'<span class="muted">—</span>'}</td>${isAdmin()?`<td>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing</span>'}</td>`:''}<td>${g.review?'<span class="chip info">Review</span>':''}</td></tr>`).join('')}
     </tbody></table></div>
     <p class="note">Editors see names, hotels and dietary needs. Passports, phones and emails stay admin only.</p>`;
+  } else if (tab === 'day') {
+    const evs = D.ev.filter(e => !/Break/i.test(e.title));
+    body = `<div class="bar"><p class="note" style="margin:0;flex:1;min-width:220px">${t('dgNote')}</p>${isEdit()?`<button class="btn sm" type="button" id="addDay">${t('dgAdd')}</button>`:''}</div>
+    <div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>${t('deskT')}</th><th>${t('sessionsT')}</th><th>${t('notes')}</th></tr></thead><tbody>
+      ${D.day.map(g => `<tr class="click" data-dayg="${g.id}" tabindex="0"><td>${esc(g.name)}</td><td>${esc(g.desk)||'<span class="muted">—</span>'}</td><td>${g.sessions.length ? g.sessions.map(sid => { const e = evs.find(x => x.id === sid); return e ? `<span class="chip plain" style="margin:2px">${dayName(e.day).slice(0,3)} ${e.s} · ${esc(L(e,'title')).slice(0,34)}</span>` : ''; }).join('') : `<span class="chip bad">${t('noSession')}</span>`}</td><td dir="auto" style="font-size:13px">${esc(g.note)}</td></tr>`).join('') || `<tr><td colspan="4" class="muted">${t('dgNone')}</td></tr>`}
+    </tbody></table></div>
+    <p class="note">Editors see names and sessions. Emails and phones stay admin only.</p>`;
   } else if (tab === 'crew') {
-    body = `<div class="cols even"><section class="panel"><div class="sec-h"><h2>Production crew</h2></div><div class="list">${CREW.map(([n,r]) => { const k = D.ops.filter(o => o.crew.some(c => c.n === n)).length; return `<button type="button" class="li" data-crew="${n}" style="grid-template-columns:36px minmax(0,1fr) auto"><span class="av">${n[0]}</span><span><div class="t">${n}</div><div class="s">${r}</div></span><span class="muted num" style="font-size:12.5px">${k} shifts</span></button>`; }).join('')}</div></section>
-    <section class="panel"><div class="sec-h"><h2>Hotel group leaders</h2></div><div class="list">${LEADERS.map(([h,n]) => `<div class="li" style="grid-template-columns:minmax(0,1fr) auto"><span>${h}</span><span class="t">${n}</span></div>`).join('')}</div></section></div>`;
+    const byRole = JF_STAFF.filter(m => !/board/i.test(m.role||'')), board = JF_STAFF.filter(m => /board/i.test(m.role||''));
+    const staffList = xs => xs.map(m => `<div class="li" style="grid-template-columns:36px minmax(0,1fr) auto"><span class="av">${esc((m.name||'?')[0])}</span><span><div class="t">${esc(m.name)}</div>${m.role && !/^(Staff|Board of directors)$/i.test(m.role) ? `<div class="s" dir="auto">${esc(m.role)}</div>` : ''}</span>${isAdmin()?`<button class="linkbtn" type="button" data-staffdel="${m.id}">${t('remove')}</button>`:''}</div>`).join('') || '<div class="empty">—</div>';
+    const addForm = LIVE && isEdit() ? `<section class="panel" style="padding:14px 16px;margin-top:14px"><div class="lbl" style="margin-bottom:8px">${t('addStaff')}</div><form id="staffForm" style="display:flex;gap:8px;flex-wrap:wrap"><label class="sr" for="stName">Name</label><input id="stName" placeholder="Name" style="flex:2;min-width:160px" required><label class="sr" for="stRole">${t('staffRole')}</label><input id="stRole" dir="auto" placeholder="${t('staffRole')}" style="flex:1;min-width:120px"><label class="sr" for="stOrg">${t('orgT')}</label><select id="stOrg"><option value="Production">${t('orgProd')}</option><option value="Jerusalem Foundation">${t('orgJF')}</option></select><button class="btn sm" type="submit">${t('add')}</button></form></section>` : '';
+    body = `<div class="cols even"><section class="panel"><div class="sec-h"><h2>${t('prodCrew')}</h2></div><div class="list">${CREW.map(([n,r]) => { const k = D.ops.filter(o => o.crew.some(c => c.n === n)).length; return `<button type="button" class="li" data-crew="${n}" style="grid-template-columns:36px minmax(0,1fr) auto"><span class="av">${n[0]}</span><span><div class="t">${n}</div><div class="s">${r}</div></span><span class="muted num" style="font-size:12.5px">${k} shifts</span></button>`; }).join('')}</div></section>
+    <section class="panel"><div class="sec-h"><h2>${t('hotelLeaders')}</h2></div><div class="list">${LEADERS.map(([h,n]) => `<div class="li" style="grid-template-columns:minmax(0,1fr) auto"><span>${h}</span><span class="t">${n}</span></div>`).join('')}</div></section></div>
+    ${LIVE ? `<div class="cols even" style="margin-top:14px"><section class="panel"><div class="sec-h"><h2>${t('jfStaff')} <span class="muted num" style="font-size:13px">${byRole.length}</span></h2></div><div class="list">${staffList(byRole)}</div></section>
+    <section class="panel"><div class="sec-h"><h2>${t('board')} <span class="muted num" style="font-size:13px">${board.length}</span></h2></div><div class="list">${staffList(board)}</div></section></div>` : ''}${addForm}`;
   } else if (tab === 'talent') {
     const lanes = [['contacted','Contacted'],['quote','Quote in'],['signed','Signed'],['invoiced','Invoiced']];
     const signed = D.talent.filter(x=>x.stage==='signed'||x.stage==='invoiced').length;
@@ -908,14 +930,43 @@ function openGuest(id){
     <label class="fld">Dietary<input id="gDiet" value="${esc(g.dietary)}" ${isEdit()?'':'disabled'} placeholder="None recorded"></label></div>
     <label class="todo"><input type="checkbox" id="gSev" ${g.severe?'checked':''} ${isEdit()?'':'disabled'}> Severe allergy · tell every caterer</label>
     <div class="box"><h3>Contact & travel documents</h3>${isAdmin() ? `<dl class="kv"><dt>Email</dt><dd>${esc(g.email)||'<span class="muted">—</span>'}</dd><dt>Phone</dt><dd class="num">${esc(g.phone)||'<span class="muted">—</span>'}</dd><dt>Passport</dt><dd>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing · needed for VAT</span>'}</dd></dl>` : '<div class="ro">Admin only</div>'}</div>
+    <div class="box"><h3>${t('booking')}</h3>${g.hotel || g.cin ? `<dl class="kv" style="margin-bottom:8px">${g.room?`<dt>${t('roomT')}</dt><dd dir="auto">${esc(g.room)}</dd>`:''}<dt>${t('checkIn')}</dt><dd class="num">${g.cin?ddmm(g.cin):'—'}</dd><dt>${t('checkOut')}</dt><dd class="num">${g.cout?ddmm(g.cout):'—'}</dd></dl>` : ''}
+      <div class="row2"><label class="fld">${t('conf')}<input id="gConf" dir="auto" value="${esc(g.conf)}" placeholder="${t('confPh')}" ${isEdit()?'':'disabled'}></label><label class="fld">${t('earlyLate')}<input id="gEarly" dir="auto" value="${esc(g.early)}" placeholder="${t('earlyPh')}" ${isEdit()?'':'disabled'}></label></div></div>
     <div class="box"><h3>Sessions <span class="num">${sess.length}</span></h3><div class="muted" style="font-size:13px">Attending all main sessions. RSVPs per session feed the headcount for catering and transport.</div></div>
     ${g.review ? `<div class="box" style="border-color:var(--info)"><h3>Flagged in the last import</h3><div style="font-size:13.5px">Details changed in the registration sheet.</div>${isEdit()?'<button class="btn ghost sm" type="button" id="gClear">Reviewed · clear flag</button>':''}</div>` : ''}
   </div>`);
   const sh = $('sheet');
   const hs = sh.querySelector('#gHotel'); hs.onchange = () => { g.hotel = hs.value; send('guest/field', { id:g.rid, field:'hotel', value:hs.value }); log('Set hotel for ' + g.name + ' to ' + (g.hotel||'none')); commit(); };
   const di = sh.querySelector('#gDiet'); di.onchange = () => { g.dietary = di.value.trim(); send('guest/field', { id:g.rid, field:'dietary', value:g.dietary }); log('Updated dietary needs for ' + g.name); commit(); };
+  const gcf = sh.querySelector('#gConf'); gcf.onchange = () => { g.conf = gcf.value.trim(); send('guest/field', { id:g.rid, field:'booking_conf', value:g.conf }); log('Hotel confirmation for ' + g.name + ': ' + (g.conf||'—')); commit(false); };
+  const gel = sh.querySelector('#gEarly'); gel.onchange = () => { g.early = gel.value.trim(); send('guest/field', { id:g.rid, field:'early_late', value:g.early }); log('Early/late check-in for ' + g.name + ': ' + (g.early||'—')); commit(false); };
   const sv = sh.querySelector('#gSev'); sv.onchange = () => { g.severe = sv.checked; send('guest/flag', { id:g.rid, field:'dietary_severe', value:sv.checked }); log((sv.checked?'Marked':'Unmarked') + ' severe allergy for ' + g.name); commit(); };
   const gc = sh.querySelector('#gClear'); if (gc) gc.onclick = () => { g.review = false; send('guest/flag', { id:g.rid, field:'needs_review', value:false }); log('Cleared review flag for ' + g.name); commit(); openGuest(id); };
+}
+function openDayGuest(id){
+  const g = id ? D.day.find(x => x.id === id) : null; if (id && !g) return; SHEET = id ? () => openDayGuest(id) : null;
+  const evs = D.ev.filter(e => !/Break/i.test(e.title)).slice().sort((a,b) => a.day - b.day || a.s.localeCompare(b.s));
+  const sel = g ? g.sessions : [], ro = isEdit() ? '' : 'disabled';
+  openSheet(`<div class="sh-h"><div><div class="lbl">${t('dayGuests')}</div><h2>${g ? esc(g.name) : t('dgAdd')}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
+  <form class="sh-b" id="dgForm">
+    <div class="row2"><label class="fld">${t('firstName')}<input id="dgFirst" value="${esc(g?g.first:'')}" required ${ro}></label><label class="fld">${t('lastName')}<input id="dgLast" value="${esc(g?g.last:'')}" ${ro}></label></div>
+    <label class="fld">${t('deskT')}<input id="dgDesk" value="${esc(g?g.desk:'')}" ${ro}></label>
+    ${isAdmin() ? `<div class="row2"><label class="fld">Email<input id="dgEmail" type="email" value="${esc(g?g.email:'')}"></label><label class="fld">Phone<input id="dgPhone" value="${esc(g?g.phone:'')}"></label></div>` : ''}
+    <div class="box"><h3>${t('sessionsT')} <span class="num">${sel.length}</span></h3>${evs.map(e => `<div class="todo"><input type="checkbox" id="dgs-${e.id}" data-dgs="${e.id}" ${sel.includes(e.id)?'checked':''} ${ro}><label for="dgs-${e.id}">${dayName(e.day)} ${e.s} · ${esc(L(e,'title'))}</label></div>`).join('')}</div>
+    <label class="fld">${t('notes')}<textarea id="dgNote" dir="auto" ${ro}>${esc(g?g.note:'')}</textarea></label>
+    ${isEdit() ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="submit">${g ? t('save') : t('add')}</button>${g && isAdmin() ? `<button class="btn ghost" type="button" id="dgDel" style="color:var(--bad)">${t('remove')}</button>` : ''}</div>` : ''}
+  </form>`);
+  const sh = $('sheet');
+  sh.querySelector('#dgForm').onsubmit = ev => { ev.preventDefault(); if (!isEdit()) return;
+    const v = { first_name:$('dgFirst').value.trim(), last_name:$('dgLast').value.trim(), desk:$('dgDesk').value.trim(), sessions:[...sh.querySelectorAll('[data-dgs]:checked')].map(c => c.dataset.dgs).join(','), note:$('dgNote').value.trim() };
+    if (isAdmin()) { v.email = $('dgEmail').value.trim(); v.phone = $('dgPhone').value.trim(); }
+    if (!v.first_name) return;
+    const name = [v.first_name, v.last_name].filter(Boolean).join(' ');
+    if (g) { Object.keys(v).forEach(k => { const old = { first_name:g.first, last_name:g.last, desk:g.desk, sessions:g.sessions.join(','), note:g.note, email:g.email, phone:g.phone }[k]; if (old !== v[k]) send('dayguest/field', { id:g.rid, field:k, value:v[k] }); });
+      Object.assign(g, { first:v.first_name, last:v.last_name, name, desk:v.desk, sessions:v.sessions.split(',').filter(Boolean), note:v.note }); if (isAdmin()) Object.assign(g, { email:v.email, phone:v.phone }); log('Day guests · updated ' + name); }
+    else { D.day.push({ id:'dgtmp' + Date.now(), first:v.first_name, last:v.last_name, name, desk:v.desk, email:v.email||'', phone:v.phone||'', sessions:v.sessions.split(',').filter(Boolean), note:v.note }); send('dayguest/add', v); log('Day guests · added ' + name); }
+    closeSheet(); commit(); };
+  const dd = sh.querySelector('#dgDel'); if (dd) dd.onclick = () => { if (!confirm(t('dgDel').replace('{n}', g.name))) return; D.day = D.day.filter(x => x !== g); send('dayguest/delete', { id:g.rid }); log('Day guests · removed ' + g.name); closeSheet(); commit(); };
 }
 function openAddContact(){
   openSheet(`<div class="sh-h"><div><div class="lbl">${t('contacts')}</div><h2>New contact</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
@@ -1205,7 +1256,7 @@ function paper(k){
   if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${'1.10.2026'}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`]), ...D.ops.filter(o=>o.day===String(d+19)).map(o=>[o.s, `Crew: ${esc(o.title)} · ${esc(o.crew.map(crewLabel).join(', '))}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
   if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>g.hotel===h).length).join(' · '):''}</td></tr>`).join(''));
   if (k==='caterer') { const by = {}; D.guests.filter(g=>g.dietary).forEach(g => by[g.dietary] = (by[g.dietary]||[]).concat(g)); return `<h1>Dietary requirements</h1><div>${D.guests.filter(g=>g.dietary).length} guests · for every caterer</div><h2>Summary</h2><table>${Object.keys(by).sort().map(k => `<tr><td>${by[k].length}</td><td class="${by[k].some(g=>g.severe)?'sev':''}">${esc(k)}${by[k].some(g=>g.severe)?' · SEVERE':''}</td></tr>`).join('')}</table><h2>Meals</h2><table>${D.food.filter(f=>/lunch|dinner|Lunch|Dinner/.test(f.title)).map(f => `<tr><td>${dayName(f.day)}</td><td>${esc(f.title)}</td></tr>`).join('')}</table>`; }
-  if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>g.hotel===h).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>g.hotel===h).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
+  if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>g.hotel===h).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>g.hotel===h).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
   if (k==='supplier') return `<h1>Brief for Schuster</h1><div>Sound, AV and lighting per session</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d && !/Break/.test(e.title)).map(e => `<tr><td>${e.s}</td><td><b>${esc(e.title)}</b> · ${esc(e.venue)}<br>${e.av?esc(e.av):'<span style="color:#B63E2A">AV brief missing</span>'}</td></tr>`).join(''));
   return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r]) => `<tr><td>${n}</td><td>${r} · [phone]</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n]) => `<tr><td>${n}</td><td>${h} · [phone]</td></tr>`).join('')}</table>`;
 }
@@ -1438,6 +1489,11 @@ function render(){
   on('[data-cf]', 'onclick', b => { S.filter.contacts = b.dataset.cf; render(); });
   on('[data-guest]', 'onclick', b => openGuest(b.dataset.guest));
   p.querySelectorAll('[data-guest]').forEach(r => r.onkeydown = e => { if (e.key === 'Enter') openGuest(r.dataset.guest); });
+  on('[data-dayg]', 'onclick', b => openDayGuest(b.dataset.dayg));
+  p.querySelectorAll('[data-dayg]').forEach(r => r.onkeydown = e => { if (e.key === 'Enter') openDayGuest(r.dataset.dayg); });
+  const ad = $('addDay'); if (ad) ad.onclick = () => openDayGuest(null);
+  on('[data-staffdel]', 'onclick', b => { const m = JF_STAFF.find(x => String(x.id) === b.dataset.staffdel); if (!m || !confirm(t('staffDel').replace('{n}', m.name))) return; JF_STAFF = JF_STAFF.filter(x => x !== m); send('team/delete', { id:m.id }); log('Staff · removed ' + m.name); commit(); });
+  const sf = $('staffForm'); if (sf) sf.onsubmit = e => { e.preventDefault(); const name = $('stName').value.trim(), role = $('stRole').value.trim(), org = $('stOrg').value; if (!name) return; if (org === 'Jerusalem Foundation') JF_STAFF.push({ id:'tmp' + Date.now(), name, role, org }); else CREW.push([name, role]); send('team/add', { name, role, org }); log('Staff · added ' + name + ' (' + org + ')'); commit(); };
   on('[data-crew]', 'onclick', b => { S.person = b.dataset.crew; S.opsView = 'me'; go('logistics','ops'); });
   on('[data-tmove]', 'onclick', b => { const x = D.talent.find(y=>y.id===b.dataset.tmove); const o = ['contacted','quote','signed','invoiced']; x.stage = o[Math.max(0, Math.min(3, o.indexOf(x.stage) + +b.dataset.dir))]; send('talent/field', { id:x.rid, field:'stage', value:x.stage }); log('Moved “' + x.title + '” to ' + x.stage); commit(); });
   on('[data-vdays]', 'onclick', b => { S.visitsDays = +b.dataset.vdays; render(); });

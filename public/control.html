@@ -161,6 +161,9 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .sh-b{padding:14px 22px 30px;overflow:auto;display:flex;flex-direction:column;gap:16px;flex:1}
 .kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 12px;margin:0;font-size:13.5px;align-items:center}
 .kv dt{color:var(--muted)} .kv dd{margin:0}
+.ros{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 14px;font-size:13.5px;line-height:1.45}
+.ros .tm{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ros .full{grid-column:1/-1;color:var(--muted);font-size:12.5px;margin-top:4px}
 .box{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .box h3{margin:0;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .mini{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px}
@@ -355,6 +358,7 @@ const T = {
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
+   ros:'Run of show', rosNone:'No run of show yet', rosEdit:'Edit', rosDone:'Done', rosPh:'One line per item, starting with the time: 14:00 Doors open',
    quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
    dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
    booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
@@ -372,6 +376,7 @@ const T = {
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
+   ros:'לו״ז מפורט', rosNone:'עדיין אין לו״ז מפורט', rosEdit:'עריכה', rosDone:'סיום', rosPh:'שורה לכל פריט, מתחילה בשעה: 14:00 פתיחת דלתות',
    quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
    dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
    booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
@@ -543,7 +548,7 @@ function applyLive(){
   const base = seed(), s = LIVE;
   // sections without live data keep what this viewer did to them until the page reloads
   if (D && D.ev) ['inbox','log','ops','talent','budget','fair','team','perms','fairForm'].forEach(k => { if (D[k] !== undefined) base[k] = D[k]; });
-  base.ev = (s.segments||[]).map(x => ({ id:x.id, day:+x.day, s:x.time, e:x.end_time==='00:00'?'24:00':x.end_time, title:x.title, title_he:x.title_he||'', venue:x.venue||'', venue_he:x.venue_he||'', status:x.status||'open', av:x.brief_av||'', loc:x.brief_location||'', notes:x.notes||'',
+  base.ev = (s.segments||[]).map(x => ({ id:x.id, day:+x.day, s:x.time, e:x.end_time==='00:00'?'24:00':x.end_time, title:x.title, title_he:x.title_he||'', venue:x.venue||'', venue_he:x.venue_he||'', status:x.status||'open', av:x.brief_av||'', ros:x.brief_runsheet||'', loc:x.brief_location||'', notes:x.notes||'',
     files: LIVE_FILES.filter(f => f.segment_id === x.id && f.section === 'content').map(f => ({ id:f.id, name:f.filename })) }));
   base.todos = (s.checklist||[]).map(c => ({ id:'c'+c.id, rid:c.id, ev:c.segment_id, text:c.text, text_he:c.text_he||'', done:!!c.done }));
   const tl = (s.timeline||[]).filter(m => /^\d{4}-\d\d-\d\d$/.test(m.due_date||''));
@@ -815,6 +820,17 @@ function furnBox(e){
     return `<div class="lbl" style="margin:8px 0 2px" dir="auto">${esc(st)}${until ? ' · ' + esc(until) : ''}</div>` + its.map(f => `<div class="mini" dir="auto"><span>${esc(f.item)}${f.size ? ' · ' + esc(f.size) : ''}${f.notes ? `<span class="muted" style="font-size:12px"> · ${esc(f.notes)}</span>` : ''}</span>${isEdit() ? `<label class="sr" for="fq-${f.id}">${t('qty')} ${esc(f.item)}</label><input id="fq-${f.id}" data-fq="${f.id}" inputmode="numeric" value="${f.qty == null ? '' : f.qty}" placeholder="—" style="width:64px;min-height:30px;text-align:center">` : `<span class="num">${f.qty == null ? '—' : f.qty}</span>`}${f.qty_note ? `<span class="muted" style="font-size:12px">${esc(f.qty_note)}</span>` : ''}${isAdmin() && !String(f.id).startsWith('tmp') ? `<button class="del" type="button" data-fdelx="${f.id}" aria-label="${t('remove')} ${esc(f.item)}">✕</button>` : ''}</div>`).join(''); }).join('')}
     <div class="muted" style="font-size:12px;margin-top:6px">${t('furnNote')}</div>${add}</div>`;
 }
+let ROS_EDIT = null;
+// "14:00 Doors" / "14:00-14:30 Panel" → [time, text]; lines without a time are notes
+const rosRows = txt => (txt || '').split('\n').map(l => l.replace(/^[\s*•·-]+/, '').trim()).filter(Boolean).map(l => { const m = l.match(/^(\d{1,2}[:.]\d{2}(?:\s*[–-]\s*\d{1,2}[:.]\d{2})?)\s*(.*)$/); return m ? [m[1].replace(/\./g, ':').replace(/\s*[–-]\s*/, '–'), m[2]] : ['', l]; });
+function rosBox(e){
+  const editing = ROS_EDIT === e.id && isEdit(), rows = rosRows(e.ros);
+  const btn = isEdit() ? `<button class="btn ghost sm" type="button" id="rosToggle">${editing ? t('rosDone') : t('rosEdit')}</button>` : '';
+  const body = editing ? `<label class="sr" for="rosIn">${t('ros')}</label><textarea id="rosIn" dir="auto" style="min-height:220px" placeholder="${t('rosPh')}">${esc(e.ros)}</textarea>`
+    : rows.length ? `<div class="ros" dir="${/[\u0590-\u05FF]/.test(e.ros) ? 'rtl' : 'ltr'}" data-notr>${rows.map(([tm, x]) => tm ? `<span class="tm" dir="ltr">${esc(tm)}</span><span>${esc(x)}</span>` : `<span class="full">${esc(x)}</span>`).join('')}</div>`
+    : `<div class="muted" style="font-size:13px">${t('rosNone')}</div>`;
+  return `<div class="box"><h3>${t('ros')} ${btn}</h3>${body}</div>`;
+}
 function openEvent(id){
   const e = D.ev.find(x => x.id === id); if (!e) return; SHEET = () => openEvent(id);
   const runs = D.runs.filter(r => r.day === e.day && near(r.t, e.s));
@@ -826,6 +842,7 @@ function openEvent(id){
     <dl class="kv"><dt>${t('venue')}</dt><dd>${esc(L(e,'venue')||'Hotels')}${e.loc && !isView() ? `<div class="muted" style="font-size:12.5px;white-space:pre-line;margin-top:2px">${esc(e.loc)}</div>` : ''}</dd>
     ${!isView() ? `<dt>${t('status')}</dt><dd>${isEdit()?`<select id="evStatus">${['open','progress','confirmed'].map(s=>`<option value="${s}" ${s===e.status?'selected':''}>${t(s)}</option>`).join('')}</select>`:stChip(e.status)}</dd>` : ''}</dl>
     ${isView() ? `<div class="box"><h3>For guests</h3><div style="font-size:13.5px">Viewers see the public description, venue and times.</div></div>` : `
+    ${rosBox(e)}
     <div class="box"><h3>${t('gettingThere')}</h3>${runs.length ? runs.map(r => `<div class="mini"><span>${fmt(mins(r.t))} · ${esc(L(r,'title'))}</span>${runChip(r.status)}</div>`).join('') : '<div class="muted" style="font-size:13px">No transfer around this time</div>'}</div>
     ${venueBox(e)}
     ${(() => { const dg = (D.day||[]).filter(g => g.sessions.includes(e.id)); return dg.length ? `<div class="box"><h3>${t('dgEv')} <span class="num">${dg.length}</span></h3>${dg.map(g => `<div class="mini"><span>${esc(g.name)}${g.desk ? ` <span class="muted" style="font-size:12px">· ${esc(g.desk)}</span>` : ''}</span>${g.note ? `<span class="muted" style="font-size:12px" dir="auto">${esc(g.note)}</span>` : ''}</div>`).join('')}</div>` : ''; })()}
@@ -844,6 +861,8 @@ function openEvent(id){
   sh.querySelectorAll('[data-todo]').forEach(c => c.onchange = () => { const x = D.todos.find(y=>y.id===c.dataset.todo); x.done = c.checked; send('check/toggle', { id:x.rid }); log((c.checked?'Completed':'Reopened') + ' to-do “' + x.text + '”'); commit(); openEvent(id); });
   sh.querySelectorAll('[data-deltodo]').forEach(b => b.onclick = () => { const del = D.todos.find(y => y.id === b.dataset.deltodo); if (del && del.rid) send('check/delete', { id:del.rid }); D.todos = D.todos.filter(y => y.id !== b.dataset.deltodo); log('Removed a to-do from “' + e.title + '”'); commit(); openEvent(id); });
   const tf = sh.querySelector('#todoForm'); if (tf) tf.onsubmit = ev => { ev.preventDefault(); const v = $('todoIn').value.trim(); if (!v) return; D.todos.push({ id:'c'+Date.now(), ev:e.id, text:v, text_he:'', done:false }); send('check/add', { segment_id:e.id, text:v, by:NAME }); log('Added to-do “' + v + '”'); commit(); openEvent(id); setTimeout(() => $('todoIn') && $('todoIn').focus(), 0); };
+  const rt = sh.querySelector('#rosToggle'); if (rt) rt.onclick = () => { const ta = sh.querySelector('#rosIn'); if (ta && ta.value !== e.ros) { e.ros = ta.value; send('segment/brief', { id:e.id, field:'brief_runsheet', value:ta.value }); log('Updated run of show for “' + e.title + '”'); commit(false); } ROS_EDIT = ROS_EDIT === e.id ? null : e.id; openEvent(id); if (ROS_EDIT) setTimeout(() => $('rosIn') && $('rosIn').focus(), 0); };
+  const ri = sh.querySelector('#rosIn'); if (ri) ri.onchange = () => { e.ros = ri.value; send('segment/brief', { id:e.id, field:'brief_runsheet', value:ri.value }); log('Updated run of show for “' + e.title + '”'); commit(false); };
   const av = sh.querySelector('#avIn'); if (av) av.onchange = () => { e.av = av.value; send('segment/brief', { id:e.id, field:'brief_av', value:av.value }); log('Updated AV brief for “' + e.title + '”'); commit(false); };
   const ff = sh.querySelector('#furnForm'); if (ff) ff.onsubmit = ev => { ev.preventDefault(); const item = $('fuItem').value.trim(); if (!item) return; const qty = $('fuQty').value.replace(/[^\d]/g, ''), size = $('fuSize').value.trim(); const setup = (L(e,'venue') || '') + ' · ' + dayName(e.day);
     LIVE_FURN.push({ id:'tmp' + Date.now(), setup, segment_ids:e.id, item, qty:qty === '' ? null : +qty, size, notes:'', qty_note:'', stays_until:'' }); send('furniture/add', { segment_id:e.id, setup, item, qty, size }); log('Furniture · added ' + item + ' to “' + e.title + '”'); commit(); openEvent(id); setTimeout(() => $('fuItem') && $('fuItem').focus(), 0); };

@@ -3313,7 +3313,7 @@ function ownerBadge(owner){
 }
 async function assignTask(kind, id, current){
   // build a simple picker: team members + free text
-  const names = data.team.filter(m=>m.org!=="Jerusalem Foundation").map(m=>m.name);
+  const names = data.team.filter(m=>(m.org||"Production")==="Production").map(m=>m.name);
   let msg = "Assign to:\n";
   names.forEach((n,i)=>{ msg += `${i+1}. ${n}\n`; });
   msg += `\nType a number, or type any name, or leave blank to unassign.`;
@@ -3328,7 +3328,7 @@ async function assignTask(kind, id, current){
   }catch(e){ toast("Couldn't assign",true); }
 }
 async function manageTeam(){
-  const list = data.team.filter(m=>m.org!=="Jerusalem Foundation").map(m=>`• ${m.name}${m.role?" ("+m.role+")":""}`).join("\n") || "(nobody yet)";
+  const list = data.team.filter(m=>(m.org||"Production")==="Production").map(m=>`• ${m.name}${m.role?" ("+m.role+")":""}`).join("\n") || "(nobody yet)";
   const ans = prompt(`Team members:\n${list}\n\nType a name to ADD, or type "del NAME" to remove.`, "");
   if(ans===null || !ans.trim()) return;
   const v = ans.trim();

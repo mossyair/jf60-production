@@ -364,7 +364,7 @@ const T = {
    quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
    dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
    booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
-   staff:'Staff', phoneT:'Phone', callT:'Call', sfAll:'All', sfProd:'Production', sfJF:'Jerusalem Foundation', sfBoard:'Board of directors', noRole:'Add role', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Board of directors', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
+   byHotel:'Filter by hotel', staff:'Staff', phoneT:'Phone', callT:'Call', sfAll:'All', sfProd:'Production', sfJF:'Jerusalem Foundation', sfBoard:'Board of directors', noRole:'Add role', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Board of directors', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
    peopleH:'Everyone in one directory', guests:'Guests', crew:'Crew', talent:'Talent & contracts', fair:'Organizations fair', contacts:'Contacts',
    logH:'Moving people, feeding people', ops:'Crew schedule', transport:'Transport', food:'Food & drink',
    prodH:'Everything being made, bought and scheduled', design:'Design & print', milestones:'Milestones', budget:'Budget', gifts:'Gifts',
@@ -383,7 +383,7 @@ const T = {
    quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
    dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
    booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
-   staff:'צוות', phoneT:'טלפון', callT:'חיוג', sfAll:'הכול', sfProd:'הפקה', sfJF:'הקרן לירושלים', sfBoard:'הנהלה', noRole:'הוספת תפקיד', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
+   byHotel:'סינון לפי מלון', staff:'צוות', phoneT:'טלפון', callT:'חיוג', sfAll:'הכול', sfProd:'הפקה', sfJF:'הקרן לירושלים', sfBoard:'הנהלה', noRole:'הוספת תפקיד', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
    peopleH:'כל האנשים במקום אחד', guests:'אורחים', crew:'צוות הפקה', talent:'תוכן וחוזים', fair:'יריד ארגונים', contacts:'אנשי קשר',
    logH:'להזיז אנשים, להאכיל אנשים', ops:'לו״ז צוות', transport:'הסעות', food:'אוכל ושתייה',
    prodH:'כל מה שמיוצר, נקנה ומתוזמן', design:'עיצוב ודפוס', milestones:'אבני דרך', budget:'תקציב', gifts:'מתנות',
@@ -463,7 +463,10 @@ let CREW = [['Hagai','Sound · site manager'],['Uri','Transport · Tower of Davi
 let TEAM_ROWS = null; // live team rows: { id, name, role, org }
 let LEADERS = [['Mishkenot Sha’ananim','Yaara'],['King David','Maichuk'],['Inbal','Tali Sasson'],['Dan Panorama','Si Agai']];
 const CONTACTS_BASE = [['Schuster','Supplier','Sound, AV & lighting'],['Peacock','Supplier','Coffee & pastries'],['Talbiye','Supplier','Coffee & pastries'],['Nir Bavli','Supplier','Catering · Ein Yael'],['Mishkenot Sha’ananim','Venue','Days 1–3 base'],['Train Theater','Venue','Day 1 plenary'],['Jerusalem Theater','Venue','Opening evening'],['HaMiffal','Venue','Art fair & dinner'],['Cinematheque Jerusalem','Venue','Day 3 morning'],['Bloomfield Science Museum','Venue','Think tank'],['Tower of David','Venue','Closing gala']];
-const HOTELS = ['Mishkenot Sha’ananim','Inbal','King David','Dan Panorama'];
+const HOTELS = ['Mishkenot Sha\'ananim','Inbal Hotel','King David Hotel','Dan Panorama'];
+// the same hotel is written several ways ("King David" / "King David Hotel"); compare on the first word
+const hk = h => String(h||'').trim().split(/\s+/)[0].toLowerCase();
+const atHotel = (g, h) => !!g.hotel && hk(g.hotel) === hk(h);
 const MOODBOARD_URL = '__MOODBOARD_URL__';
 const FAIR_FORM_URL = 'https://docs.google.com/forms/d/1Mfd1edYgeirD_Ivrauuh90O82OJjY3usXg4vtZVVHVY/edit#responses';
 const FAIR_FORM_DONE = 18;
@@ -670,7 +673,7 @@ function go(area, tab){ if (!allowed(area)) return; S.area = area; if (tab) S.ta
 
 /* ============================ clock (day-of simulation) ============================ */
 function clockBar(){
-  const days = [['19','Mon 19.10'],['20',dayName(1)],['21',dayName(2)],['22',dayName(3)],['23','Fri 23.10']];
+  const days = [['19','Mon 19.10'],['20',dayName(1)],['21',dayName(2)],['22',dayName(3)]];
   return `<section class="clockbar" aria-label="Simulated clock">
     <button class="play" id="play" type="button" aria-label="${S.playing?'Pause':'Play the day'}">${S.playing?'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>'}</button>
     <div><div class="t num" id="clockT">${fmt(S.clock.now)}</div><div class="muted" style="font-size:12px">${S.clock.now>=1440?'Night · ':''}simulated</div></div>
@@ -895,7 +898,7 @@ function viewPeople(){
   let body = '';
   if (tab === 'guests') {
     const f = S.filter.guests;
-    const list = D.guests.filter(g => f==='all' || (f==='nohotel' && !g.hotel) || (f==='diet' && g.dietary) || (f==='review' && g.review) || (f==='nopass' && !g.passport));
+    const list = D.guests.filter(g => f==='all' || (f.startsWith('h:') && atHotel(g, f.slice(2))) || (f==='nohotel' && !g.hotel) || (f==='diet' && g.dietary) || (f==='review' && g.review) || (f==='nopass' && !g.passport));
     const noH = D.guests.filter(g=>!g.hotel).length;
     body = `<div class="stats">
       <div class="panel stat"><div class="n num">${D.guests.length}</div><div class="s">Registered</div></div>
@@ -903,6 +906,7 @@ function viewPeople(){
       <div class="panel stat"><div class="n num">${D.guests.filter(g=>g.dietary).length}</div><div class="s">Dietary needs · ${D.guests.filter(g=>g.severe).length} severe</div></div>
       <div class="panel stat"><div class="n num">${isAdmin()?D.guests.filter(g=>!g.passport).length:'<span class="masked">•••</span>'}</div><div class="s">Missing passport${isAdmin()?'':' · admin only'}</div></div></div>
     <div class="bar"><div class="chips" role="group" aria-label="Filter guests">${[['all','All'],['nohotel','No hotel'],['diet','Dietary'],['review','Needs review'],...(isAdmin()?[['nopass','No passport']]:[])].map(([k,l]) => `<button type="button" class="fchip" data-gf="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>${isAdmin()?`<button class="btn ghost sm" type="button" data-go="inbox">Import spreadsheet</button>`:''}</div>
+    <div class="chips" role="group" aria-label="${t('byHotel')}" style="margin:-4px 0 12px">${HOTELS.map(h => `<button type="button" class="fchip" data-gf="h:${esc(h)}" aria-pressed="${f==='h:'+h}">${esc(h)} <span class="num muted">${D.guests.filter(g => atHotel(g, h)).length}</span></button>`).join('')}</div>
     <div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Desk</th><th>Hotel</th><th>Dietary</th>${isAdmin()?'<th>Passport</th>':''}<th></th></tr></thead><tbody>
       ${list.map(g => `<tr class="click" data-guest="${g.id}" tabindex="0"><td>${esc(g.name)}</td><td>${esc(g.desk)}</td><td>${g.hotel?esc(g.hotel):'<span style="color:var(--bad)">Not recorded</span>'}</td><td>${g.severe?`<span class="chip bad">${esc(g.dietary)}</span>`:esc(g.dietary)||'<span class="muted">—</span>'}</td>${isAdmin()?`<td>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing</span>'}</td>`:''}<td>${g.review?'<span class="chip info">Review</span>':''}</td></tr>`).join('')}
     </tbody></table></div>
@@ -956,7 +960,7 @@ function openGuest(id){
   const sess = D.ev.filter(e => !/Break|optional/i.test(e.title));
   openSheet(`<div class="sh-h"><div><div class="lbl">${esc(g.desk)} desk</div><h2>${esc(g.name)}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
   <div class="sh-b">
-    <div class="row2"><label class="fld">Hotel<select id="gHotel" ${isEdit()?'':'disabled'}><option value="">Not recorded</option>${[...HOTELS,'Own arrangement'].map(h => `<option ${h===g.hotel?'selected':''}>${h}</option>`).join('')}</select></label>
+    <div class="row2"><label class="fld">Hotel<select id="gHotel" ${isEdit()?'':'disabled'}><option value="">Not recorded</option>${[...HOTELS,'Own arrangement'].map(h => `<option ${h===g.hotel || (h!=='Own arrangement' && atHotel(g, h))?'selected':''}>${h}</option>`).join('')}</select></label>
     <label class="fld">Dietary<input id="gDiet" value="${esc(g.dietary)}" ${isEdit()?'':'disabled'} placeholder="None recorded"></label></div>
     <label class="todo"><input type="checkbox" id="gSev" ${g.severe?'checked':''} ${isEdit()?'':'disabled'}> Severe allergy · tell every caterer</label>
     <div class="box"><h3>Contact & travel documents</h3>${isAdmin() ? `<dl class="kv"><dt>Email</dt><dd>${esc(g.email)||'<span class="muted">—</span>'}</dd><dt>Phone</dt><dd class="num">${esc(g.phone)||'<span class="muted">—</span>'}</dd><dt>Passport</dt><dd>${g.passport?'<span class="chip good">On file</span>':'<span class="chip bad">Missing · needed for VAT</span>'}</dd></dl>` : '<div class="ro">Admin only</div>'}</div>
@@ -1031,7 +1035,7 @@ function viewLogistics(){
 function openRun(id){
   const r = D.runs.find(x => x.id === id); if (!r) return; SHEET = () => openRun(id);
   const fromHotels = /^(Hotels|מהמלונות)/.test(r.title) || /Hotels →/.test(r.title);
-  const byHotel = HOTELS.map(h => [h, D.guests.filter(g => g.hotel === h).length, (LEADERS.find(l => l[0].startsWith(h.split(' ')[0]))||[])[1]]);
+  const byHotel = HOTELS.map(h => [h, D.guests.filter(g => atHotel(g, h)).length, (LEADERS.find(l => l[0].startsWith(h.split(' ')[0]))||[])[1]]);
   openSheet(`<div class="sh-h"><div><div class="lbl">${dayName(r.day)} · ${fmt(mins(r.t))}</div><h2>${esc(L(r,'title'))}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
   <div class="sh-b"><dl class="kv"><dt>${t('status')}</dt><dd>${runChip(r.status)}</dd><dt>Driver</dt><dd class="muted">${r.status==='booked'?'[driver · phone]':'Not assigned'}</dd></dl>
   ${fromHotels ? `<div class="box"><h3>Pickups by hotel</h3>${byHotel.map(([h,n,l]) => `<div class="mini"><span>${h}${l?' · group leader '+l:''}</span><span class="num">${n} pax</span></div>`).join('')}<div class="mini" style="color:var(--bad)"><span>No hotel recorded</span><span class="num">${D.guests.filter(g=>!g.hotel).length} not on any manifest</span></div></div>` : '<div class="box"><h3>Passengers</h3><div style="font-size:13.5px">Everyone attending the previous session.</div></div>'}
@@ -1291,9 +1295,9 @@ function paper(k){
   const dayBlocks = fn => [1,2,3].map(d => `<section class="pday"><h2>${dayName(d)}</h2><table>${fn(d)}</table></section>`).join('');
   if (k==='program') return `<h1>Jerusalem — Yesterday, Today and Tomorrow</h1><div>20–22 October 2026 · The Jerusalem Foundation at 60</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d).map(e => `<tr><td>${e.s}–${e.e}</td><td><b>${esc(L(e,'title'))}</b><br><span data-notr>${esc(S.lang==='he' ? e.title : e.title_he)}</span><br><span style="color:#6D685F">${esc(L(e,'venue'))}</span></td></tr>`).join(''));
   if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
-  if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>g.hotel===h).length).join(' · '):''}</td></tr>`).join(''));
+  if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>atHotel(g, h)).length).join(' · '):''}</td></tr>`).join(''));
   if (k==='caterer') { const by = {}; D.guests.filter(g=>g.dietary).forEach(g => by[g.dietary] = (by[g.dietary]||[]).concat(g)); return `<h1>Dietary requirements</h1><div>${D.guests.filter(g=>g.dietary).length} guests · for every caterer</div><h2>Summary</h2><table>${Object.keys(by).sort().map(k => `<tr><td>${by[k].length}</td><td class="${by[k].some(g=>g.severe)?'sev':''}">${esc(k)}${by[k].some(g=>g.severe)?' · SEVERE':''}</td></tr>`).join('')}</table><h2>Meals</h2><table>${D.food.filter(f=>/lunch|dinner|Lunch|Dinner/.test(f.title)).map(f => `<tr><td>${dayName(f.day)}</td><td>${esc(f.title)}</td></tr>`).join('')}</table>`; }
-  if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>g.hotel===h).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>g.hotel===h).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
+  if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>atHotel(g, h)).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>atHotel(g, h)).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
   if (k==='supplier') return `<h1>Brief for Schuster</h1><div>Sound, AV and lighting per session</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d && !/Break/.test(e.title)).map(e => `<tr><td>${e.s}</td><td><b>${esc(e.title)}</b> · ${esc(e.venue)}<br>${e.av?esc(e.av):'<span style="color:#B63E2A">AV brief missing</span>'}</td></tr>`).join(''));
   const phone = (n, p) => { const c = p || ((D.contacts.find(x => x.phone && x.name === n) || {}).phone); return c ? ' · ' + esc(c) : ''; };
   return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r,ph]) => `<tr><td>${esc(n)}</td><td>${esc(r)}${phone(n, ph)}</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n,ph]) => `<tr><td>${esc(n)}</td><td>${esc(h)}${phone(n, ph)}</td></tr>`).join('')}</table>`;
@@ -1409,7 +1413,7 @@ function answer(q){
           `${dayName(d)}: ${evs.length} מפגשים, ${todo} משימות פתוחות. ${nd.length} הסעות בלי נהג${nd.length?' ('+ndList+')':''}. ${gaps.length} משמרות צוות בלי אחראי${gaps.length?' ('+gList+')':''}.`); }
   else if (/driver|transport|bus|run|נהג|הסע|אוטובוס/.test(q)) { const nd = D.runs.filter(r=>r.status==='no_driver'), dec = D.runs.filter(r=>r.status==='needs_decision'), bk = D.runs.filter(r=>r.status==='booked').length; const list = nd.map(r=>dayName(r.day)+' '+fmt(mins(r.t))).join(', ');
     a = H(`${nd.length} runs have no driver: ${list}. ${dec.length} need a decision. ${bk} of ${D.runs.length} are booked.`, `ל-${nd.length} הסעות אין נהג: ${list}. ${dec.length} דורשות החלטה. ${bk} מתוך ${D.runs.length} הוזמנו.`); }
-  else if (/hotel|guest|manifest|מלון|אורח/.test(q)) { const nh = D.guests.filter(g=>!g.hotel).length, list = HOTELS.map(h => tk(h) + ' ' + D.guests.filter(g=>g.hotel===h).length).join(', ');
+  else if (/hotel|guest|manifest|מלון|אורח/.test(q)) { const nh = D.guests.filter(g=>!g.hotel).length, list = HOTELS.map(h => tk(h) + ' ' + D.guests.filter(g=>atHotel(g, h)).length).join(', ');
     a = H(`${nh} of ${D.guests.length} guests have no hotel recorded, so they are on no pickup list. ${list}.`, `ל-${nh} מתוך ${D.guests.length} אורחים לא רשום מלון, ולכן הם לא באף רשימת איסוף. ${list}.`); }
   else if (/contract|talent|sign|fee|חוז|תוכן|שכר/.test(q)) { const s = D.talent.filter(x=>x.stage==='signed'||x.stage==='invoiced').length, qn = D.talent.filter(x=>x.stage==='quote').length;
     a = !isAdmin() ? H('Contracts are admin only.', 'חוזים זמינים למנהלים בלבד.') : H(`${s} of ${D.talent.length} talent contracts are signed; ${qn} have a quote. Fees total ₪395,800 incl. VAT.`, `${s} מתוך ${D.talent.length} חוזי תוכן חתומים; ל-${qn} יש הצעת מחיר. סך השכר ₪395,800 כולל מע״מ.`); }

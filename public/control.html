@@ -364,7 +364,7 @@ const T = {
    quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
    dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
    booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
-   staff:'Staff', sfAll:'All', sfProd:'Production', sfJF:'Jerusalem Foundation', sfBoard:'Board of directors', noRole:'Add role', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Board of directors', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
+   staff:'Staff', phoneT:'Phone', callT:'Call', sfAll:'All', sfProd:'Production', sfJF:'Jerusalem Foundation', sfBoard:'Board of directors', noRole:'Add role', prodCrew:'Production staff', jfStaff:'Jerusalem Foundation staff', board:'Board of directors', hotelLeaders:'Hotel group leaders', addStaff:'Add to the staff sheet', staffRole:'Role', orgT:'Group', orgProd:'Production', orgJF:'Jerusalem Foundation', staffDel:'Remove {n} from the staff sheet?',
    peopleH:'Everyone in one directory', guests:'Guests', crew:'Crew', talent:'Talent & contracts', fair:'Organizations fair', contacts:'Contacts',
    logH:'Moving people, feeding people', ops:'Crew schedule', transport:'Transport', food:'Food & drink',
    prodH:'Everything being made, bought and scheduled', design:'Design & print', milestones:'Milestones', budget:'Budget', gifts:'Gifts',
@@ -383,7 +383,7 @@ const T = {
    quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
    dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
    booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
-   staff:'צוות', sfAll:'הכול', sfProd:'הפקה', sfJF:'הקרן לירושלים', sfBoard:'הנהלה', noRole:'הוספת תפקיד', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
+   staff:'צוות', phoneT:'טלפון', callT:'חיוג', sfAll:'הכול', sfProd:'הפקה', sfJF:'הקרן לירושלים', sfBoard:'הנהלה', noRole:'הוספת תפקיד', prodCrew:'צוות הפקה', jfStaff:'צוות הקרן לירושלים', board:'הנהלת הקרן', hotelLeaders:'ראשי קבוצות במלונות', addStaff:'הוספה לרשימת הצוות', staffRole:'תפקיד', orgT:'קבוצה', orgProd:'הפקה', orgJF:'הקרן לירושלים', staffDel:'להסיר את {n} מרשימת הצוות?',
    peopleH:'כל האנשים במקום אחד', guests:'אורחים', crew:'צוות הפקה', talent:'תוכן וחוזים', fair:'יריד ארגונים', contacts:'אנשי קשר',
    logH:'להזיז אנשים, להאכיל אנשים', ops:'לו״ז צוות', transport:'הסעות', food:'אוכל ושתייה',
    prodH:'כל מה שמיוצר, נקנה ומתוזמן', design:'עיצוב ודפוס', milestones:'אבני דרך', budget:'תקציב', gifts:'מתנות',
@@ -581,10 +581,10 @@ function applyLive(){
   }
   if (LIVE_HAS.team) {
     const lead = /^Hotel group leader · /, prod = s.team.filter(m => (m.org||'Production') === 'Production');
-    CREW = prod.filter(m => !lead.test(m.role||'')).map(m => [m.name, m.role||'']);
-    LEADERS = prod.filter(m => lead.test(m.role||'')).map(m => [(m.role||'').replace(lead, ''), m.name]);
+    CREW = prod.filter(m => !lead.test(m.role||'')).map(m => [m.name, m.role||'', m.phone||'']);
+    LEADERS = prod.filter(m => lead.test(m.role||'')).map(m => [(m.role||'').replace(lead, ''), m.name, m.phone||'']);
     // older rows mark the board and staff in the role field; the group now lives in org
-    TEAM_ROWS = s.team.map(m => { const board = m.org === 'Jerusalem Foundation' && /^board of directors$/i.test(m.role||''); return { id:m.id, name:m.name, role:/^(staff|board of directors)$/i.test(m.role||'') ? '' : (m.role||''), org:board ? 'Jerusalem Foundation board' : (m.org||'Production'), legacy:board }; });
+    TEAM_ROWS = s.team.map(m => { const board = m.org === 'Jerusalem Foundation' && /^board of directors$/i.test(m.role||''); return { id:m.id, name:m.name, phone:m.phone||'', role:/^(staff|board of directors)$/i.test(m.role||'') ? '' : (m.role||''), org:board ? 'Jerusalem Foundation board' : (m.org||'Production'), legacy:board }; });
   }
   if (LIVE_HAS.inbox) {
     const toClient = (type, tg) => !tg ? '' : type === 'menu' ? 'f' + tg : type === 'proof' ? 'd' + tg : tg;
@@ -670,7 +670,7 @@ function go(area, tab){ if (!allowed(area)) return; S.area = area; if (tab) S.ta
 
 /* ============================ clock (day-of simulation) ============================ */
 function clockBar(){
-  const days = [['19','Mon 19.10'],['20',dayName(1)],['21',dayName(2)],['22',dayName(3)]];
+  const days = [['19','Mon 19.10'],['20',dayName(1)],['21',dayName(2)],['22',dayName(3)],['23','Fri 23.10']];
   return `<section class="clockbar" aria-label="Simulated clock">
     <button class="play" id="play" type="button" aria-label="${S.playing?'Pause':'Play the day'}">${S.playing?'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>'}</button>
     <div><div class="t num" id="clockT">${fmt(S.clock.now)}</div><div class="muted" style="font-size:12px">${S.clock.now>=1440?'Night · ':''}simulated</div></div>
@@ -921,7 +921,7 @@ function viewPeople(){
     const groups = [['prod', t('prodCrew'), of('Production').filter(m => !lead.test(m.role))], ['prod', t('hotelLeaders'), of('Production').filter(m => lead.test(m.role))], ['jf', t('jfStaff'), of('Jerusalem Foundation')], ['board', t('board'), of('Jerusalem Foundation board')]];
     const canRole = LIVE && isEdit();
     const row = (m, k) => { const shifts = k === 'prod' ? D.ops.filter(o => o.crew.some(c => c.n === m.name)).length : null;
-      return `<div class="li" style="grid-template-columns:36px minmax(0,1fr) minmax(0,1.3fr) auto"><span class="av">${esc((m.name||'?')[0])}</span><span class="t">${k === 'prod' ? `<button type="button" class="linkbtn" data-crew="${esc(m.name)}" style="text-decoration:none;color:var(--ink);text-align:start;font:inherit">${esc(m.name)}</button>` : esc(m.name)}</span>${canRole ? `<label class="sr" for="role-${m.id}">${t('staffRole')} ${esc(m.name)}</label><input id="role-${m.id}" data-role="${m.id}" dir="auto" value="${esc(m.role)}" placeholder="${t('noRole')}" style="min-height:32px;padding:4px 8px;font-size:13px">` : `<span class="s" dir="auto">${esc(m.role) || '<span class="muted">—</span>'}</span>`}<span style="display:flex;gap:10px;align-items:center">${shifts !== null ? `<span class="muted num" style="font-size:12.5px">${shifts} shifts</span>` : ''}${isAdmin() && LIVE ? `<button class="linkbtn" type="button" data-staffdel="${m.id}">${t('remove')}</button>` : ''}</span></div>`; };
+      return `<div class="li" style="grid-template-columns:36px minmax(0,1fr) minmax(0,1.3fr) auto"><span class="av">${esc((m.name||'?')[0])}</span><span class="t">${k === 'prod' ? `<button type="button" class="linkbtn" data-crew="${esc(m.name)}" style="text-decoration:none;color:var(--ink);text-align:start;font:inherit">${esc(m.name)}</button>` : esc(m.name)}</span>${canRole ? `<label class="sr" for="role-${m.id}">${t('staffRole')} ${esc(m.name)}</label><input id="role-${m.id}" data-role="${m.id}" dir="auto" value="${esc(m.role)}" placeholder="${t('noRole')}" style="min-height:32px;padding:4px 8px;font-size:13px">` : `<span class="s" dir="auto">${esc(m.role) || '<span class="muted">—</span>'}</span>`}<span style="display:flex;gap:10px;align-items:center">${k === 'prod' && canRole ? `<label class="sr" for="ph-${m.id}">${t('phoneT')} ${esc(m.name)}</label><input id="ph-${m.id}" data-tphone="${m.id}" type="tel" dir="ltr" value="${esc(m.phone)}" placeholder="${t('phoneT')}" style="width:130px;min-height:32px;padding:4px 8px;font-size:13px">${m.phone ? `<a href="tel:${esc(m.phone.replace(/[^\d+]/g,''))}" aria-label="${t('phoneT')} ${esc(m.name)}" style="color:var(--info);font-size:12.5px">${t('callT')}</a>` : ''}` : m.phone ? `<a class="num" href="tel:${esc(m.phone.replace(/[^\d+]/g,''))}" style="color:var(--info);font-size:12.5px;white-space:nowrap">${esc(m.phone)}</a>` : ''}${shifts !== null ? `<span class="muted num" style="font-size:12.5px;white-space:nowrap">${shifts} shifts</span>` : ''}${isAdmin() && LIVE ? `<button class="linkbtn" type="button" data-staffdel="${m.id}">${t('remove')}</button>` : ''}</span></div>`; };
     const chips = [['all', t('sfAll'), rows.length], ['prod', t('sfProd'), of('Production').length], ['jf', t('sfJF'), of('Jerusalem Foundation').length], ['board', t('sfBoard'), of('Jerusalem Foundation board').length]];
     const addForm = LIVE && isEdit() ? `<section class="panel" style="padding:14px 16px;margin-top:14px"><div class="lbl" style="margin-bottom:8px">${t('addStaff')}</div><form id="staffForm" style="display:flex;gap:8px;flex-wrap:wrap"><label class="sr" for="stName">Name</label><input id="stName" placeholder="Name" style="flex:2;min-width:160px" required><label class="sr" for="stRole">${t('staffRole')}</label><input id="stRole" dir="auto" placeholder="${t('staffRole')}" style="flex:1;min-width:120px"><label class="sr" for="stOrg">${t('orgT')}</label><select id="stOrg">${[['Production', t('sfProd')], ['Jerusalem Foundation', t('sfJF')], ['Jerusalem Foundation board', t('sfBoard')]].map(([v,l]) => `<option value="${v}" ${(f==='jf'&&v==='Jerusalem Foundation')||(f==='board'&&v==='Jerusalem Foundation board')?'selected':''}>${l}</option>`).join('')}</select><button class="btn sm" type="submit">${t('add')}</button></form></section>` : '';
     body = `<div class="bar"><div class="chips" role="group" aria-label="${t('staff')}">${chips.map(([k,l,n]) => `<button type="button" class="fchip" data-sf="${k}" aria-pressed="${f===k}">${l} <span class="num muted">${n}</span></button>`).join('')}</div></div>
@@ -1275,7 +1275,7 @@ function apply(id, plain){
 /* ============================ PRINT CENTER ============================ */
 const DOCS = [
   ['program','Guest program','Bilingual, one page per day','all'],
-  ['ros','Run of show','Internal: sessions, crew, transport, catering by time','edit'],
+  ['ros','Run of show','Sessions, run-of-show lines and transport by time','edit'],
   ['drivers','Driver sheets','One per run: time, route, pickups per hotel','edit'],
   ['caterer','Caterer dietary sheet','Counts per requirement, severe allergies highlighted','edit'],
   ['hotels','Hotel manifests','Guests per hotel with group leader','edit'],
@@ -1288,15 +1288,15 @@ function viewPrint(){
   <p class="note">Every document is built from the live data, so it is always current. Today these are three separate buttons spread across tabs.</p>`;
 }
 function paper(k){
-  const dayBlocks = fn => [1,2,3].map(d => `<h2>${dayName(d)}</h2><table>${fn(d)}</table>`).join('');
+  const dayBlocks = fn => [1,2,3].map(d => `<section class="pday"><h2>${dayName(d)}</h2><table>${fn(d)}</table></section>`).join('');
   if (k==='program') return `<h1>Jerusalem — Yesterday, Today and Tomorrow</h1><div>20–22 October 2026 · The Jerusalem Foundation at 60</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d).map(e => `<tr><td>${e.s}–${e.e}</td><td><b>${esc(L(e,'title'))}</b><br><span data-notr>${esc(S.lang==='he' ? e.title : e.title_he)}</span><br><span style="color:#6D685F">${esc(L(e,'venue'))}</span></td></tr>`).join(''));
-  if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`]), ...D.ops.filter(o=>o.day===String(d+19)).map(o=>[o.s, `Crew: ${esc(o.title)} · ${esc(o.crew.map(crewLabel).join(', '))}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
+  if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
   if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>g.hotel===h).length).join(' · '):''}</td></tr>`).join(''));
   if (k==='caterer') { const by = {}; D.guests.filter(g=>g.dietary).forEach(g => by[g.dietary] = (by[g.dietary]||[]).concat(g)); return `<h1>Dietary requirements</h1><div>${D.guests.filter(g=>g.dietary).length} guests · for every caterer</div><h2>Summary</h2><table>${Object.keys(by).sort().map(k => `<tr><td>${by[k].length}</td><td class="${by[k].some(g=>g.severe)?'sev':''}">${esc(k)}${by[k].some(g=>g.severe)?' · SEVERE':''}</td></tr>`).join('')}</table><h2>Meals</h2><table>${D.food.filter(f=>/lunch|dinner|Lunch|Dinner/.test(f.title)).map(f => `<tr><td>${dayName(f.day)}</td><td>${esc(f.title)}</td></tr>`).join('')}</table>`; }
   if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>g.hotel===h).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>g.hotel===h).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
   if (k==='supplier') return `<h1>Brief for Schuster</h1><div>Sound, AV and lighting per session</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d && !/Break/.test(e.title)).map(e => `<tr><td>${e.s}</td><td><b>${esc(e.title)}</b> · ${esc(e.venue)}<br>${e.av?esc(e.av):'<span style="color:#B63E2A">AV brief missing</span>'}</td></tr>`).join(''));
-  const phone = n => { const c = D.contacts.find(x => x.phone && x.name === n); return c ? ' · ' + esc(c.phone) : ''; };
-  return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r]) => `<tr><td>${esc(n)}</td><td>${esc(r)}${phone(n)}</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n]) => `<tr><td>${esc(n)}</td><td>${esc(h)}${phone(n)}</td></tr>`).join('')}</table>`;
+  const phone = (n, p) => { const c = p || ((D.contacts.find(x => x.phone && x.name === n) || {}).phone); return c ? ' · ' + esc(c) : ''; };
+  return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r,ph]) => `<tr><td>${esc(n)}</td><td>${esc(r)}${phone(n, ph)}</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n,ph]) => `<tr><td>${esc(n)}</td><td>${esc(h)}${phone(n, ph)}</td></tr>`).join('')}</table>`;
 }
 function openDoc(k){
   const d = DOCS.find(x => x[0] === k);
@@ -1321,6 +1321,8 @@ function printPaper(title, html){
     td { padding: 5px 0; border-top: 1px solid #E4E0D7; vertical-align: top; }
     td:first-child { width: 82px; font-variant-numeric: tabular-nums; }
     .sev { color: #B63E2A; font-weight: 700; }
+    .pday + .pday { page-break-before: always; break-before: page; }
+    .pday + .pday > h2:first-child { margin-top: 0; }
     .ros { color: #4A463D; font-size: 11px; white-space: pre-line; margin-top: 3px; text-align: ${rtl ? 'right' : 'left'}; }
   </style></head><body>${html}</body></html>`);
   w.document.close();
@@ -1555,6 +1557,7 @@ function render(){
   const ad = $('addDay'); if (ad) ad.onclick = () => openDayGuest(null);
   on('[data-sf]', 'onclick', b => { S.filter.staff = b.dataset.sf; render(); });
   on('[data-role]', 'onchange', inp => { const m = (TEAM_ROWS||[]).find(x => String(x.id) === inp.dataset.role); if (!m) return; m.role = inp.value.trim(); send('team/field', { id:m.id, field:'role', value:m.role }); if (m.legacy) { send('team/field', { id:m.id, field:'org', value:m.org }); m.legacy = false; } log('Staff · ' + m.name + ': ' + (m.role || '—')); commit(false); });
+  on('[data-tphone]', 'onchange', inp => { const m = (TEAM_ROWS||[]).find(x => String(x.id) === inp.dataset.tphone); if (!m) return; m.phone = inp.value.trim(); send('team/field', { id:m.id, field:'phone', value:m.phone }); log('Staff · ' + m.name + ' phone'); commit(false); });
   on('[data-staffdel]', 'onclick', b => { const m = (TEAM_ROWS||[]).find(x => String(x.id) === b.dataset.staffdel); if (!m || !confirm(t('staffDel').replace('{n}', m.name))) return; TEAM_ROWS = TEAM_ROWS.filter(x => x !== m); send('team/delete', { id:m.id }); log('Staff · removed ' + m.name); commit(); });
   const sf = $('staffForm'); if (sf) sf.onsubmit = e => { e.preventDefault(); const name = $('stName').value.trim(), role = $('stRole').value.trim(), org = $('stOrg').value; if (!name) return; TEAM_ROWS = TEAM_ROWS || []; TEAM_ROWS.push({ id:'tmp' + Date.now(), name, role, org }); send('team/add', { name, role, org }); log('Staff · added ' + name + ' (' + org + ')'); commit(); };
   on('[data-crew]', 'onclick', b => { S.person = b.dataset.crew; S.opsView = 'me'; go('logistics','ops'); });

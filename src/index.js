@@ -131,7 +131,7 @@ How to read the data:
 - day 1 = Tue 20.10, day 2 = Wed 21.10, day 3 = Thu 22.10. A time after midnight (00:15) belongs to the evening before.
 - Session, food and to-do status: open, progress (in progress), confirmed. Transport status: no_driver, to_confirm, booked, needs_decision. Design status: content_missing, in_design, awaiting_approval, approved, changes, no_design, unresolved.
 - todos and people_per_session link to sessions by segment_id. done = 1 means done.
-- crew_schedule: day is the date in October (19-22); start_min/end_min are minutes from midnight (past 1440 means after midnight); crew_json lists people as n (name, or a number for a headcount like "2" runners) and r (role), with n "?" meaning nobody is assigned yet; flag is an open issue.
+- crew_schedule: day is the date in October (19-22); start_min/end_min are minutes from midnight (past 1440 means after midnight); crew_json lists people as n (name, or a number for a headcount like "2" assistant producers) and r (role), with n "?" meaning nobody is assigned yet; flag is an open issue.
 - talent_contracts (admins only): stage is contacted, quote, signed or invoiced; fee is in ILS including VAT.
 - guest_summary has counts only. Individual guests aren't included, so for questions about a named guest, point to People → Guests.
 

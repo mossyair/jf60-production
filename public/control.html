@@ -437,27 +437,27 @@ const C = (n, r) => ({ n, r });
 const SMR = 'Site manager';
 const OPS_BASE = [
  ['19',480,1080,'Furniture & design install','Mishkenot Sha’ananim','setup',[C('Hagai',SMR),C('Designer','Design')]],
- ['20',420,660,'Crew arrival · coffee station · sound check','Mishkenot Sha’ananim','setup',[C('Hagai',SMR),C('Natali',SMR),C('1','runner')]],
+ ['20',420,660,'Crew arrival · coffee station · sound check','Mishkenot Sha’ananim','setup',[C('Hagai',SMR),C('Natali',SMR),C('1','assistant producer')]],
  ['20',480,510,'Hotel pickups','Hotels (4)','move',[C('3','escorts')],'','Each vehicle: cooler with ice, water, soda.'],
  ['20',510,550,'Registration desk for walk-ins','Mishkenot Sha’ananim','guest',[C('2','ushers')],'Desk location not decided'],
  ['20',585,630,'Advance vehicle · sound setup, restrooms check','Botanical Garden','setup',[C('Uri',SMR),C('Natali',SMR),C('Schuster','AV')]],
  ['20',585,600,'Board the double-decker','Mishkenot Sha’ananim','move',[C('4','escorts')],'Can the bus stand at Mishkenot?'],
- ['20',630,660,'Show (15 min) + tour','Botanical Garden','guest',[C('Uri',SMR),C('1','runner')]],
+ ['20',630,660,'Show (15 min) + tour','Botanical Garden','guest',[C('Uri',SMR),C('1','assistant producer')]],
  ['20',630,750,'Tables, furniture, signage','Ein Yael','setup',[C('Kosta',SMR),C('Natali',SMR),C('1','crew')]],
- ['20',675,735,'Show (15 min) + tour','Gazelle Valley','guest',[C('Hagai',SMR),C('1','runner')]],
- ['20',765,840,'Lunch + show','Ein Yael','guest',[C('?',SMR),C('1','runner')],'Plan B needed · site manager unconfirmed'],
- ['20',870,990,'Panel · Jerusalem women leaders','Train Theater','guest',[C('Uri',SMR),C('1','runner')]],
- ['20',1140,1320,'Opening evening','Jerusalem Theater','guest',[C('Hagai',SMR),C('2','runners')]],
- ['21',420,540,'Round tables setup','Mishkenot Sha’ananim','setup',[C('Hagai',SMR),C('2','runners'),C('4','table heads')]],
+ ['20',675,735,'Show (15 min) + tour','Gazelle Valley','guest',[C('Hagai',SMR),C('1','assistant producer')]],
+ ['20',765,840,'Lunch + show','Ein Yael','guest',[C('?',SMR),C('1','assistant producer')],'Plan B needed · site manager unconfirmed'],
+ ['20',870,990,'Panel · Jerusalem women leaders','Train Theater','guest',[C('Uri',SMR),C('1','assistant producer')]],
+ ['20',1140,1320,'Opening evening','Jerusalem Theater','guest',[C('Hagai',SMR),C('2','assistant producers')]],
+ ['21',420,540,'Round tables setup','Mishkenot Sha’ananim','setup',[C('Hagai',SMR),C('2','assistant producers'),C('4','table heads')]],
  ['21',540,840,'Morning program','Gan Yael','guest',[C('?',SMR)],'Site manager unconfirmed'],
  ['21',600,780,'Setup for tomorrow','Cinematheque','setup',[C('Hagai',SMR)]],
- ['21',870,1020,'Visit','Beit Hanina','guest',[C('Uri',SMR),C('1','runner')]],
- ['21',900,1320,'Evening venue','HaMiffal','setup',[C('Hagai',SMR),C('2','runners')]],
+ ['21',870,1020,'Visit','Beit Hanina','guest',[C('Uri',SMR),C('1','assistant producer')]],
+ ['21',900,1320,'Evening venue','HaMiffal','setup',[C('Hagai',SMR),C('2','assistant producers')]],
  ['21',1380,1740,'Overnight build #1','Tower of David','setup',[C('?','Build lead')],'Setup & strike lead not named'],
- ['22',420,720,'Build #2 · engineer sign-off','Tower of David','setup',[C('Uri',SMR),C('2','runners')]],
- ['22',570,750,'Main gathering + organizations fair','Cinematheque','guest',[C('Hagai',SMR),C('Yarden',SMR),C('2','runners')]],
- ['22',900,1050,'TED-style build','Science Museum','guest',[C('?',SMR),C('1','runner')],'Site manager unconfirmed'],
- ['22',1080,1440,'Gala evening','Tower of David','guest',[C('Uri',SMR),C('3','runners')]],
+ ['22',420,720,'Build #2 · engineer sign-off','Tower of David','setup',[C('Uri',SMR),C('2','assistant producers')]],
+ ['22',570,750,'Main gathering + organizations fair','Cinematheque','guest',[C('Hagai',SMR),C('Yarden',SMR),C('2','assistant producers')]],
+ ['22',900,1050,'TED-style build','Science Museum','guest',[C('?',SMR),C('1','assistant producer')],'Site manager unconfirmed'],
+ ['22',1080,1440,'Gala evening','Tower of David','guest',[C('Uri',SMR),C('3','assistant producers')]],
  ['22',1410,1740,'Overnight strike','Tower of David','strike',[C('?','Build lead')],'Strike lead not named']];
 const TALENT_BASE = [['Panel host · Train Theater','quote',8000],['Performance + workshop · Jerusalem Theater','contacted',28000],['Keynote speaker · Jerusalem Theater','quote',25000],['Yoga · day 2','contacted',400],['Run tour · day 2','contacted',2000],['Round-table keynote','contacted',3000],['Arabic lesson for donors','contacted',600],['Yoga · day 3','contacted',400],['British Trail run','contacted',2000],['TED-style build · Science Museum','quote',null],['Main performance · gala','quote',null],['Additional booking','contacted',null]];
 const BUDGET_BASE = [['Coffee & pastries','Peacock + Talbiye',23500],['Sound','Schuster',15000],['Sound technician · 3 days','Schuster',9000],['Double-decker bus','TBC',10000],['Dedicated cleaner','TBC',4000],['Water & soda for rides','TBC',3000]];
@@ -1056,9 +1056,9 @@ function viewOps(){
     v = list.length ? `<div class="panel list">${list.map(o => { const st = opStatus(o); return `<button type="button" class="li ${st==='past'||st==='done'?'past':''}" data-op="${o.id}" style="${st==='live'?'box-shadow:inset 3px 0 0 var(--good)':''}"><span class="time num">${fmt(o.s)}</span><span style="min-width:0"><div class="t" style="display:flex;gap:8px;align-items:center"><span class="dot k-${o.kind}"></span>${esc(o.title)}</div>${o.flag?`<div class="s" style="color:var(--bad);font-weight:500;display:flex;gap:5px;align-items:center">${flagIcon}${esc(o.flag)}</div>`:`<div class="s">${esc(o.site)} · until ${fmt(o.e)}</div>`}</span><span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:260px">${st==='live'?`<span class="chip good">● ${t('live')}</span>`:st==='done'?`<span class="chip plain">${t('done')}</span>`:''}${o.crew.map(c => `<span class="chip ${c.n==='?'?'bad':'plain'}">${esc(crewLabel(c))}</span>`).join('')}</span></button>`; }).join('')}</div>` : '<div class="panel empty">Nothing matches.</div>';
   } else if (S.opsView === 'sites') {
     const by = {}; list.forEach(o => (by[o.site] = by[o.site] || []).push(o));
-    v = `<div class="cards">${Object.keys(by).map(site => { const xs = by[site]; const leads = [...new Set(xs.flatMap(o => o.crew.filter(c=>c.r===SMR&&c.n!=='?').map(c=>c.n)))]; const gap = xs.some(o => o.crew.some(c=>c.n==='?')); const runners = xs.reduce((s,o) => s + o.crew.filter(c=>/^\d/.test(c.n)&&/runner/.test(c.r)).reduce((a,c)=>a+ +c.n,0), 0); const live = xs.some(o => opStatus(o)==='live');
+    v = `<div class="cards">${Object.keys(by).map(site => { const xs = by[site]; const leads = [...new Set(xs.flatMap(o => o.crew.filter(c=>c.r===SMR&&c.n!=='?').map(c=>c.n)))]; const gap = xs.some(o => o.crew.some(c=>c.n==='?')); const runners = xs.reduce((s,o) => s + o.crew.filter(c=>/^\d/.test(c.n)&&/assistant producer/i.test(c.r)).reduce((a,c)=>a+ +c.n,0), 0); const live = xs.some(o => opStatus(o)==='live');
       return `<article class="panel card ${gap?'gap':''}"><div class="mini"><span class="muted num">${fmt(Math.min(...xs.map(o=>o.s)))}–${fmt(Math.max(...xs.map(o=>o.e)))}</span>${live?`<span class="chip good">● ${t('live')}</span>`:''}</div><h3>${esc(site)}</h3>
-      <dl class="kv"><dt>${SMR}</dt><dd style="${leads.length?'font-weight:500':'color:var(--bad);font-weight:700'}">${leads.length?esc(leads.join(', ')):'Unassigned'}${leads.length&&gap?' <span style="color:var(--bad)">+ gap</span>':''}</dd><dt>Runners</dt><dd class="num">${runners||'—'}</dd></dl>
+      <dl class="kv"><dt>${SMR}</dt><dd style="${leads.length?'font-weight:500':'color:var(--bad);font-weight:700'}">${leads.length?esc(leads.join(', ')):'Unassigned'}${leads.length&&gap?' <span style="color:var(--bad)">+ gap</span>':''}</dd><dt>Assistant producers</dt><dd class="num">${runners||'—'}</dd></dl>
       <div class="list" style="border-top:1px solid var(--line)">${xs.map(o => `<button type="button" class="li" data-op="${o.id}" style="padding:7px 0;grid-template-columns:54px minmax(0,1fr)"><span class="muted num" style="font-size:12.5px">${fmt(o.s)}</span><span style="font-size:13px">${esc(o.title)}${o.flag?' <span style="color:var(--bad)">•</span>':''}</span></button>`).join('')}</div></article>`; }).join('') || '<div class="panel empty">Nothing matches.</div>'}</div>`;
   } else if (S.opsView === 'timeline') {
     const START = 360, SPAN = 1440, pct = m => ((m - START) / SPAN * 100);
@@ -1668,7 +1668,7 @@ const HE = {
  'Furniture & design install':'הקמת ריהוט ועיצוב','Crew arrival':'הגעת צוות','coffee station':'עמדת קפה','sound check':'בדיקת סאונד','Hotel pickups':'איסוף מהמלונות','Registration desk for walk-ins':'עמדת רישום למגיעים עצמאית','Advance vehicle':'רכב מקדים','sound setup, restrooms check':'הקמת סאונד ובדיקת שירותים','Board the double-decker':'עלייה לאוטובוס הקומתיים','Show (15 min) + tour':'הצגה (15 דק׳) + סיור','Tables, furniture, signage':'שולחנות, ריהוט, שילוט','Lunch + show':'ארוחת צהריים + הצגה','Panel':'פאנל','Jerusalem women leaders':'מובילות ירושלמיות','Round tables setup':'הקמת שולחנות עגולים','Morning program':'תוכנית בוקר','Setup for tomorrow':'הקמה למחר','Visit':'ביקור','Evening venue':'הקמת אתר הערב','Overnight build #1':'הקמת לילה #1','Build #2':'הקמה #2','engineer sign-off':'אישור מהנדס','Main gathering + organizations fair':'כינוס מרכזי + יריד ארגונים','Gala evening':'ערב גאלה','Overnight strike':'פירוק לילה',
  'Botanical Garden':'הגן הבוטני','Gazelle Valley':'עמק הצבאים','Gan Yael':'גן יעל','Beit Hanina':'בית חנינא','Hotels (4)':'מלונות (4)',
  'Desk location not decided':'מיקום העמדה לא הוחלט','Can the bus stand at Mishkenot?':'האם האוטובוס יכול לעמוד במשכנות?','Plan B needed':'נדרשת תוכנית ב׳','site manager unconfirmed':'מנהל אתר לא מאושר','Site manager unconfirmed':'מנהל אתר לא מאושר','Setup & strike lead not named':'אחראי הקמה ופירוק לא נקבע','Strike lead not named':'אחראי פירוק לא נקבע','Each vehicle: cooler with ice, water, soda.':'על כל רכב: צידנית עם קרח, מים וסודה.',
- 'Unassigned':'לא שובץ','+ gap':'+ חוסר','Runners':'ראנרים','Free right now':'פנוי כרגע','Mark done':'סימון כבוצע','Mark not done':'ביטול ביצוע','Undo':'ביטול','Earlier':'מוקדם יותר','No assignments this day.':'אין משימות ביום הזה.','Preview as':'תצוגה כ',
+ 'Unassigned':'לא שובץ','+ gap':'+ חוסר','Assistant producers':'עוזרי הפקה','Assistant producer':'עוזר הפקה','Free right now':'פנוי כרגע','Mark done':'סימון כבוצע','Mark not done':'ביטול ביצוע','Undo':'ביטול','Earlier':'מוקדם יותר','No assignments this day.':'אין משימות ביום הזה.','Preview as':'תצוגה כ',
  'What each crew member sees on their phone. It follows the clock above; assigning someone as lead adds the item to their day.':'מה שכל איש צוות רואה בטלפון. זה עוקב אחרי השעון למעלה; שיבוץ מישהו כאחראי מוסיף את המשימה ליום שלו.',
  'Phone preview':'תצוגת טלפון','overnight':'לילה','Finished':'הסתיים','Upcoming':'בקרוב','Open issue':'בעיה פתוחה','Mark resolved':'סימון כפתור','Admins resolve issues':'מנהלים פותרים בעיות','admins assign leads':'מנהלים משבצים אחראים','From the sheet':'מהגיליון','Upload a proof':'העלאת הגהה',
  // production
@@ -1719,7 +1719,7 @@ const HX = [
  [/^in (\d+) days$/,'בעוד $1 ימים'],[/^in (\d+)d$/,'בעוד $1 ימים'],[/^(\d+)d late$/,'באיחור $1 ימים'],[/^(\d+)d left$/,'נותרו $1 ימים'],[/^(\d+)d overdue$/,'באיחור $1 ימים'],
  [/^until (\S+)$/,'עד $1'],[/^UNTIL (\S+)$/,'עד $1'],[/^due (\S+)$/,'יעד $1'],[/^Next at (\S+)$/,'הבא ב-$1'],[/^(\d+) leads$/,'$1 אחראים'],[/^(\d+) files$/,'$1 קבצים'],[/^(\d+) shifts$/,'$1 משמרות'],[/^(\d+) assignments$/,'$1 משימות'],[/^(\d+) pax$/,'$1 נוסעים'],
  [/^(\d+) not on any manifest$/,'$1 לא באף רשימה'],[/^group leader (.+)$/,(m,a)=>'ראש קבוצה '+trk(a)],[/^leader (.+)$/,(m,a)=>'ראש קבוצה '+trk(a)],
- [/^(\d+) (runner|runners|escorts|ushers|crew|table heads)$/,(m,n,r)=>n+' '+({runner:'ראנר',runners:'ראנרים',escorts:'מלווים',ushers:'סדרנים',crew:'אנשי צוות','table heads':'ראשי שולחן'})[r]],
+ [/^(\d+) (assistant producer|assistant producers|escorts|ushers|crew|table heads)$/,(m,n,r)=>n+' '+({'assistant producer':'עוזר הפקה','assistant producers':'עוזרי הפקה',escorts:'מלווים',ushers:'סדרנים',crew:'אנשי צוות','table heads':'ראשי שולחן'})[r]],
  [/^(.+) \?$/,(m,a)=>trk(a)+' ?'],[/^(.+) unassigned$/,(m,a)=>trk(a)+' לא שובץ'],[/^(.+) desk$/,(m,a)=>'דסק '+trk(a)],
  [/^Guest (\d+)$/,'אורח $1'],[/^Organization (\d+)$/,'ארגון $1'],[/^proof v(\d+)$/,'הגהה v$1'],[/^v(\d+)$/,'v$1'],
  [/^These (\d+) lines, excl\. VAT$/,'$1 השורות האלה, לפני מע״מ'],[/^(₪[\d,]+) excl\. VAT$/,'$1 לפני מע״מ'],

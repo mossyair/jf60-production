@@ -1288,7 +1288,7 @@ function viewPrint(){
   <p class="note">Every document is built from the live data, so it is always current. Today these are three separate buttons spread across tabs.</p>`;
 }
 function paper(k){
-  const dayBlocks = fn => [1,2,3].map(d => `<h2>${dayName(d)}</h2><table>${fn(d)}</table>`).join('');
+  const dayBlocks = fn => [1,2,3].map(d => `<section class="pday"><h2>${dayName(d)}</h2><table>${fn(d)}</table></section>`).join('');
   if (k==='program') return `<h1>Jerusalem — Yesterday, Today and Tomorrow</h1><div>20–22 October 2026 · The Jerusalem Foundation at 60</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d).map(e => `<tr><td>${e.s}–${e.e}</td><td><b>${esc(L(e,'title'))}</b><br><span data-notr>${esc(S.lang==='he' ? e.title : e.title_he)}</span><br><span style="color:#6D685F">${esc(L(e,'venue'))}</span></td></tr>`).join(''));
   if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`]), ...D.ops.filter(o=>o.day===String(d+19)).map(o=>[o.s, `Crew: ${esc(o.title)} · ${esc(o.crew.map(crewLabel).join(', '))}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
   if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>g.hotel===h).length).join(' · '):''}</td></tr>`).join(''));
@@ -1321,6 +1321,8 @@ function printPaper(title, html){
     td { padding: 5px 0; border-top: 1px solid #E4E0D7; vertical-align: top; }
     td:first-child { width: 82px; font-variant-numeric: tabular-nums; }
     .sev { color: #B63E2A; font-weight: 700; }
+    .pday + .pday { page-break-before: always; break-before: page; }
+    .pday + .pday > h2:first-child { margin-top: 0; }
     .ros { color: #4A463D; font-size: 11px; white-space: pre-line; margin-top: 3px; text-align: ${rtl ? 'right' : 'left'}; }
   </style></head><body>${html}</body></html>`);
   w.document.close();

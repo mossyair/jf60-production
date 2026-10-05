@@ -359,6 +359,7 @@ const T = {
    admin:'Admin', editor:'Editor', viewer:'Viewer', open:'Open', progress:'In progress', confirmed:'Confirmed', to_confirm:'To confirm', no_driver:'No driver', needs_decision:'Needs decision', booked:'Booked',
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
+   progDocH:'Jerusalem Foundation 60th Anniversary Conference — Detailed Program', progDocSub:'20–22 October 2026 · Updated {d}', progDocFile:'Jerusalem Foundation 60th Anniversary Conference - Detailed Program', busT:'Bus',
    ros:'Run of show', rosNone:'No run of show yet', rosEdit:'Edit', rosDone:'Done', rosPh:'One line per item, starting with the time: 14:00 Doors open',
    popupBlocked:'Allow pop-ups for this site to download the PDF',
    quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
@@ -378,6 +379,7 @@ const T = {
    admin:'מנהל', editor:'עורך', viewer:'צופה', open:'פתוח', progress:'בתהליך', confirmed:'מאושר', to_confirm:'לאישור', no_driver:'אין נהג', needs_decision:'נדרשת החלטה', booked:'הוזמן',
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
+   progDocH:'הקרן לירושלים · כנס ה-60 — לו״ז מפורט', progDocSub:'20–22 באוקטובר 2026 · עודכן {d}', progDocFile:'הקרן לירושלים - כנס ה-60 - לו״ז מפורט', busT:'הסעה',
    ros:'לו״ז מפורט', rosNone:'עדיין אין לו״ז מפורט', rosEdit:'עריכה', rosDone:'סיום', rosPh:'שורה לכל פריט, מתחילה בשעה: 14:00 פתיחת דלתות',
    popupBlocked:'יש לאפשר חלונות קופצים לאתר כדי להוריד את ה-PDF',
    quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
@@ -1279,7 +1281,7 @@ function apply(id, plain){
 /* ============================ PRINT CENTER ============================ */
 const DOCS = [
   ['program','Guest program','Bilingual, one page per day','all'],
-  ['ros','Run of show','Sessions, run-of-show lines and transport by time','edit'],
+  ['ros','Detailed program','Sessions, run-of-show lines and transport by time · for the Foundation','edit'],
   ['drivers','Driver sheets','One per run: time, route, pickups per hotel','edit'],
   ['caterer','Caterer dietary sheet','Counts per requirement, severe allergies highlighted','edit'],
   ['hotels','Hotel manifests','Guests per hotel with group leader','edit'],
@@ -1294,7 +1296,7 @@ function viewPrint(){
 function paper(k){
   const dayBlocks = fn => [1,2,3].map(d => `<section class="pday"><h2>${dayName(d)}</h2><table>${fn(d)}</table></section>`).join('');
   if (k==='program') return `<h1>Jerusalem — Yesterday, Today and Tomorrow</h1><div>20–22 October 2026 · The Jerusalem Foundation at 60</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d).map(e => `<tr><td>${e.s}–${e.e}</td><td><b>${esc(L(e,'title'))}</b><br><span data-notr>${esc(S.lang==='he' ? e.title : e.title_he)}</span><br><span style="color:#6D685F">${esc(L(e,'venue'))}</span></td></tr>`).join(''));
-  if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
+  if (k==='ros') return `<h1>${t('progDocH')}</h1><div>${t('progDocSub').replace('{d}', ddmm(new Date().toISOString().slice(0,10)))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `${t('busT')}: ${esc(r.title)}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
   if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>atHotel(g, h)).length).join(' · '):''}</td></tr>`).join(''));
   if (k==='caterer') { const by = {}; D.guests.filter(g=>g.dietary).forEach(g => by[g.dietary] = (by[g.dietary]||[]).concat(g)); return `<h1>Dietary requirements</h1><div>${D.guests.filter(g=>g.dietary).length} guests · for every caterer</div><h2>Summary</h2><table>${Object.keys(by).sort().map(k => `<tr><td>${by[k].length}</td><td class="${by[k].some(g=>g.severe)?'sev':''}">${esc(k)}${by[k].some(g=>g.severe)?' · SEVERE':''}</td></tr>`).join('')}</table><h2>Meals</h2><table>${D.food.filter(f=>/lunch|dinner|Lunch|Dinner/.test(f.title)).map(f => `<tr><td>${dayName(f.day)}</td><td>${esc(f.title)}</td></tr>`).join('')}</table>`; }
   if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>atHotel(g, h)).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>atHotel(g, h)).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
@@ -1306,7 +1308,7 @@ function openDoc(k){
   const d = DOCS.find(x => x[0] === k);
   openSheet(`<div class="sh-h"><div><div class="lbl">${t('print')}</div><h2>${d[1]}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
   <div class="sh-b"><div class="paper">${paper(k)}</div><button class="btn" type="button" id="dlPdf">Download PDF</button></div>`, true);
-  $('dlPdf').onclick = () => { if (printPaper(d[1], paper(k))) log('Generated “' + d[1] + '”'); };
+  $('dlPdf').onclick = () => { if (printPaper(k === 'ros' ? t('progDocFile') : 'JF60 · ' + d[1], paper(k))) log('Generated “' + d[1] + '”'); };
 }
 // Opens the document in a print window; the browser's print dialog saves it as a PDF
 function printPaper(title, html){
@@ -1314,7 +1316,7 @@ function printPaper(title, html){
   const w = window.open('', '_blank');
   if (!w) { toast(t('popupBlocked')); return false; }
   w.document.open();
-  w.document.write(`<!DOCTYPE html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'he' : 'en'}"><head><meta charset="utf-8"><title>JF60 · ${esc(title)} · ${stamp}</title><style>
+  w.document.write(`<!DOCTYPE html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'he' : 'en'}"><head><meta charset="utf-8"><title>${esc(title)} · ${stamp}</title><style>
     @page { margin: 14mm; }
     * { box-sizing: border-box; }
     body { font-family: Georgia, 'Frank Ruhl Libre', serif; color: #22201B; font-size: 12px; line-height: 1.45; margin: 0; }
@@ -1691,7 +1693,7 @@ const HE = {
  'Prototype: the sample documents are pre-read; files you drop are sorted by name and type, and spreadsheets are opened to count rows. In the app, Claude reads each file, extracts the details and suggests where it goes. Nothing is filed until someone presses Apply.':'אב־טיפוס: מסמכי הדוגמה כבר נקראו; קבצים שתגררו ממוינים לפי שם וסוג, וגיליונות נפתחים לספירת שורות. באפליקציה Claude קורא כל קובץ, מחלץ את הפרטים ומציע לאן לתייק. שום דבר לא מתויק עד שמישהו לוחץ על תיוק.',
  'Dismissed':'הוסר',
  // print
- 'Guest program':'תוכנית לאורחים','Bilingual, one page per day':'דו־לשונית, עמוד לכל יום','Run of show':'לו״ז מפורט','Internal: sessions, crew, transport, catering by time':'פנימי: מפגשים, צוות, הסעות וכיבוד לפי שעה','Driver sheets':'דפי נהגים','One per run: time, route, pickups per hotel':'אחד לכל הסעה: שעה, מסלול, איסוף לפי מלון','Caterer dietary sheet':'דף תזונה לקייטרינג','Counts per requirement, severe allergies highlighted':'ספירה לפי דרישה, אלרגיות חמורות מודגשות','Hotel manifests':'רשימות מלון','Guests per hotel with group leader':'אורחים לפי מלון עם ראש הקבוצה','Supplier brief':'בריף לספק','AV needs per session, from the AV briefs':'צרכי הגברה לכל מפגש, מתוך הבריפים','Crew contact sheet':'דף קשר לצוות','Crew, roles, sites and group leaders':'צוות, תפקידים, אתרים וראשי קבוצות',
+ 'Guest program':'תוכנית לאורחים','Bilingual, one page per day':'דו־לשונית, עמוד לכל יום','Run of show':'לו״ז מפורט','Detailed program':'לו״ז מפורט','Sessions, run-of-show lines and transport by time · for the Foundation':'מפגשים, לו״ז מפורט והסעות לפי שעה · לקרן','Internal: sessions, crew, transport, catering by time':'פנימי: מפגשים, צוות, הסעות וכיבוד לפי שעה','Driver sheets':'דפי נהגים','One per run: time, route, pickups per hotel':'אחד לכל הסעה: שעה, מסלול, איסוף לפי מלון','Caterer dietary sheet':'דף תזונה לקייטרינג','Counts per requirement, severe allergies highlighted':'ספירה לפי דרישה, אלרגיות חמורות מודגשות','Hotel manifests':'רשימות מלון','Guests per hotel with group leader':'אורחים לפי מלון עם ראש הקבוצה','Supplier brief':'בריף לספק','AV needs per session, from the AV briefs':'צרכי הגברה לכל מפגש, מתוך הבריפים','Crew contact sheet':'דף קשר לצוות','Crew, roles, sites and group leaders':'צוות, תפקידים, אתרים וראשי קבוצות',
  'Every document is built from the live data, so it is always current. Today these are three separate buttons spread across tabs.':'כל מסמך נבנה מהנתונים החיים, ולכן תמיד מעודכן. היום אלה שלושה כפתורים נפרדים בלשוניות שונות.',
  'Jerusalem — Yesterday, Today and Tomorrow':'ירושלים — אתמול, היום ומחר','20–22 October 2026':'20–22 באוקטובר 2026','The Jerusalem Foundation at 60':'הקרן לירושלים בת 60','Internal':'פנימי','Dietary requirements':'דרישות תזונה','for every caterer':'לכל ספק קייטרינג','Summary':'סיכום','SEVERE':'חמור','Meals':'ארוחות','Brief for Schuster':'בריף לשוסטר','Sound, AV and lighting per session':'סאונד, הגברה ותאורה לכל מפגש','AV brief missing':'חסר בריף טכני','Download PDF':'הורדת PDF','In the app this downloads the PDF':'באפליקציה זה מוריד את ה-PDF',
  // settings

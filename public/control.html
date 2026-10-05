@@ -243,6 +243,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .paper td{padding:5px 0;border-top:1px solid #E4E0D7;vertical-align:top}
 .paper td:first-child{width:82px;font-variant-numeric:tabular-nums}
 .paper .sev{color:#B63E2A;font-weight:700}
+.paper .ros{color:#4A463D;font-size:11.5px;white-space:pre-line;margin-top:3px;text-align:start}
 .docrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 16px;width:100%;border:0;background:none;text-align:start}
 .docrow:hover{background:var(--sunk)}
 .docrow .fileic{height:52px;width:40px}
@@ -359,6 +360,7 @@ const T = {
    homeH:'Good morning. Here’s what needs you.', liveH:'Live now', attention:'Needs attention', readiness:'Readiness', comingUp:'Coming up', review:'Review', allFiled:'All filed.',
    progH:'Three days of sessions', addSession:'Add session', openTodos:'open to-dos', transfers:'transfers', catering:'catering',
    ros:'Run of show', rosNone:'No run of show yet', rosEdit:'Edit', rosDone:'Done', rosPh:'One line per item, starting with the time: 14:00 Doors open',
+   popupBlocked:'Allow pop-ups for this site to download the PDF',
    quotesT:'Catering quotes', quotesNote:'From the catering supplier comparison. Admin only, like the budget. Tick the quote you go with.', qSupplier:'Supplier', qMenu:'Menu', qPrice:'Price', qLinens:'Tablecloths & napkins', qDishes:'Dishes & cutlery', qChosen:'Chosen', qUnlinked:'Not tied to one meal',
    dayGuests:'Day guests', dgNote:'People who come to single sessions without staying at a hotel, from the session RSVP tabs of the registration master.', dgAdd:'Add day guest', dgNone:'No day guests yet', dgDel:'Remove {n} from the day guests?', firstName:'First name', lastName:'Last name', deskT:'Desk', sessionsT:'Sessions', noSession:'No session picked', dgEv:'Day guests at this session',
    booking:'Hotel booking', conf:'Confirmation', confPh:'Number, or Sent', earlyLate:'Early check-in / late check-out', earlyPh:'e.g. Early check-in', checkIn:'Check-in', checkOut:'Check-out', roomT:'Room',
@@ -377,6 +379,7 @@ const T = {
    homeH:'בוקר טוב. זה מה שמחכה לך.', liveH:'עכשיו בשידור', attention:'דורש טיפול', readiness:'מוכנות', comingUp:'בקרוב', review:'לבדיקה', allFiled:'הכל תויק.',
    progH:'שלושה ימים של מפגשים', addSession:'הוספת מפגש', openTodos:'משימות פתוחות', transfers:'הסעות', catering:'כיבוד',
    ros:'לו״ז מפורט', rosNone:'עדיין אין לו״ז מפורט', rosEdit:'עריכה', rosDone:'סיום', rosPh:'שורה לכל פריט, מתחילה בשעה: 14:00 פתיחת דלתות',
+   popupBlocked:'יש לאפשר חלונות קופצים לאתר כדי להוריד את ה-PDF',
    quotesT:'הצעות מחיר לקייטרינג', quotesNote:'מטבלת השוואת ספקי האוכל. למנהלים בלבד, כמו התקציב. סמנו את ההצעה שנבחרה.', qSupplier:'ספק', qMenu:'תפריט', qPrice:'מחיר', qLinens:'מפות ומפיות', qDishes:'כלים וסכו״ם', qChosen:'נבחרה', qUnlinked:'לא משויך לארוחה אחת',
    dayGuests:'אורחי יום', dgNote:'מי שמגיע למפגשים בודדים בלי לינה במלון, מלשוניות האישורים לכל מפגש בגיליון הרישום.', dgAdd:'הוספת אורח יום', dgNone:'עדיין אין אורחי יום', dgDel:'להסיר את {n} מאורחי היום?', firstName:'שם פרטי', lastName:'שם משפחה', deskT:'דסק', sessionsT:'מפגשים', noSession:'לא נבחר מפגש', dgEv:'אורחי יום במפגש הזה',
    booking:'הזמנת מלון', conf:'אישור הזמנה', confPh:'מספר, או Sent', earlyLate:'צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר', earlyPh:'למשל צ׳ק-אין מוקדם', checkIn:'צ׳ק-אין', checkOut:'צ׳ק-אאוט', roomT:'חדר',
@@ -1287,18 +1290,42 @@ function viewPrint(){
 function paper(k){
   const dayBlocks = fn => [1,2,3].map(d => `<h2>${dayName(d)}</h2><table>${fn(d)}</table>`).join('');
   if (k==='program') return `<h1>Jerusalem — Yesterday, Today and Tomorrow</h1><div>20–22 October 2026 · The Jerusalem Foundation at 60</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d).map(e => `<tr><td>${e.s}–${e.e}</td><td><b>${esc(L(e,'title'))}</b><br><span data-notr>${esc(S.lang==='he' ? e.title : e.title_he)}</span><br><span style="color:#6D685F">${esc(L(e,'venue'))}</span></td></tr>`).join(''));
-  if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${'1.10.2026'}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`]), ...D.ops.filter(o=>o.day===String(d+19)).map(o=>[o.s, `Crew: ${esc(o.title)} · ${esc(o.crew.map(crewLabel).join(', '))}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
+  if (k==='ros') return `<h1>Run of show</h1><div>Internal · printed ${ddmm(new Date().toISOString().slice(0,10))}</div>` + dayBlocks(d => [...D.ev.filter(e=>e.day===d).map(e=>[mins(e.s), `<b>${esc(e.title)}</b> · ${esc(e.venue)}${e.ros ? `<div class="ros" dir="auto">${esc(e.ros)}</div>` : ''}`]), ...D.runs.filter(r=>r.day===d).map(r=>[mins(r.t), `Bus: ${esc(r.title)} · ${t(r.status)}`]), ...D.ops.filter(o=>o.day===String(d+19)).map(o=>[o.s, `Crew: ${esc(o.title)} · ${esc(o.crew.map(crewLabel).join(', '))}`])].sort((a,b)=>a[0]-b[0]).map(([m,x]) => `<tr><td>${fmt(m)}</td><td>${x}</td></tr>`).join(''));
   if (k==='drivers') return `<h1>Driver sheets</h1>` + dayBlocks(d => D.runs.filter(r=>r.day===d).map(r => `<tr><td>${fmt(mins(r.t))}</td><td><b>${esc(r.title)}</b> · ${t(r.status)}${/Hotels →/.test(r.title)?'<br>'+HOTELS.map(h=>h+' '+D.guests.filter(g=>g.hotel===h).length).join(' · '):''}</td></tr>`).join(''));
   if (k==='caterer') { const by = {}; D.guests.filter(g=>g.dietary).forEach(g => by[g.dietary] = (by[g.dietary]||[]).concat(g)); return `<h1>Dietary requirements</h1><div>${D.guests.filter(g=>g.dietary).length} guests · for every caterer</div><h2>Summary</h2><table>${Object.keys(by).sort().map(k => `<tr><td>${by[k].length}</td><td class="${by[k].some(g=>g.severe)?'sev':''}">${esc(k)}${by[k].some(g=>g.severe)?' · SEVERE':''}</td></tr>`).join('')}</table><h2>Meals</h2><table>${D.food.filter(f=>/lunch|dinner|Lunch|Dinner/.test(f.title)).map(f => `<tr><td>${dayName(f.day)}</td><td>${esc(f.title)}</td></tr>`).join('')}</table>`; }
   if (k==='hotels') return `<h1>Hotel manifests</h1>` + HOTELS.map(h => `<h2>${h} · ${D.guests.filter(g=>g.hotel===h).length} guests · leader ${(LEADERS.find(l=>l[0].startsWith(h.split(' ')[0]))||['',''])[1]}</h2><table>${D.guests.filter(g=>g.hotel===h).map(g => `<tr><td>${esc(g.desk)}</td><td>${esc(g.name)}${g.dietary?' · '+esc(g.dietary):''}${g.cin?' · '+ddmm(g.cin)+'–'+(g.cout?ddmm(g.cout):'?'):''}${g.early?' · <b>'+esc(g.early)+'</b>':''}${g.conf?' · conf. '+esc(g.conf):''}</td></tr>`).join('')}</table>`).join('') + `<h2 class="sev">No hotel recorded · ${D.guests.filter(g=>!g.hotel).length}</h2>`;
   if (k==='supplier') return `<h1>Brief for Schuster</h1><div>Sound, AV and lighting per session</div>` + dayBlocks(d => D.ev.filter(e=>e.day===d && !/Break/.test(e.title)).map(e => `<tr><td>${e.s}</td><td><b>${esc(e.title)}</b> · ${esc(e.venue)}<br>${e.av?esc(e.av):'<span style="color:#B63E2A">AV brief missing</span>'}</td></tr>`).join(''));
-  return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r]) => `<tr><td>${n}</td><td>${r} · [phone]</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n]) => `<tr><td>${n}</td><td>${h} · [phone]</td></tr>`).join('')}</table>`;
+  const phone = n => { const c = D.contacts.find(x => x.phone && x.name === n); return c ? ' · ' + esc(c.phone) : ''; };
+  return `<h1>Crew contact sheet</h1><h2>Production crew</h2><table>${CREW.map(([n,r]) => `<tr><td>${esc(n)}</td><td>${esc(r)}${phone(n)}</td></tr>`).join('')}</table><h2>Hotel group leaders</h2><table>${LEADERS.map(([h,n]) => `<tr><td>${esc(n)}</td><td>${esc(h)}${phone(n)}</td></tr>`).join('')}</table>`;
 }
 function openDoc(k){
   const d = DOCS.find(x => x[0] === k);
   openSheet(`<div class="sh-h"><div><div class="lbl">${t('print')}</div><h2>${d[1]}</h2></div><button class="x" type="button" aria-label="${t('close')}" data-close>✕</button></div>
   <div class="sh-b"><div class="paper">${paper(k)}</div><button class="btn" type="button" id="dlPdf">Download PDF</button></div>`, true);
-  $('dlPdf').onclick = () => { log('Generated “' + d[1] + '”'); persist(); toast('In the app this downloads the PDF'); };
+  $('dlPdf').onclick = () => { if (printPaper(d[1], paper(k))) log('Generated “' + d[1] + '”'); };
+}
+// Opens the document in a print window; the browser's print dialog saves it as a PDF
+function printPaper(title, html){
+  const rtl = S.lang === 'he', stamp = new Date().toISOString().slice(0, 10);
+  const w = window.open('', '_blank');
+  if (!w) { toast(t('popupBlocked')); return false; }
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'he' : 'en'}"><head><meta charset="utf-8"><title>JF60 · ${esc(title)} · ${stamp}</title><style>
+    @page { margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Frank Ruhl Libre', serif; color: #22201B; font-size: 12px; line-height: 1.45; margin: 0; }
+    h1 { font-weight: 400; font-size: 24px; margin: 0 0 2px; }
+    h2 { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; margin: 18px 0 6px; color: #6D685F; page-break-after: avoid; }
+    table { width: 100%; border-collapse: collapse; }
+    tr { page-break-inside: avoid; }
+    td { padding: 5px 0; border-top: 1px solid #E4E0D7; vertical-align: top; }
+    td:first-child { width: 82px; font-variant-numeric: tabular-nums; }
+    .sev { color: #B63E2A; font-weight: 700; }
+    .ros { color: #4A463D; font-size: 11px; white-space: pre-line; margin-top: 3px; text-align: ${rtl ? 'right' : 'left'}; }
+  </style></head><body>${html}</body></html>`);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 350);
+  return true;
 }
 
 /* ============================ ACCESS & ACTIVITY ============================ */

@@ -1649,7 +1649,7 @@ ${context}`;
           const b = await readBody(request);
           if (!b.name || !b.name.trim())
             return json({ error: "name required" }, 400);
-          const org = b.org === "Jerusalem Foundation" ? "Jerusalem Foundation" : "Production";
+          const org = ["Jerusalem Foundation", "Jerusalem Foundation board"].includes(b.org) ? b.org : "Production";
           const r = await env.DB.prepare("INSERT INTO team (name, role, org) VALUES (?,?,?)").bind(b.name.trim().slice(0, 120), (b.role || "").slice(0, 120), org).run();
           return json({ ok: true, id: r.meta.last_row_id });
         }
@@ -1660,7 +1660,7 @@ ${context}`;
           let value = (b.value ?? "").toString().trim().slice(0, 120);
           if (b.field === "name" && !value)
             return json({ error: "name required" }, 400);
-          if (b.field === "org" && !["Production", "Jerusalem Foundation"].includes(value))
+          if (b.field === "org" && !["Production", "Jerusalem Foundation", "Jerusalem Foundation board"].includes(value))
             return json({ error: "bad org" }, 400);
           await env.DB.prepare(`UPDATE team SET ${b.field}=? WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });

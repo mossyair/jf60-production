@@ -39,7 +39,7 @@ INSERT INTO team (name, role, org) SELECT 'Kenny Borsykowsky', 'Staff', 'Jerusal
 INSERT INTO team (name, role, org) SELECT 'Rina Antar', 'Staff', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Rina Antar'));
 INSERT INTO team (name, role, org) SELECT 'Shira Maslati', 'Staff', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Shira Maslati'));
 INSERT INTO team (name, role, org) SELECT 'Shani Wurmbrand', 'Staff', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Shani Wurmbrand'));
-INSERT INTO team (name, role, org) SELECT 'Tehilla Alexander', 'Staff', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Tehilla Alexander'));
+INSERT INTO team (name, role, org) SELECT 'Tehila Alexander', 'Staff', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Tehila Alexander'));
 INSERT INTO team (name, role, org) SELECT 'Ronit Abramson', 'Board of directors', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Ronit Abramson'));
 INSERT INTO team (name, role, org) SELECT 'Zvi Agmon', 'Board of directors', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Zvi Agmon'));
 INSERT INTO team (name, role, org) SELECT 'Yoram Belizovsky', 'Board of directors', 'Jerusalem Foundation' WHERE NOT EXISTS (SELECT 1 FROM team WHERE lower(name)=lower('Yoram Belizovsky'));

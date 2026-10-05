@@ -1650,12 +1650,12 @@ ${context}`;
           if (!b.name || !b.name.trim())
             return json({ error: "name required" }, 400);
           const org = ["Jerusalem Foundation", "Jerusalem Foundation board"].includes(b.org) ? b.org : "Production";
-          const r = await env.DB.prepare("INSERT INTO team (name, role, org) VALUES (?,?,?)").bind(b.name.trim().slice(0, 120), (b.role || "").slice(0, 120), org).run();
+          const r = await env.DB.prepare("INSERT INTO team (name, role, org, phone) VALUES (?,?,?,?)").bind(b.name.trim().slice(0, 120), (b.role || "").slice(0, 120), org, (b.phone || "").toString().slice(0, 40)).run();
           return json({ ok: true, id: r.meta.last_row_id });
         }
         if (path === "/api/team/field" && request.method === "POST") {
           const b = await readBody(request);
-          if (!b.id || !["name", "role", "org"].includes(b.field))
+          if (!b.id || !["name", "role", "org", "phone"].includes(b.field))
             return json({ error: "bad field" }, 400);
           let value = (b.value ?? "").toString().trim().slice(0, 120);
           if (b.field === "name" && !value)

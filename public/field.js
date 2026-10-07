@@ -65,6 +65,10 @@ function hello(){
   try { if (sessionStorage.getItem('jf60dv')) return; } catch(e){}
   api('access/hello', { name:NAME, ui:FIELD.level }).then(() => { try { sessionStorage.setItem('jf60dv', '1'); } catch(e){} }).catch(() => {});
 }
-$('gateForm').onsubmit = e => { e.preventDefault(); KEY = $('gKey').value.trim(); NAME = $('gName').value.trim(); try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); sessionStorage.removeItem('jf60dv'); } catch(e){} start(); };
-$('logout').onclick = () => { try { sessionStorage.removeItem('jf60k'); sessionStorage.removeItem('jf60dv'); } catch(e){} KEY = ''; DATA = null; $('gKey').value = ''; $('app').hidden = true; $('gate').hidden = false; };
+// a key for another mode goes to that mode's page
+$('gateForm').onsubmit = async e => { e.preventDefault(); KEY = $('gKey').value.trim(); NAME = $('gName').value.trim(); try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); sessionStorage.removeItem('jf60dv'); } catch(e){}
+  try { const s = await api('state'); if (s.redirect !== location.pathname) { location.href = s.redirect || '/'; return; } } catch(err){}
+  start(); };
+// log out to the main sign-in screen, so any key (another mode included) can be used next
+$('logout').onclick = () => { try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; location.href = '/'; };
 setInterval(() => { if (DATA && document.visibilityState === 'visible' && !document.querySelector('input:focus')) load().then(FIELD.render).catch(() => {}); }, 120000);

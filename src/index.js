@@ -53,8 +53,14 @@ async function tokenLevel(token, env) {
     if (env[name] && await safeEqual(token, env[name]))
       return level;
   }
-  if (await safeEqual(token.trim().toLowerCase(), (env.DRIVER_TOKEN || "driver").toLowerCase()))
+  const t = token.trim().toLowerCase().replace(/\s+/g, " ");
+  if (await safeEqual(t, (env.DRIVER_TOKEN || "driver").toLowerCase()))
     return "driver";
+  // field apps: one shared key per role; group leaders and crew also give their name, which picks what they see
+  for (const [level, keys] of [["leader", [env.LEADER_TOKEN || "group leader"]], ["av", [env.AV_TOKEN || "shuster"]], ["crew", env.CREW_TOKEN ? [env.CREW_TOKEN] : ["site manager", "assistant producer"]]])
+    for (const k of keys)
+      if (await safeEqual(t, k.toLowerCase()))
+        return level;
   return null;
 }
 async function makeSessionCookie(level, env) {
@@ -151,7 +157,7 @@ async function handleAccess(path, request, env, level) {
   try {
     if (path === "/api/access/hello" && request.method === "POST") {
       const b = await readBody(request);
-      const ui = b.ui === "classic" ? "classic" : b.ui === "driver" ? "driver" : "control";
+      const ui = ["classic", "driver", "leader", "av", "crew"].includes(b.ui) ? b.ui : "control";
       const country = request.cf && request.cf.country || "";
       const r = await env.DB.prepare("INSERT INTO access_log (name, level, ui, device, country) VALUES (?,?,?,?,?)").bind((b.name || "").toString().trim().slice(0, 80), level, ui, deviceLabel(request.headers.get("user-agent")), country).run();
       await env.DB.prepare("DELETE FROM access_log WHERE started_at < datetime('now','-180 days')").run();
@@ -459,6 +465,70 @@ async function driverState(env) {
   }
   return { level: "driver", runs, stops, segments, contacts, counts };
 }
+var FIELD_PAGES = { leader: "/leader", av: "/av", crew: "/crew" };
+var normName = (x) => String(x || "").toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
+// who is asking: the name typed at login must match a production team member (full name, or a first name only one person has)
+async function fieldPerson(env, request, roleLike) {
+  const want = normName(decodeURIComponent(request.headers.get("x-name") || ""));
+  if (!want)
+    return null;
+  const rows = (await env.DB.prepare("SELECT id, name, role, phone FROM team WHERE org='Production'").all()).results.filter((r) => roleLike(r.role || ""));
+  const full = rows.filter((r) => normName(r.name) === want);
+  if (full.length === 1)
+    return full[0];
+  const first = rows.filter((r) => normName(r.name).split(" ")[0] === want);
+  return first.length === 1 ? first[0] : null;
+}
+async function fieldCommon(env) {
+  const q = async (sql) => {
+    try {
+      return (await env.DB.prepare(sql).all()).results;
+    } catch (e) {
+      return [];
+    }
+  };
+  const d = await driverState(env);
+  const team = await q("SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' ORDER BY id");
+  return { q, runs: d.runs, stops: d.stops, segments: d.segments, counts: d.counts, team };
+}
+var isLeaderRole = (r) => /^Hotel group leader/i.test(r);
+var isCrewRole = (r) => /site manager|assistant producer|lead producer|setup|strike|design/i.test(r);
+async function leaderState(env, me) {
+  const c = await fieldCommon(env);
+  const hotelKey = normName((me.role.split("·")[1] || "").replace(/hotel/i, ""));
+  const guests = (await c.q("SELECT id, party_id, first_name, last_name, ptype, country, phone, dietary, dietary_severe, hotel, room_type, checkin, checkout, early_late, guest_note FROM guests WHERE status='active' AND hotel<>'' ORDER BY last_name, first_name"))
+    .filter((g) => hotelKey && normName(g.hotel).includes(hotelKey));
+  const ids = new Set(guests.map((g) => g.id));
+  const sessions = (await c.q("SELECT guest_id, segment_id FROM guest_sessions WHERE attending=1")).filter((x) => ids.has(x.guest_id));
+  const hotels = [...new Set(guests.map((g) => g.hotel))];
+  const runIds = new Set(c.stops.filter((s) => hotels.includes(s.hotel_match)).map((s) => s.run_id));
+  const first = normName(me.name).split(" ")[0];
+  const runs = c.runs.filter((r) => runIds.has(r.id) || normName(r.escort).includes(first));
+  const boarded = (await c.q("SELECT guest_id, day FROM boarding")).filter((x) => ids.has(x.guest_id));
+  const shifts = (await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => normName(x.crew_json).includes(normName(me.name)));
+  return { level: "leader", me: { name: me.name, role: me.role }, hotels, guests, sessions, boarded, runs, stops: c.stops.filter((s) => runs.some((r) => r.id === s.run_id)), segments: c.segments, shifts, contacts: c.team.filter((t) => /Lead producer|site manager|Hotel group leader/i.test(t.role) && t.name !== me.name) };
+}
+var AV_SUPPLIER = /שוסטר|shuster|schuster/i;
+async function avState(env) {
+  const c = await fieldCommon(env);
+  const segments = await c.q("SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_av, brief_staging, brief_location FROM segments ORDER BY day, time, sort_order");
+  const needs = (await c.q("SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id")).filter((n) => AV_SUPPLIER.test(n.supplier || "") || n.kind === "podium");
+  const screens = await c.q("SELECT id, title, title_he, size, spec, brief, status, linked_segment FROM design_items WHERE id LIKE 'd-screen%' OR category LIKE '%screen%' OR category LIKE '%מסך%' ORDER BY sort_order, id");
+  const files = await c.q("SELECT id, filename, size, segment_id FROM files WHERE section='content' AND segment_id IS NOT NULL ORDER BY uploaded_at");
+  const shifts = (await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => /sound|av\b|tech|טכני|סאונד|הגברה|מסך|screen|stage|במה/i.test(x.title + " " + (x.note || "")));
+  const venues = await c.q("SELECT name, role, phone, venue FROM contacts WHERE phone<>'' AND (role LIKE '%אתר%' OR role LIKE '%טכני%') ORDER BY venue");
+  return { level: "av", segments, needs, screens, files, shifts, venues, contacts: c.team.filter((t) => /Lead producer|site manager/i.test(t.role)) };
+}
+async function crewState(env, me) {
+  const c = await fieldCommon(env);
+  const segments = await c.q("SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_location, brief_staging, brief_materials, notes_logistics FROM segments ORDER BY day, time, sort_order");
+  const needs = await c.q("SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id");
+  const shifts = await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min, sort_order");
+  const food = await c.q("SELECT id, segment_id, day, time, title, venue, meal_type, caterer, headcount, dietary_note FROM food_items ORDER BY day, time");
+  const att = await c.q("SELECT segment_id, count(*) n FROM guest_sessions WHERE attending=1 GROUP BY segment_id");
+  const venues = await c.q("SELECT name, role, phone, venue FROM contacts WHERE phone<>'' ORDER BY venue, name");
+  return { level: "crew", me: { name: me.name, role: me.role }, segments, needs, shifts, food, attendance: att, runs: c.runs, stops: c.stops, counts: c.counts, venues, contacts: c.team.filter((t) => t.name !== me.name) };
+}
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -495,6 +565,61 @@ var src_default = {
           return json({ ok: true });
         }
         return json({ error: "drivers only see the driver page" }, 403);
+      }
+      if (FIELD_PAGES[level]) {
+        if (path.startsWith("/api/access/")) {
+          const res = await handleAccess(path, request, env, level);
+          if (res)
+            return res;
+        }
+        if (path === "/api/state" && request.method === "GET")
+          return json({ level, redirect: FIELD_PAGES[level] });
+        const me = level === "leader" ? await fieldPerson(env, request, isLeaderRole) : level === "crew" ? await fieldPerson(env, request, isCrewRole) : null;
+        if (level !== "av" && !me)
+          return json({ error: "name not found" }, 403);
+        if (path === `/api/${level}/state` && request.method === "GET")
+          return json(level === "leader" ? await leaderState(env, me) : level === "crew" ? await crewState(env, me) : await avState(env));
+        // group leader: mark a guest of her hotel as on board for the day
+        if (level === "leader" && path === "/api/leader/board" && request.method === "POST") {
+          const b = await readBody(request);
+          const st = await leaderState(env, me);
+          const gid = Number(b.guest_id), day = Number(b.day);
+          if (!st.guests.some((g) => g.id === gid) || ![1, 2, 3].includes(day))
+            return json({ error: "not your guest" }, 403);
+          if (b.on)
+            await env.DB.prepare("INSERT OR REPLACE INTO boarding (guest_id, day, by, at) VALUES (?,?,?,datetime('now'))").bind(gid, day, me.name).run();
+          else
+            await env.DB.prepare("DELETE FROM boarding WHERE guest_id=? AND day=?").bind(gid, day).run();
+          return json({ ok: true });
+        }
+        // AV and crew tick off site needs (AV: only Shuster's); crew also tick off shifts
+        if ((level === "av" || level === "crew") && path === "/api/field/done" && request.method === "POST") {
+          const b = await readBody(request);
+          const on = b.done ? 1 : 0;
+          if (b.kind === "need") {
+            const n = await env.DB.prepare("SELECT supplier, kind FROM site_needs WHERE id=?").bind(String(b.id || "")).first();
+            if (!n || level === "av" && !(AV_SUPPLIER.test(n.supplier || "") || n.kind === "podium"))
+              return json({ error: "not allowed" }, 403);
+            await env.DB.prepare("UPDATE site_needs SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, String(b.id)).run();
+            return json({ ok: true });
+          }
+          if (b.kind === "shift" && level === "crew") {
+            const r = await env.DB.prepare("UPDATE crew_shifts SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, String(b.id || "")).run();
+            return r.meta.changes ? json({ ok: true }) : json({ error: "not found" }, 404);
+          }
+          return json({ error: "bad kind" }, 400);
+        }
+        // presentations and run-sheet files linked to an event
+        if ((level === "av" || level === "crew") && path === "/api/files/download" && request.method === "GET") {
+          const row = await env.DB.prepare("SELECT r2_key, filename, content_type FROM files WHERE id=? AND section='content'").bind(url.searchParams.get("id")).first();
+          if (!row || !env.BUCKET)
+            return json({ error: "not found" }, 404);
+          const obj = await env.BUCKET.get(row.r2_key);
+          if (!obj)
+            return json({ error: "not found" }, 404);
+          return new Response(obj.body, { headers: { "content-type": row.content_type || "application/octet-stream", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`, "cache-control": "private, no-store" } });
+        }
+        return json({ error: "this key only opens its own page" }, 403);
       }
       if (path === "/api/session" && request.method === "POST") {
         const res = json({ ok: true, level });

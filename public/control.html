@@ -551,7 +551,7 @@ async function loadLive(){
   const r = await fetch('/api/state', { headers:{ 'x-token':KEY } });
   if (r.status === 401) throw new Error('unauthorized');
   const s = await r.json(); if (s.error) throw new Error(s.error);
-  if (s.level === 'driver') { try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); } catch(e){} location.replace('/driver'); return new Promise(() => {}); }
+  if (s.redirect) { try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); } catch(e){} location.replace(s.redirect); return new Promise(() => {}); }
   LIVE = s; S.role = ({ admin:'admin', edit:'edit', view:'viewer' })[s.level] || 'viewer';
   if (s.level !== 'view') { try { LIVE_FILES = (await api('files')).files || []; } catch(e){ LIVE_FILES = []; } }
   if (s.level === 'admin') { try { LIVE_VISITS = (await api('access/log?days=30')).rows || []; } catch(e){ LIVE_VISITS = null; } }

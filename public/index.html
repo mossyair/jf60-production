@@ -464,7 +464,7 @@ async function tryEnter(){
   try {
     const s = await api("state");
     if(!s || !s.level) throw new Error("rejected");
-    if(s.level==="driver"){ try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){} location.href="/driver"; return; }
+    if(s.redirect){ try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){} location.href=s.redirect; return; }
     try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){}
     document.getElementById("gate").style.display="none";
     document.getElementById("main").style.display="block";

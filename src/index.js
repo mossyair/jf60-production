@@ -534,6 +534,9 @@ var src_default = {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path.startsWith("/api/")) {
+      // sign out: drop the file-download cookie (the key itself lives in the browser tab)
+      if (path === "/api/logout" && request.method === "POST")
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json", "set-cookie": `${SESSION_COOKIE}=; Path=/api/files/download; HttpOnly; Secure; SameSite=Strict; Max-Age=0` } });
       let level = await authLevel(request, env, url);
       // the chief key is an admin key that also opens the budget sheet
       const chief = level === "chief";

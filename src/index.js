@@ -30,7 +30,7 @@ var UPLOAD_TYPES = {
   txt: "text/plain"
 };
 var INLINE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];
-var LEVELS = [["admin", "ADMIN_TOKEN"], ["edit", "EDIT_TOKEN"], ["view", "VIEW_TOKEN"]];
+var LEVELS = [["chief", "CHIEF_TOKEN"], ["admin", "ADMIN_TOKEN"], ["edit", "EDIT_TOKEN"], ["view", "VIEW_TOKEN"]];
 var SESSION_COOKIE = "jf60_dl";
 var SESSION_TTL = 12 * 3600;
 var enc = new TextEncoder();
@@ -534,7 +534,11 @@ var src_default = {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path.startsWith("/api/")) {
-      const level = await authLevel(request, env, url);
+      let level = await authLevel(request, env, url);
+      // the chief key is an admin key that also opens the budget sheet
+      const chief = level === "chief";
+      if (chief)
+        level = "admin";
       if (!level)
         return json({ error: "unauthorized" }, 401);
       if (level === "driver") {
@@ -808,6 +812,7 @@ var src_default = {
           }
           return json({
             level,
+            chief,
             segments: segs.results,
             people: ppl.results,
             checklist: checks.results,
@@ -1013,8 +1018,8 @@ var src_default = {
           return json({ ok: true });
         }
         if (path === "/api/grid" && request.method === "GET") {
-          if (!admin)
-            return json({ error: "admin required" }, 403);
+          if (!chief)
+            return json({ error: "chief key required" }, 403);
           let row;
           try {
             row = await env.DB.prepare("SELECT columns, rows FROM admin_grid WHERE id=1").first();
@@ -1037,8 +1042,8 @@ var src_default = {
           return json({ tabs: [{ name: "Budget", columns: JSON.parse(row.columns), rows: JSON.parse(row.rows) }] });
         }
         if (path === "/api/grid" && request.method === "POST") {
-          if (!admin)
-            return json({ error: "admin required" }, 403);
+          if (!chief)
+            return json({ error: "chief key required" }, 403);
           const b = await readBody(request);
           const tabs = JSON.stringify(b.tabs || []);
           if (tabs.length > 3e6)

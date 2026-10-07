@@ -406,7 +406,7 @@ function setLang(lang){ LANG=lang; try{ sessionStorage.setItem("jf60lang",lang);
   render();
 }
 
-let KEY = "", NAME = "", ROLE = null;
+let KEY = "", NAME = "", ROLE = null, CHIEF = false;
 let data = { segments:[], people:[], checklist:[], venues:[], contacts:[], timeline:[], team:[], food_items:[], dietary:[], guests:[], guest_sessions:[], design_items:[], design_proofs:[], transport_runs:[], run_stops:[], gift_items:[] };
 let ui = { view:"schedule", dayFilter:"all", statusFilter:"all", search:"", openId:null, foodDay:"all", foodType:"all", openFood:new Set(), guestDesk:"all", guestHotel:"all", guestGroupHotel:false, guestSearch:"", openGuest:new Set(), importChanges:null, designCat:"all", openDesign:new Set(), runDay:"all", openRun:new Set(), pdfBuses:true };
 
@@ -442,6 +442,7 @@ function applyState(s){
     data.run_stops = s.run_stops || [];
     data.gift_items = s.gift_items || [];
     ROLE = s.level;
+    CHIEF = !!s.chief;
     stateLoaded = true;
     render();
 }
@@ -1096,8 +1097,8 @@ async function renderFiles(){
   const el=document.getElementById("content");
   const isAdmin = ROLE==="admin";
   el.innerHTML = `
-    ${isAdmin?`<div class="loose-group" id="gridWrap">
-      <h3>${DL("Admin spreadsheet","גיליון ניהול")} <span style="font-size:11px;color:var(--terra);font-weight:700;letter-spacing:.04em;">${DL("ADMIN ONLY","למנהלים בלבד")}</span></h3>
+    ${isAdmin && CHIEF?`<div class="loose-group" id="gridWrap">
+      <h3>${DL("Budget spreadsheet","גיליון תקציב")} <span style="font-size:11px;color:var(--terra);font-weight:700;letter-spacing:.04em;">${DL("CHIEF KEY ONLY","מפתח chief בלבד")}</span></h3>
       <div id="gridArea"><div class="empty">${DL("Loading grid…","טוען גיליון…")}</div></div>
     </div>`:''}
     <div class="loose-group">
@@ -1121,7 +1122,7 @@ async function renderFiles(){
       <div id="generalList"><div class="empty">Loading…</div></div>
     </div>
   `;
-  if(isAdmin) renderGrid();
+  if(isAdmin && CHIEF) renderGrid();
   // wire uploads
   document.getElementById("contentUpload").onclick=()=>doUpload("content", "contentFile", document.getElementById("contentSeg").value);
   document.getElementById("generalUpload").onclick=()=>doUpload("general", "generalFile", null);

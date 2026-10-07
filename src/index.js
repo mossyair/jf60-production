@@ -131,7 +131,7 @@ How to read the data:
 - day 1 = Tue 20.10, day 2 = Wed 21.10, day 3 = Thu 22.10. A time after midnight (00:15) belongs to the evening before.
 - Session, food and to-do status: open, progress (in progress), confirmed. Transport status: no_driver, to_confirm, booked, needs_decision. Design status: content_missing, in_design, awaiting_approval, approved, changes, no_design, unresolved.
 - todos and people_per_session link to sessions by segment_id. done = 1 means done.
-- crew_schedule: day is the date in October (19-22); start_min/end_min are minutes from midnight (past 1440 means after midnight); crew_json lists people as n (name, or a number for a headcount like "2" runners) and r (role), with n "?" meaning nobody is assigned yet; flag is an open issue.
+- crew_schedule: day is the date in October (19-22); start_min/end_min are minutes from midnight (past 1440 means after midnight); crew_json lists people as n (name, or a number for a headcount like "2" assistant producers) and r (role), with n "?" meaning nobody is assigned yet; flag is an open issue.
 - talent_contracts (admins only): stage is contacted, quote, signed or invoiced; fee is in ILS including VAT.
 - guest_summary has counts only. Individual guests aren't included, so for questions about a named guest, point to People → Guests.
 
@@ -592,6 +592,11 @@ var src_default = {
             furnitureItems = await env.DB.prepare("SELECT * FROM furniture_items ORDER BY sort_order, id").all();
           } catch (e) {
           }
+          let siteNeeds = { results: [] };
+          try {
+            siteNeeds = await env.DB.prepare("SELECT * FROM site_needs ORDER BY sort_order, id").all();
+          } catch (e) {
+          }
           let fairOrgs = { results: [] };
           try {
             fairOrgs = await env.DB.prepare("SELECT * FROM fair_orgs ORDER BY sort_order, name").all();
@@ -640,6 +645,7 @@ var src_default = {
             day_guests: dayGuests.results,
             catering_quotes: cateringQuotes.results,
             furniture_items: furnitureItems.results,
+            site_needs: siteNeeds.results,
             inbox_items: inboxItems.results
           });
         }
@@ -1777,6 +1783,14 @@ ${context}`;
             return json({ error: "admin required" }, 403);
           const b = await readBody(request);
           await env.DB.prepare("DELETE FROM furniture_items WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/siteneed/field" && request.method === "POST") {
+          const b = await readBody(request);
+          if (!b.id || !["done", "qty", "supplier", "notes"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          const value = b.field === "done" ? (b.value ? 1 : 0) : (b.value ?? "").toString().slice(0, 1e3);
+          await env.DB.prepare(`UPDATE site_needs SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/fair/field" && request.method === "POST") {

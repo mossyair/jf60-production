@@ -53,6 +53,8 @@ async function tokenLevel(token, env) {
     if (env[name] && await safeEqual(token, env[name]))
       return level;
   }
+  if (await safeEqual(token.trim().toLowerCase(), (env.DRIVER_TOKEN || "driver").toLowerCase()))
+    return "driver";
   return null;
 }
 async function makeSessionCookie(level, env) {
@@ -149,7 +151,7 @@ async function handleAccess(path, request, env, level) {
   try {
     if (path === "/api/access/hello" && request.method === "POST") {
       const b = await readBody(request);
-      const ui = b.ui === "classic" ? "classic" : "control";
+      const ui = b.ui === "classic" ? "classic" : b.ui === "driver" ? "driver" : "control";
       const country = request.cf && request.cf.country || "";
       const r = await env.DB.prepare("INSERT INTO access_log (name, level, ui, device, country) VALUES (?,?,?,?,?)").bind((b.name || "").toString().trim().slice(0, 80), level, ui, deviceLabel(request.headers.get("user-agent")), country).run();
       await env.DB.prepare("DELETE FROM access_log WHERE started_at < datetime('now','-180 days')").run();
@@ -428,6 +430,35 @@ async function handleInboxApply(request, env, admin) {
   return json({ ok: true, filed_to: filedTo });
 }
 __name(handleInboxApply, "handleInboxApply");
+// ---- Driver app: bus runs, stops, passenger counts per hotel and production contacts. No guest names. ----
+var DRIVER_DAYS = { 1: "2026-10-20", 2: "2026-10-21", 3: "2026-10-22" };
+async function driverState(env) {
+  const q = async (sql) => {
+    try {
+      return (await env.DB.prepare(sql).all()).results;
+    } catch (e) {
+      return [];
+    }
+  };
+  const runs = (await q("SELECT * FROM transport_runs ORDER BY day, depart_time")).map((r) => ({
+    id: r.id, day: r.day, depart_time: r.depart_time, arrive_time: r.arrive_time, title: r.title, title_he: r.title_he,
+    destination: r.destination, destination_he: r.destination_he, linked_segment: r.linked_segment, vehicles: r.vehicles,
+    capacity: r.capacity, driver: r.driver, driver_phone: r.driver_phone, company: r.company, escort: r.escort,
+    driver_note: r.driver_note || "", dropoff: r.dropoff || "", dropoff_url: r.dropoff_url || ""
+  }));
+  const stops = await q("SELECT run_id, time, stop_label, hotel_match, sort_order FROM run_stops ORDER BY run_id, sort_order");
+  const segments = await q("SELECT id, day, time, end_time, title, title_he, venue, venue_he FROM segments ORDER BY day, time");
+  const contacts = await q("SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' AND (role LIKE 'Lead producer%' OR role LIKE '%site manager%' OR role LIKE 'Hotel group leader%') ORDER BY id");
+  const stays = await q("SELECT hotel, checkin, checkout FROM guests WHERE status='active' AND hotel<>''");
+  const counts = {};
+  for (const [day, date] of Object.entries(DRIVER_DAYS)) {
+    counts[day] = {};
+    for (const g of stays)
+      if (g.checkin && g.checkout && g.checkin <= date && g.checkout >= date)
+        counts[day][g.hotel] = (counts[day][g.hotel] || 0) + 1;
+  }
+  return { level: "driver", runs, stops, segments, contacts, counts };
+}
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -436,6 +467,18 @@ var src_default = {
       const level = await authLevel(request, env, url);
       if (!level)
         return json({ error: "unauthorized" }, 401);
+      if (level === "driver") {
+        if (path.startsWith("/api/access/")) {
+          const res = await handleAccess(path, request, env, level);
+          if (res)
+            return res;
+        }
+        if (path === "/api/state" && request.method === "GET")
+          return json({ level, redirect: "/driver" });
+        if (path === "/api/driver/state" && request.method === "GET")
+          return json(await driverState(env));
+        return json({ error: "drivers only see the driver page" }, 403);
+      }
       if (path === "/api/session" && request.method === "POST") {
         const res = json({ ok: true, level });
         res.headers.append("set-cookie", await makeSessionCookie(level, env));
@@ -951,7 +994,7 @@ var src_default = {
         }
         if (path === "/api/run/field" && request.method === "POST") {
           const b = await readBody(request);
-          const allowed = ["depart_time", "arrive_time", "title", "title_he", "destination", "destination_he", "linked_segment", "vehicles", "capacity", "driver", "driver_phone", "company", "escort", "notes", "status", "pdf_hide"];
+          const allowed = ["depart_time", "arrive_time", "title", "title_he", "destination", "destination_he", "linked_segment", "vehicles", "capacity", "driver", "driver_phone", "company", "escort", "notes", "status", "pdf_hide", "driver_note", "dropoff", "dropoff_url"];
           if (!b.id || !allowed.includes(b.field))
             return json({ error: "bad field" }, 400);
           await env.DB.prepare(`UPDATE transport_runs SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind((b.value ?? "").toString().slice(0, 4e3), b.id).run();

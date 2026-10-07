@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>JF60 · דף נהג</title>
+<style>
+:root{--bg:#F5F0E6;--card:#FBF8F2;--ink:#1E2B33;--muted:#5E676C;--line:#E0D7C6;--accent:#A8461F;--info:#2F6B8A;--ok:#3E7A4F;--now:#FFF3E3}
+@media (prefers-color-scheme: dark){:root{--bg:#151B1F;--card:#1E262B;--ink:#EDE7DC;--muted:#A3ABB0;--line:#334047;--accent:#E9905F;--info:#7DB6D3;--ok:#86C79A;--now:#2C2620}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{font-size:13px;font-weight:700;letter-spacing:1px;color:var(--accent)}
+h1{margin:2px 0 0;font-size:22px}
+.tabs{display:flex;gap:6px;margin-top:10px}
+.tabs button{flex:1;padding:10px 4px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;font:inherit;font-size:15px;font-weight:600}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+main{padding:14px 16px 40px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.card.now{background:var(--now);border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.card.past{opacity:.55}
+.badge{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:2px 10px;margin-bottom:6px}
+.time{font-size:26px;font-weight:800;direction:ltr;unicode-bidi:isolate}
+.time small{font-size:15px;font-weight:600;color:var(--muted)}
+.title{font-size:18px;font-weight:700;margin:2px 0 8px}
+.sec{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin:10px 0 4px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row .t{font-weight:700;direction:ltr;unicode-bidi:isolate;min-width:48px}
+.row .m{flex:1;min-width:0}
+.row .s{font-size:14px;color:var(--muted)}
+a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);text-decoration:none;font:inherit;font-size:15px;font-weight:600;white-space:nowrap}
+a.btn.nav{background:var(--info);border-color:var(--info);color:#fff}
+a.btn.call{background:var(--ok);border-color:var(--ok);color:#fff}
+.note{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px dashed var(--line);font-size:15px;white-space:pre-line}
+.muted{color:var(--muted)}
+.empty{padding:30px 0;text-align:center;color:var(--muted)}
+.gate{max-width:420px;margin:12vh auto 0;padding:0 16px}
+.gate label{display:block;font-size:14px;font-weight:600;margin:14px 0 4px}
+.gate input{width:100%;min-height:48px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+.gate button{width:100%;margin-top:18px;min-height:50px;border:0;border-radius:12px;background:var(--ink);color:var(--bg);font:inherit;font-weight:700}
+.err{color:#B3261E;min-height:1.3em;margin-top:8px;font-size:14px}
+footer{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div id="gate" class="gate" hidden>
+  <div class="brand">הקרן לירושלים · כנס 60</div>
+  <h1>דף נהג</h1>
+  <form id="gateForm">
+    <label for="gName">שם</label><input id="gName" autocomplete="name">
+    <label for="gKey">קוד כניסה</label><input id="gKey" type="password" autocomplete="current-password" required>
+    <div class="err" id="gErr" role="alert"></div>
+    <button type="submit">כניסה</button>
+  </form>
+</div>
+<div id="app" hidden>
+  <header>
+    <div class="top">
+      <div><div class="brand">הקרן לירושלים · כנס 60</div><h1>דף נהג</h1></div>
+      <button class="btn" type="button" id="logout">יציאה</button>
+    </div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+  </header>
+  <main id="main"></main>
+</div>
+<script>
+const DAYS = { 1:{ date:'2026-10-20', name:'שלישי 20.10' }, 2:{ date:'2026-10-21', name:'רביעי 21.10' }, 3:{ date:'2026-10-22', name:'חמישי 22.10' } };
+// Waze searches by place name; exact drop-off points come from each run's drop-off link once production adds them
+const PLACES = { "Mishkenot Sha'ananim":"Mishkenot Sha'ananim Jerusalem", "King David Hotel":"King David Hotel Jerusalem", "Inbal Hotel":"Inbal Hotel Jerusalem", "Dan Panorama Hotel":"Dan Panorama Jerusalem", "Dan Panorama":"Dan Panorama Jerusalem",
+  "Train Theater":"Train Theater Jerusalem", "Jerusalem Theater":"Jerusalem Theatre", "Botanical Gardens":"Jerusalem Botanical Gardens", "Gazelle Valley":"Gazelle Valley Park Jerusalem", "Ein Yael":"Ein Yael Jerusalem",
+  "Beit Hanina Sports Complex":"Beit Hanina Sports Complex Jerusalem", "HaMiffal":"HaMiffal Jerusalem", "HaMazkeka":"HaMazkeka Jerusalem", "Cinematheque Jerusalem":"Jerusalem Cinematheque", "Cinematheque":"Jerusalem Cinematheque",
+  "Bloomfield Science Museum":"Bloomfield Science Museum Jerusalem", "Science Museum":"Bloomfield Science Museum Jerusalem", "Tower of David":"Tower of David Museum Jerusalem" };
+const HOTEL_HE = { "Mishkenot Sha'ananim":'משכנות שאננים', "King David Hotel":'מלון המלך דוד', "Inbal Hotel":'מלון ענבל', "Dan Panorama Hotel":'מלון דן פנורמה', "Dan Panorama":'מלון דן פנורמה' };
+const ESCORT_KEY = { "Mishkenot Sha'ananim":'Mishkenot', "King David Hotel":'King David', "Inbal Hotel":'Inbal', "Dan Panorama Hotel":'Dan Panorama', "Dan Panorama":'Dan Panorama' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+let KEY = '', NAME = '', DATA = null, DAY = 1;
+try { KEY = sessionStorage.getItem('jf60k') || ''; NAME = sessionStorage.getItem('jf60n') || ''; } catch(e){}
+
+// minutes from midnight; a run after midnight belongs to the evening before
+const mins = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return null; const v = +m[1] * 60 + +m[2]; return v < 300 ? v + 1440 : v; };
+const nowIL = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Jerusalem', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(new Date()).map(x => [x.type, x.value])); return { date:`${p.year}-${p.month}-${p.day}`, min:+p.hour * 60 + +p.minute }; };
+const waze = q => 'https://waze.com/ul?q=' + encodeURIComponent(q) + '&navigate=yes';
+const tel = p => 'tel:' + String(p).replace(/[^\d+]/g, '');
+const roleHe = r => String(r || '').replace(/Hotel group leader/g, 'מלווה קבוצה').replace(/Lead producer/g, 'מפיק ראשי').replace(/[Ss]ite manager/g, 'מנהל אתר').replace(/production coordination/g, 'תיאום הפקה').replace(/production/g, 'הפקה')
+  .replace(/Mishkenot Sha’ananim|Mishkenot Sha'ananim/g, 'משכנות שאננים').replace(/King David/g, 'המלך דוד').replace(/Inbal/g, 'ענבל').replace(/Dan Panorama/g, 'דן פנורמה');
+
+async function load(){
+  const r = await fetch('/api/driver/state', { headers:{ 'x-token':KEY } });
+  if (r.status === 401 || r.status === 403) throw new Error('unauthorized');
+  const s = await r.json(); if (s.error) throw new Error(s.error);
+  DATA = s;
+}
+function escortFor(label){ const k = ESCORT_KEY[label]; if (!k || !DATA) return null; return DATA.contacts.find(c => /Hotel group leader/.test(c.role) && c.role.includes(k)) || null; }
+function placeButtons(dest){
+  return String(dest || '').split(/\s*(?:·|\/| or )\s*/).map(x => x.trim()).filter(x => x && !/^hotels?$/i.test(x))
+    .map(x => `<a class="btn nav" href="${waze(PLACES[x] || x + ' Jerusalem')}" target="_blank" rel="noopener">ניווט · ${esc(HOTEL_HE[x] || x)}</a>`).join(' ');
+}
+function runCard(r, state){
+  const stops = DATA.stops.filter(s => s.run_id === r.id).sort((a, b) => a.sort_order - b.sort_order);
+  const seg = DATA.segments.find(s => s.id === r.linked_segment);
+  const counts = DATA.counts[r.day] || {};
+  const late = (mins(r.depart_time) || 0) >= 1440;
+  const stopRows = stops.map(s => {
+    const n = counts[s.hotel_match], esc0 = escortFor(s.stop_label);
+    return `<div class="row"><span class="t">${esc(s.time)}</span><span class="m"><div><b>${esc(HOTEL_HE[s.stop_label] || s.stop_label)}</b></div>
+      <div class="s">${n ? `עד ${n} אורחים במלון` : ''}${n && esc0 ? ' · ' : ''}${esc0 ? `מלווה: <bdi>${esc(esc0.name)}</bdi>` : ''}</div></span>
+      <span style="display:flex;gap:6px">${esc0 ? `<a class="btn call" href="${tel(esc0.phone)}" aria-label="להתקשר ל${esc(esc0.name)}">📞</a>` : ''}<a class="btn nav" href="${waze(PLACES[s.stop_label] || s.stop_label)}" target="_blank" rel="noopener" aria-label="ניווט">ניווט</a></span></div>`;
+  }).join('');
+  const drop = r.dropoff || r.dropoff_url ? `<div class="sec">נקודת הורדה</div><div>${esc(r.dropoff)}</div>${r.dropoff_url ? `<a class="btn nav" href="${esc(r.dropoff_url)}" target="_blank" rel="noopener" style="margin-top:6px">ניווט לנקודת ההורדה</a>` : ''}` : '';
+  const dest = r.destination_he || r.destination;
+  return `<div class="card ${state}">${state === 'now' ? '<span class="badge">הנסיעה הבאה</span>' : ''}
+    <div class="time">${esc(r.depart_time)}${r.arrive_time ? ` <small>← ${esc(r.arrive_time)}</small>` : ''}${late ? ' <small>(אחרי חצות)</small>' : ''}</div>
+    <div class="title">${esc(r.title_he || r.title)}</div>
+    ${stopRows ? `<div class="sec">איסוף</div>${stopRows}` : ''}
+    <div class="sec">יעד</div><div><b>${esc(dest)}</b>${seg ? `<div class="s muted">לאירוע: ${esc(seg.title_he || seg.title)} · ${esc(seg.time)}</div>` : ''}</div>
+    ${drop || (placeButtons(r.destination) ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${placeButtons(r.destination)}</div>` : '')}
+    ${r.vehicles || r.driver || r.company ? `<div class="sec">רכב</div><div>${[r.vehicles, r.company, r.driver, r.driver_phone].filter(Boolean).map(x => `<bdi>${esc(x)}</bdi>`).join(' · ')}</div>` : ''}
+    ${r.escort ? `<div class="sec">מלווה מטעם הקרן</div><div>${esc(r.escort)}</div>` : ''}
+    ${r.driver_note ? `<div class="note">${esc(r.driver_note)}</div>` : ''}
+  </div>`;
+}
+function render(){
+  $('tabs').innerHTML = Object.entries(DAYS).map(([d, x]) => `<button type="button" role="tab" data-day="${d}" aria-selected="${+d === DAY}">${x.name}</button>`).join('');
+  $('tabs').querySelectorAll('[data-day]').forEach(b => b.onclick = () => { DAY = +b.dataset.day; render(); window.scrollTo(0, 0); });
+  const runs = DATA.runs.filter(r => r.day === DAY).sort((a, b) => mins(a.depart_time) - mins(b.depart_time));
+  const now = nowIL(), today = DAYS[DAY].date === now.date;
+  const next = today ? runs.find(r => (mins(r.arrive_time) ?? mins(r.depart_time)) >= now.min) : null;
+  const html = runs.map(r => runCard(r, r === next ? 'now' : today && (mins(r.arrive_time) ?? mins(r.depart_time)) < now.min ? 'past' : '')).join('');
+  const contacts = DATA.contacts.map(c => `<div class="row"><span class="m"><div><b><bdi>${esc(c.name)}</bdi></b></div><div class="s">${esc(roleHe(c.role))}</div></span><a class="btn call" href="${tel(c.phone)}">📞 <bdi dir="ltr">${esc(c.phone)}</bdi></a></div>`).join('');
+  $('main').innerHTML = (html || '<div class="empty">אין נסיעות ביום הזה</div>')
+    + `<div class="card"><div class="title">אנשי קשר בהפקה</div>${contacts || '<div class="muted">—</div>'}</div>`
+    + `<footer>הנתונים מתעדכנים אוטומטית · מספר האורחים הוא לפי רשימת הלינה במלון, לא אישור הגעה</footer>`;
+}
+function pickDay(){ const d = nowIL().date; const hit = Object.entries(DAYS).find(([, x]) => x.date === d); DAY = hit ? +hit[0] : 1; }
+async function start(){
+  try { await load(); } catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = KEY ? 'הקוד לא התקבל.' : ''; return; }
+  $('gate').hidden = true; $('app').hidden = false; pickDay(); render(); hello();
+}
+function hello(){
+  try { if (sessionStorage.getItem('jf60dv')) return; } catch(e){}
+  fetch('/api/access/hello', { method:'POST', headers:{ 'x-token':KEY, 'content-type':'application/json' }, body:JSON.stringify({ name:NAME, ui:'driver' }) }).then(() => { try { sessionStorage.setItem('jf60dv', '1'); } catch(e){} }).catch(() => {});
+}
+$('gateForm').onsubmit = e => { e.preventDefault(); KEY = $('gKey').value.trim(); NAME = $('gName').value.trim(); try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); sessionStorage.removeItem('jf60dv'); } catch(e){} start(); };
+$('logout').onclick = () => { try { sessionStorage.removeItem('jf60k'); sessionStorage.removeItem('jf60dv'); } catch(e){} KEY = ''; DATA = null; $('gKey').value = ''; $('app').hidden = true; $('gate').hidden = false; };
+setInterval(() => { if (DATA && document.visibilityState === 'visible') load().then(render).catch(() => {}); }, 120000);
+start();
+</script>
+</body>
+</html>

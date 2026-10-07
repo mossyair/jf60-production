@@ -464,6 +464,7 @@ async function tryEnter(){
   try {
     const s = await api("state");
     if(!s || !s.level) throw new Error("rejected");
+    if(s.level==="driver"){ try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){} location.href="/driver"; return; }
     try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){}
     document.getElementById("gate").style.display="none";
     document.getElementById("main").style.display="block";
@@ -1264,7 +1265,10 @@ function runBodyHtml(r){
     <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;">
       ${canEdit?`
       <input class="g-in" data-rf="escort" data-rid="${r.id}" value="${esc(r.escort||'')}" placeholder="${DL('Foundation staff escort','מלווה מטעם הקרן')}" style="margin-bottom:7px;">
-      <textarea class="notes-area" data-rf="notes" data-rid="${r.id}" style="min-height:58px;" placeholder="${DL('Notes for the driver — access, parking, luggage…','הערות לנהג — גישה, חניה, מזוודות…')}">${esc(r.notes||'')}</textarea>`
+      <textarea class="notes-area" data-rf="notes" data-rid="${r.id}" style="min-height:58px;" placeholder="${DL('Internal notes for the production team','הערות פנימיות לצוות ההפקה')}">${esc(r.notes||'')}</textarea>
+      <textarea class="notes-area" data-rf="driver_note" data-rid="${r.id}" style="min-height:58px;margin-top:7px;" placeholder="${DL('Note shown in the driver app — access, parking, luggage…','הערה שמופיעה באפליקציית הנהגים — גישה, חניה, מזוודות…')}">${esc(r.driver_note||'')}</textarea>
+      <input class="g-in" data-rf="dropoff" data-rid="${r.id}" value="${esc(r.dropoff||'')}" placeholder="${DL('Exact drop-off point','נקודת הורדה מדויקת')}" style="margin-top:7px;">
+      <input class="g-in" data-rf="dropoff_url" data-rid="${r.id}" value="${esc(r.dropoff_url||'')}" placeholder="${DL('Drop-off map link (Waze / Google Maps)','קישור מפה לנקודת ההורדה (Waze / גוגל מפות)')}" style="margin-top:7px;">`
       :`<div class="g-val">${esc(r.escort||'—')}<br>${esc(r.notes||'')}</div>`}
     </div>
 

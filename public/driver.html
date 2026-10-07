@@ -42,6 +42,10 @@ a.btn.call{background:var(--ok);border-color:var(--ok);color:#fff}
 .gate input{width:100%;min-height:48px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
 .gate button{width:100%;margin-top:18px;min-height:50px;border:0;border-radius:12px;background:var(--ink);color:var(--bg);font:inherit;font-weight:700}
 .err{color:#B3261E;min-height:1.3em;margin-top:8px;font-size:14px}
+.share{display:flex;align-items:center;gap:10px;margin-top:10px}
+.share button{flex:none}
+.share .st{font-size:13px;color:var(--muted)}
+button.btn.on{background:var(--ok);border-color:var(--ok);color:#fff}
 footer{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
 </style>
 </head>
@@ -63,6 +67,7 @@ footer{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
       <button class="btn" type="button" id="logout">יציאה</button>
     </div>
     <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="share"><button class="btn" type="button" id="shareBtn" aria-pressed="false">📍 שיתוף מיקום עם ההפקה</button><span class="st" id="shareSt" role="status"></span></div>
   </header>
   <main id="main"></main>
 </div>
@@ -136,17 +141,50 @@ function render(){
     + `<div class="card"><div class="title">אנשי קשר בהפקה</div>${contacts || '<div class="muted">—</div>'}</div>`
     + `<footer>הנתונים מתעדכנים אוטומטית · מספר האורחים הוא לפי רשימת הלינה במלון, לא אישור הגעה</footer>`;
 }
+// ---- location sharing: while this page is open, the phone's position goes to the Control Room map every ~20 seconds ----
+let WATCH = null, LAST_POS = null, LAST_SENT = 0, WAKE = null, DEVICE = '';
+try { DEVICE = localStorage.getItem('jf60dev') || ''; if (!DEVICE) { DEVICE = 'd' + Math.random().toString(36).slice(2, 12); localStorage.setItem('jf60dev', DEVICE); } } catch(e){ DEVICE = 'd' + Math.random().toString(36).slice(2, 12); }
+function currentRun(){ if (!DATA) return ''; const now = nowIL(); const d = Object.entries(DAYS).find(([, x]) => x.date === now.date); if (!d) return ''; const runs = DATA.runs.filter(r => r.day === +d[0]).sort((a, b) => mins(a.depart_time) - mins(b.depart_time)); const r = runs.find(x => (mins(x.arrive_time) ?? mins(x.depart_time)) >= now.min - 15); return r ? r.id : ''; }
+function postPos(p){
+  LAST_SENT = Date.now();
+  const c = p.coords;
+  fetch('/api/driver/position', { method:'POST', headers:{ 'x-token':KEY, 'content-type':'application/json' }, body:JSON.stringify({ device:DEVICE, name:NAME, run_id:currentRun(), lat:c.latitude, lng:c.longitude, accuracy:c.accuracy, speed:c.speed, heading:c.heading }) })
+    .then(r => { $('shareSt').textContent = r.ok ? 'נשלח ' + new Date().toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' }) : 'המיקום לא נשלח'; })
+    .catch(() => { $('shareSt').textContent = 'אין חיבור, מנסה שוב'; });
+}
+async function keepAwake(){ try { if ('wakeLock' in navigator && document.visibilityState === 'visible') WAKE = await navigator.wakeLock.request('screen'); } catch(e){} }
+function shareUI(){ const on = WATCH !== null; const b = $('shareBtn'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.textContent = on ? '📍 משתף מיקום · לעצירה' : '📍 שיתוף מיקום עם ההפקה'; if (!on) $('shareSt').textContent = ''; }
+function startShare(){
+  if (!navigator.geolocation) { $('shareSt').textContent = 'הטלפון לא תומך בשיתוף מיקום'; return; }
+  WATCH = navigator.geolocation.watchPosition(p => { LAST_POS = p; if (Date.now() - LAST_SENT > 20000) postPos(p); },
+    err => { $('shareSt').textContent = err.code === 1 ? 'צריך לאשר גישה למיקום בהגדרות הדפדפן' : 'מחפש מיקום…'; if (err.code === 1) stopShare(true); },
+    { enableHighAccuracy:true, maximumAge:15000, timeout:30000 });
+  try { localStorage.setItem('jf60share', '1'); } catch(e){}
+  $('shareSt').textContent = 'מחפש מיקום…'; keepAwake(); shareUI();
+}
+function stopShare(silent){
+  if (WATCH !== null) navigator.geolocation.clearWatch(WATCH); WATCH = null; LAST_POS = null;
+  try { localStorage.removeItem('jf60share'); } catch(e){}
+  if (WAKE) { WAKE.release().catch(() => {}); WAKE = null; }
+  if (!silent) fetch('/api/driver/position', { method:'POST', headers:{ 'x-token':KEY, 'content-type':'application/json' }, body:JSON.stringify({ device:DEVICE, stop:true }) }).catch(() => {});
+  shareUI();
+}
+$('shareBtn').onclick = () => WATCH === null ? startShare() : stopShare();
+// a parked bus may not move enough to fire an update: resend the last position so the map knows the phone is still on
+setInterval(() => { if (WATCH !== null && LAST_POS && Date.now() - LAST_SENT > 30000) postPos(LAST_POS); }, 10000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && WATCH !== null) keepAwake(); });
 function pickDay(){ const d = nowIL().date; const hit = Object.entries(DAYS).find(([, x]) => x.date === d); DAY = hit ? +hit[0] : 1; }
 async function start(){
   try { await load(); } catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = KEY ? 'הקוד לא התקבל.' : ''; return; }
   $('gate').hidden = true; $('app').hidden = false; pickDay(); render(); hello();
+  try { if (localStorage.getItem('jf60share') === '1' && WATCH === null) startShare(); } catch(e){}
 }
 function hello(){
   try { if (sessionStorage.getItem('jf60dv')) return; } catch(e){}
   fetch('/api/access/hello', { method:'POST', headers:{ 'x-token':KEY, 'content-type':'application/json' }, body:JSON.stringify({ name:NAME, ui:'driver' }) }).then(() => { try { sessionStorage.setItem('jf60dv', '1'); } catch(e){} }).catch(() => {});
 }
 $('gateForm').onsubmit = e => { e.preventDefault(); KEY = $('gKey').value.trim(); NAME = $('gName').value.trim(); try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); sessionStorage.removeItem('jf60dv'); } catch(e){} start(); };
-$('logout').onclick = () => { try { sessionStorage.removeItem('jf60k'); sessionStorage.removeItem('jf60dv'); } catch(e){} KEY = ''; DATA = null; $('gKey').value = ''; $('app').hidden = true; $('gate').hidden = false; };
+$('logout').onclick = () => { if (WATCH !== null) stopShare(); try { sessionStorage.removeItem('jf60k'); sessionStorage.removeItem('jf60dv'); } catch(e){} KEY = ''; DATA = null; $('gKey').value = ''; $('app').hidden = true; $('gate').hidden = false; };
 setInterval(() => { if (DATA && document.visibilityState === 'visible') load().then(render).catch(() => {}); }, 120000);
 start();
 </script>

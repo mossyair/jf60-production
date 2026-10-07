@@ -477,6 +477,23 @@ var src_default = {
           return json({ level, redirect: "/driver" });
         if (path === "/api/driver/state" && request.method === "GET")
           return json(await driverState(env));
+        if (path === "/api/driver/position" && request.method === "POST") {
+          const b = await readBody(request);
+          const device = (b.device || "").toString().replace(/[^\w-]/g, "").slice(0, 40);
+          if (!device)
+            return json({ error: "device required" }, 400);
+          if (b.stop) {
+            await env.DB.prepare("UPDATE driver_positions SET sharing=0, at=datetime('now') WHERE device=?").bind(device).run();
+            return json({ ok: true });
+          }
+          const lat = Number(b.lat), lng = Number(b.lng), num = (v) => Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : null;
+          // Israel and around; anything else is a bad reading
+          if (!(lat > 29 && lat < 34) || !(lng > 34 && lng < 36.5))
+            return json({ error: "position out of range" }, 400);
+          await env.DB.prepare("INSERT OR REPLACE INTO driver_positions (device, name, run_id, lat, lng, accuracy, speed, heading, sharing, at) VALUES (?,?,?,?,?,?,?,?,1,datetime('now'))").bind(device, (b.name || "").toString().trim().slice(0, 80), (b.run_id || "").toString().slice(0, 40), lat, lng, num(b.accuracy), num(b.speed), num(b.heading)).run();
+          await env.DB.prepare("DELETE FROM driver_positions WHERE at < datetime('now','-2 days')").run();
+          return json({ ok: true });
+        }
         return json({ error: "drivers only see the driver page" }, 403);
       }
       if (path === "/api/session" && request.method === "POST") {
@@ -1829,6 +1846,14 @@ ${context}`;
           const b = await readBody(request);
           await env.DB.prepare("DELETE FROM furniture_items WHERE id=?").bind(b.id).run();
           return json({ ok: true });
+        }
+        if (path === "/api/drivers/positions" && request.method === "GET") {
+          let rows = { results: [] };
+          try {
+            rows = await env.DB.prepare("SELECT device, name, run_id, lat, lng, accuracy, speed, heading, sharing, at FROM driver_positions WHERE at > datetime('now','-12 hours') ORDER BY at DESC").all();
+          } catch (e) {
+          }
+          return json({ positions: rows.results, now: new Date().toISOString() });
         }
         if (path === "/api/siteneed/field" && request.method === "POST") {
           const b = await readBody(request);

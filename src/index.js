@@ -592,6 +592,11 @@ var src_default = {
             furnitureItems = await env.DB.prepare("SELECT * FROM furniture_items ORDER BY sort_order, id").all();
           } catch (e) {
           }
+          let siteNeeds = { results: [] };
+          try {
+            siteNeeds = await env.DB.prepare("SELECT * FROM site_needs ORDER BY sort_order, id").all();
+          } catch (e) {
+          }
           let fairOrgs = { results: [] };
           try {
             fairOrgs = await env.DB.prepare("SELECT * FROM fair_orgs ORDER BY sort_order, name").all();
@@ -640,6 +645,7 @@ var src_default = {
             day_guests: dayGuests.results,
             catering_quotes: cateringQuotes.results,
             furniture_items: furnitureItems.results,
+            site_needs: siteNeeds.results,
             inbox_items: inboxItems.results
           });
         }
@@ -1777,6 +1783,14 @@ ${context}`;
             return json({ error: "admin required" }, 403);
           const b = await readBody(request);
           await env.DB.prepare("DELETE FROM furniture_items WHERE id=?").bind(b.id).run();
+          return json({ ok: true });
+        }
+        if (path === "/api/siteneed/field" && request.method === "POST") {
+          const b = await readBody(request);
+          if (!b.id || !["done", "qty", "supplier", "notes"].includes(b.field))
+            return json({ error: "bad field" }, 400);
+          const value = b.field === "done" ? (b.value ? 1 : 0) : (b.value ?? "").toString().slice(0, 1e3);
+          await env.DB.prepare(`UPDATE site_needs SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind(value, b.id).run();
           return json({ ok: true });
         }
         if (path === "/api/fair/field" && request.method === "POST") {

@@ -487,8 +487,8 @@ var src_default = {
             return json({ ok: true });
           }
           const lat = Number(b.lat), lng = Number(b.lng), num = (v) => Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : null;
-          // Israel and around; anything else is a bad reading
-          if (!(lat > 29 && lat < 34) || !(lng > 34 && lng < 36.5))
+          // any real coordinate (0,0 is a failed reading)
+          if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180) || (lat === 0 && lng === 0))
             return json({ error: "position out of range" }, 400);
           await env.DB.prepare("INSERT OR REPLACE INTO driver_positions (device, name, run_id, lat, lng, accuracy, speed, heading, sharing, at) VALUES (?,?,?,?,?,?,?,?,1,datetime('now'))").bind(device, (b.name || "").toString().trim().slice(0, 80), (b.run_id || "").toString().slice(0, 40), lat, lng, num(b.accuracy), num(b.speed), num(b.heading)).run();
           await env.DB.prepare("DELETE FROM driver_positions WHERE at < datetime('now','-2 days')").run();

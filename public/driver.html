@@ -149,7 +149,7 @@ function postPos(p){
   LAST_SENT = Date.now();
   const c = p.coords;
   fetch('/api/driver/position', { method:'POST', headers:{ 'x-token':KEY, 'content-type':'application/json' }, body:JSON.stringify({ device:DEVICE, name:NAME, run_id:currentRun(), lat:c.latitude, lng:c.longitude, accuracy:c.accuracy, speed:c.speed, heading:c.heading }) })
-    .then(r => { $('shareSt').textContent = r.ok ? 'נשלח ' + new Date().toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' }) : 'המיקום לא נשלח'; })
+    .then(async r => { if (r.ok) { $('shareSt').textContent = 'נשלח ' + new Date().toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' }); return; } let e = ''; try { e = (await r.json()).error || ''; } catch(x){} $('shareSt').textContent = 'המיקום לא נשלח' + (e ? ' (' + e + ')' : ' (' + r.status + ')'); })
     .catch(() => { $('shareSt').textContent = 'אין חיבור, מנסה שוב'; });
 }
 async function keepAwake(){ try { if ('wakeLock' in navigator && document.visibilityState === 'visible') WAKE = await navigator.wakeLock.request('screen'); } catch(e){} }

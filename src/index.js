@@ -997,6 +997,8 @@ var src_default = {
           const allowed = ["depart_time", "arrive_time", "title", "title_he", "destination", "destination_he", "linked_segment", "vehicles", "capacity", "driver", "driver_phone", "company", "escort", "notes", "status", "pdf_hide", "driver_note", "dropoff", "dropoff_url"];
           if (!b.id || !allowed.includes(b.field))
             return json({ error: "bad field" }, 400);
+          if (b.field === "dropoff_url" && b.value && !/^https?:\/\//i.test(String(b.value).trim()))
+            return json({ error: "map link must start with https://" }, 400);
           await env.DB.prepare(`UPDATE transport_runs SET ${b.field}=?, updated_at=datetime('now') WHERE id=?`).bind((b.value ?? "").toString().slice(0, 4e3), b.id).run();
           return json({ ok: true });
         }

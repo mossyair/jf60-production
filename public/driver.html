@@ -110,7 +110,8 @@ function runCard(r, state){
       <div class="s">${n ? `עד ${n} אורחים במלון` : ''}${n && esc0 ? ' · ' : ''}${esc0 ? `מלווה: <bdi>${esc(esc0.name)}</bdi>` : ''}</div></span>
       <span style="display:flex;gap:6px">${esc0 ? `<a class="btn call" href="${tel(esc0.phone)}" aria-label="להתקשר ל${esc(esc0.name)}">📞</a>` : ''}<a class="btn nav" href="${waze(PLACES[s.stop_label] || s.stop_label)}" target="_blank" rel="noopener" aria-label="ניווט">ניווט</a></span></div>`;
   }).join('');
-  const drop = r.dropoff || r.dropoff_url ? `<div class="sec">נקודת הורדה</div><div>${esc(r.dropoff)}</div>${r.dropoff_url ? `<a class="btn nav" href="${esc(r.dropoff_url)}" target="_blank" rel="noopener" style="margin-top:6px">ניווט לנקודת ההורדה</a>` : ''}` : '';
+  const url = /^https?:\/\//i.test(r.dropoff_url || '') ? r.dropoff_url : '';
+  const drop = r.dropoff || url ? `<div class="sec">נקודת הורדה</div><div>${esc(r.dropoff)}</div>${url ? `<a class="btn nav" href="${esc(url)}" target="_blank" rel="noopener" style="margin-top:6px">ניווט לנקודת ההורדה</a>` : ''}` : '';
   const dest = r.destination_he || r.destination;
   return `<div class="card ${state}">${state === 'now' ? '<span class="badge">הנסיעה הבאה</span>' : ''}
     <div class="time">${esc(r.depart_time)}${r.arrive_time ? ` <small>← ${esc(r.arrive_time)}</small>` : ''}${late ? ' <small>(אחרי חצות)</small>' : ''}</div>

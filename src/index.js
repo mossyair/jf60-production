@@ -76,13 +76,62 @@ async function authenticate(request, env, url) {
         return { level: c.role, cred: { id: c.id, role: c.role, label: c.label || "", person, hotel_ids: arr(c.hotel_ids), run_ids: arr(c.run_ids), segment_ids: arr(c.segment_ids), all_scope: !!c.all_scope } };
       }
     }
-    return null;
+    return await legacyFieldKey(request, env, token);
   }
   if (url.pathname === "/api/files/download" && request.method === "GET") {
     const level = await cookieLevel(request, env);
     return level ? { level, cred: null } : null;
   }
   return null;
+}
+// ---- the field keys in use before individual credentials (kept during the event, by the owner's decision) ----
+// Shared words per role, compared without case or extra spaces: "driver", "group leader", "shuster",
+// "site manager" / "assistant producer" (or DRIVER_TOKEN, LEADER_TOKEN, AV_TOKEN, CREW_TOKEN when set).
+// Leaders and crew are identified by the name they type (x-name), matched to the staff sheet, as before.
+// Turn them off after the event with the secret LEGACY_FIELD_KEYS = "off" once individual credentials are out.
+var isLeaderRole = (r) => /^Hotel group leader/i.test(r);
+var isCrewRole = (r) => /site manager|assistant producer|lead producer|setup|strike|design/i.test(r);
+async function legacyPerson(env, request, roleLike) {
+  let want = "";
+  try {
+    want = normName(decodeURIComponent(request.headers.get("x-name") || ""));
+  } catch {
+    want = "";
+  }
+  if (!want)
+    return null;
+  const rows = (await env.DB.prepare("SELECT id, name, role, phone FROM team WHERE org='Production'").all()).results.filter((r) => roleLike(r.role || ""));
+  const full = rows.filter((r) => normName(r.name) === want);
+  if (full.length === 1)
+    return full[0];
+  const first = rows.filter((r) => normName(r.name).split(" ")[0] === want);
+  return first.length === 1 ? first[0] : null;
+}
+async function legacyFieldKey(request, env, token) {
+  if (String(env.LEGACY_FIELD_KEYS || "").toLowerCase() === "off")
+    return null;
+  const t = token.trim().toLowerCase().replace(/\s+/g, " ");
+  const is = async (k) => !!k && await safeEqual(t, String(k).trim().toLowerCase());
+  if (await is(env.DRIVER_TOKEN || "driver"))
+    return { level: "driver", cred: null };
+  if (await is(env.AV_TOKEN || "shuster"))
+    return { level: "av", cred: null };
+  const leader = await is(env.LEADER_TOKEN || "group leader");
+  let crew = false;
+  for (const k of env.CREW_TOKEN ? [env.CREW_TOKEN] : ["site manager", "assistant producer"])
+    if (await is(k))
+      crew = true;
+  if (!leader && !crew)
+    return null;
+  const person = await legacyPerson(env, request, leader ? isLeaderRole : isCrewRole);
+  if (!person)
+    throw new HttpError(403, "name not found");
+  if (crew)
+    return { level: "crew", cred: { id: null, role: "crew", label: "", person, hotel_ids: [], run_ids: [], segment_ids: [], all_scope: true, legacy: true } };
+  // the leader's hotel comes from her role in the staff sheet: "Hotel group leader · <hotel>"
+  const key = normName((String(person.role).split("·")[1] || "").replace(/hotel/i, ""));
+  const hotels = key ? (await env.DB.prepare("SELECT id, name FROM hotels").all()).results.filter((h) => normName(String(h.name).replace(/hotel/i, "")).includes(key)).map((h) => h.id) : [];
+  return { level: "leader", cred: { id: null, role: "leader", label: "", person, hotel_ids: hotels, run_ids: [], segment_ids: [], all_scope: false, legacy: true } };
 }
 async function makeSessionCookie(level, env) {
   const secret = env[LEVELS.find(([l]) => l === level)[1]];

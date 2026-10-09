@@ -5,7 +5,7 @@ INSERT INTO segments (id, day, time, end_time, title, venue, descr, status, sort
   ('s1-night', 1, '23:45', '01:30', 'Night gathering', 'Test Hotel A', '', 'open', 2, 'מפגש לילה', 'מלון א', ''),
   ('s2-panel', 2, '10:00', '12:00', 'Panel', 'Test Theater', '', 'confirmed', 0, 'פאנל', 'תיאטרון הבדיקה', '');
 INSERT INTO team (id, name, role, org, phone) VALUES
-  (1, 'Lea Leader', 'Hotel group leader', 'Production', '+972-50-000-0001'),
+  (1, 'Lea Leader', 'Hotel group leader · Test Hotel A', 'Production', '+972-50-000-0001'),
   (2, 'Sam Site', 'Site manager', 'Production', '+972-50-000-0002'),
   (3, 'Pat Producer', 'Lead producer', 'Production', '+972-50-000-0003'),
   (4, 'Other Leader', 'Hotel group leader', 'Production', '+972-50-000-0004');

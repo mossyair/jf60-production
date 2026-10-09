@@ -1065,7 +1065,7 @@ function viewSettings(){
   const yes = '<span class="chip good" aria-label="yes">✓</span>', no = '<span class="muted" aria-label="no">—</span>';
   const body = tab === 'visits' ? visitsView() : `<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th></th><th>View</th><th>Edit</th><th>Admin</th><th>Chief</th></tr></thead><tbody>
     ${PERM_ROWS.map(([l, ...c]) => `<tr><td>${esc(l)}</td>${c.map(v => `<td>${v ? yes : no}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-    <p class="note">Field apps (drivers, group leaders, AV, crew) use separate keys that open only their own page, limited to the runs, hotel or events on the key. Keys are issued and revoked by an admin with the credential script described in the README; there is no key management screen.</p>`;
+    <p class="note">Field apps (drivers, group leaders, AV, crew) use separate keys that open only their own page. During the event the shared field words still work; group leaders and crew are then identified by the name they type. Keys are issued and revoked by an admin with the credential script described in the README; there is no key management screen.</p>`;
   return `<div class="page-h"><div><div class="lbl">${t('settings')}</div><h1>${t('accessH')}</h1></div></div>
   <div class="tabs" role="tablist">${tabs.map(([k,l]) => `<button role="tab" type="button" data-t="settings" data-k="${k}" aria-selected="${tab===k}">${esc(l)}</button>`).join('')}</div>${body}`;
 }

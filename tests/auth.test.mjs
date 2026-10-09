@@ -11,8 +11,21 @@ test("no key, wrong key, and a wrong-case key are refused", async () => {
   assert.equal((await call("/api/state", { key: KEYS.admin.toUpperCase() })).status, 401);
 });
 
-test("removed built-in field keys do not work", async () => {
-  for (const k of ["driver", "drivers", "leader", "av", "crew", "jf60", "driver2026"])
+test("the field keys in use before this release still work (kept during the event)", async () => {
+  // run.mjs sets DRIVER_TOKEN and AV_TOKEN, which replace "driver" and "shuster" exactly as before
+  assert.equal((await call("/api/state", { key: "  Test-Driver-Shared-00000001 " })).data.redirect, "/driver", "case and spaces ignored as before");
+  const lead = await call("/api/leader/state", { key: "Group Leader", headers: { "x-name": encodeURIComponent("lea leader") } });
+  assert.equal(lead.status, 200);
+  assert.equal(lead.data.me.name, "Lea Leader");
+  assert.deepEqual(lead.data.hotels, ["Test Hotel A"], "hotel from the role in the staff sheet");
+  assert.ok(lead.data.guests.every((g) => g.hotel === "Test Hotel A"));
+  assert.equal((await call("/api/leader/board", { key: "group leader", headers: { "x-name": "Lea" }, body: { guest_id: 3, day: 1, on: true } })).status, 403, "still only her own hotel");
+  assert.equal((await call("/api/leader/state", { key: "group leader" })).status, 403, "no name, no access");
+  assert.equal((await call("/api/leader/state", { key: "group leader", headers: { "x-name": "Nobody" } })).data.error, "name not found");
+  const crew = await call("/api/crew/state", { key: "site manager", headers: { "x-name": "Sam Site" } });
+  assert.equal(crew.data.me.name, "Sam Site");
+  assert.equal((await call("/api/files", { key: "site manager", headers: { "x-name": "Sam Site" } })).status, 403, "still only its own page");
+  for (const k of ["leader", "jf60", "admin", "crew"])
     assert.equal((await call("/api/state", { key: k })).status, 401, k);
 });
 
@@ -96,6 +109,7 @@ test("field credentials: each role reaches only its own page", async () => {
     assert.equal((await call("/api/segment/status", { key: C[k], body: { id: "s1-tour", status: "open" } })).status, 403, k + " dashboard write");
   }
   assert.equal((await call("/api/state", { key: KEYS.driverShared })).data.redirect, "/driver");
+  assert.equal((await call("/api/state", { key: "driver" })).status, 401, "the word is replaced once DRIVER_TOKEN is set");
   assert.equal((await call("/api/state", { key: KEYS.avShared })).data.redirect, "/av");
   // a leader credential whose person no longer exists does nothing
   assert.equal((await call("/api/state", { key: C.orphanLeader })).status, 401);

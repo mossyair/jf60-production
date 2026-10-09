@@ -32,9 +32,10 @@ const personRow = c => `<div class="row"><span class="m"><div><b><bdi>${esc(c.na
 const segName = s => s ? (s.title_he || s.title) : '';
 const segDays = ids => String(ids || '').split(',').map(x => x.trim()).filter(Boolean);
 
-// identity comes from the key alone; the name typed at sign-in is only shown in the usage log
+// With an individual key, identity comes from the key alone. With the shared role words still in use
+// during the event ("group leader", "site manager"…), the server finds the person by this name.
 function api(path, body){
-  return apiRequest(path, { key:KEY, body, timeout:20000 });
+  return apiRequest(path, { key:KEY, body, timeout:20000, headers:{ 'x-name':encodeURIComponent(NAME) } });
 }
 // connection line under the header: when the data was last loaded and whether the last attempt worked
 let LAST_OK = 0, LAST_FAIL = false;
@@ -53,7 +54,7 @@ async function load(){
 // files come through the API (they need the key), then save as a normal download
 async function download(id, name){
   let r;
-  try { r = await fetch('/api/files/download?id=' + encodeURIComponent(id), { headers:{ 'x-token':KEY }, cache:'no-store' }); } catch(e){ alert('אין חיבור, ההורדה נכשלה'); return; }
+  try { r = await fetch('/api/files/download?id=' + encodeURIComponent(id), { headers:{ 'x-token':KEY, 'x-name':encodeURIComponent(NAME) }, cache:'no-store' }); } catch(e){ alert('אין חיבור, ההורדה נכשלה'); return; }
   if (!r.ok) { alert(r.status === 404 ? 'הקובץ לא זמין לקוד הזה' : 'ההורדה נכשלה'); return; }
   const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
@@ -77,7 +78,7 @@ function tabs(list){
 function pickDay(){ const d = EventClock.now().day; DAY = d != null && d > 0 ? d : 1; }
 async function start(){
   try { await load(); }
-  catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = !KEY ? '' : e.kind === 'auth' || e.kind === 'forbidden' ? 'הקוד לא התקבל.' : apiErrorText(e, true); return; }
+  catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = !KEY ? '' : e.message === 'name not found' ? 'השם לא נמצא ברשימת הצוות. כתבו שם מלא באנגלית, כמו ברשימה.' : e.kind === 'auth' || e.kind === 'forbidden' ? 'הקוד לא התקבל.' : apiErrorText(e, true); return; }
   $('gate').hidden = true; $('app').hidden = false; pickDay(); FIELD.render(); connLine(); hello();
 }
 function hello(){

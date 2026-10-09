@@ -46,13 +46,15 @@ Field apps never use dashboard keys:
 | AV | individual credential or the shared `AV_TOKEN` | AV needs (Shuster and podiums) and event-linked **ops** content files |
 | Crew | individual credential (person + events, or all events) | ticks site needs of its events and shifts it is named on; event-linked **ops** content files of its events |
 
-Identity in the field apps comes only from the credential. The name typed at sign-in is shown in the usage information and nowhere else.
+With an individual credential, identity comes only from the credential.
+
+**During the event the field keys used before this release still work** (kept on purpose so nobody in the field needs a new key mid-production): `driver`, `shuster`, `group leader`, `site manager`, `assistant producer` (case and spaces ignored), or the values of `DRIVER_TOKEN`, `AV_TOKEN`, `LEADER_TOKEN`, `CREW_TOKEN` when those are set. With these words, group leaders and crew are identified by the name they type, matched to the staff sheet, as before; a leader's hotel comes from her role ("Hotel group leader · <hotel>"). Scope rules still apply: leaders see and mark only their hotel, AV and crew open only event-linked team files. These words are easy to guess. After the event, issue individual credentials and set the secret `LEGACY_FIELD_KEYS` to `off`.
 
 ---
 
 ## Secrets
 
-Set with `npx wrangler secret put NAME` (production) or in `.dev.vars` (local only; never commit it). Nothing has a built-in default: if a secret is missing, that role simply cannot sign in.
+Set with `npx wrangler secret put NAME` (production) or in `.dev.vars` (local only; never commit it). If a dashboard secret is missing, that role simply cannot sign in.
 
 | Secret | Needed for |
 |---|---|
@@ -60,15 +62,15 @@ Set with `npx wrangler secret put NAME` (production) or in `.dev.vars` (local on
 | `ADMIN_TOKEN` | admin key |
 | `EDIT_TOKEN` | edit key |
 | `VIEW_TOKEN` | view key (optional) |
-| `DRIVER_TOKEN` | optional shared driver key, at least 16 characters; otherwise drivers need individual credentials |
-| `AV_TOKEN` | optional shared AV key, at least 16 characters; otherwise AV needs an individual credential |
+| `DRIVER_TOKEN`, `AV_TOKEN`, `LEADER_TOKEN`, `CREW_TOKEN` | optional: replace the shared field words (see "Who can do what"). Leave them as they are now |
+| `LEGACY_FIELD_KEYS` | set to `off` after the event to stop the shared field words; individual credentials keep working |
 | `ANTHROPIC_API_KEY` | Ask, Suggest changes, menu reading, inbox reading (optional; without it these answer "not configured") |
 
 Keys are compared exactly (case-sensitive), the same way as before this release. The existing chief, admin, edit and view keys stay as they are: nothing in this release requires changing or rotating them.
 
 ### Field credentials (individual keys)
 
-Leaders and crew always need an individual credential; drivers and AV may use one. Only a SHA-256 hash is stored.
+Individual credentials are optional during the event (the shared field words still work) and the way forward after it. Only a SHA-256 hash is stored.
 
 ```bash
 # prints a new token (give it to the person privately) and the SQL to store its hash
@@ -114,9 +116,9 @@ Order matters: the new code reads the new columns, and the old code keeps workin
 1. **Back up** (keep the file out of git; `backups/` is ignored):
    `npx wrangler d1 export jf60-db --remote --output backups/jf60-$(date +%Y%m%d-%H%M).sql`
    Note the time as well: D1 Time Travel can restore the database to any minute of the last 30 days (7 days on the free plan).
-2. **Secrets**: leave `CHIEF_TOKEN`, `ADMIN_TOKEN`, `EDIT_TOKEN` and `VIEW_TOKEN` exactly as they are; people signed in with them stay signed in. The old built-in field keys no longer work. Either set `DRIVER_TOKEN` / `AV_TOKEN` (16+ characters) or issue individual credentials.
+2. **Secrets**: leave `CHIEF_TOKEN`, `ADMIN_TOKEN`, `EDIT_TOKEN` and `VIEW_TOKEN` exactly as they are; people signed in with them stay signed in. Field keys also stay as they are.
 3. **Migrate**: `npm run migrate:remote`. Check: `npx wrangler d1 migrations list jf60-db --remote`.
-4. **Field credentials**: issue one per group leader and crew member (see above) and send them out.
+4. **Field credentials**: optional during the event (the current field keys keep working). After the event: issue individual credentials, then set `LEGACY_FIELD_KEYS=off`.
 5. **Merge** the pull request. Workers Builds deploys `main`.
 6. **Check**: sign in with each key; open a file; save a field and see "Saved"; open a field app with a credential.
 7. **Review file access** (below) and **clean stored notes** (below).

@@ -584,7 +584,10 @@ function downloadResponse(obj, row, inline) {
   headers.set("content-type", safeInline ? ctype : "application/octet-stream");
   headers.set("content-disposition", `${safeInline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(row.filename)}`);
   headers.set("x-content-type-options", "nosniff");
-  headers.set("content-security-policy", "default-src 'none'; sandbox");
+  // everything that is not a PDF or image shown inline is a download, and never runs as a page.
+  // (A sandbox would also stop the browser's own PDF viewer, so inline PDFs and images get no CSP.)
+  if (!safeInline)
+    headers.set("content-security-policy", "default-src 'none'; sandbox");
   headers.set("cache-control", "private, no-store");
   return new Response(obj.body, { headers });
 }

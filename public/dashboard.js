@@ -53,13 +53,56 @@ let data = { segments:[], people:[], checklist:[], venues:[], contacts:[], timel
 let ui = { view:"schedule", dayFilter:"all", statusFilter:"all", search:"", openId:null, foodDay:"all", foodType:"all", openFood:new Set(), guestDesk:"all", guestHotel:"all", guestGroupHotel:false, guestSearch:"", openGuest:new Set(), importChanges:null, designCat:"all", openDesign:new Set(), runDay:"all", openRun:new Set(), pdfBuses:true };
 
 // ---- API ----
-async function api(path, body){
-  const opts = { method: body?"POST":"GET", headers:{ "x-token":KEY } };
-  if(body){ opts.headers["content-type"]="application/json"; opts.body=JSON.stringify(body); }
-  const r = await fetch("/api/"+path, opts);
-  if(r.status===401){ throw new Error("unauthorized"); }
-  return r.json();
+// Every request goes through apiRequest (timeout, error kinds). A write that fails throws, so nothing after it
+// (a "saved" hint, a toast) runs; the status line under the header shows Saving… / Saved / Not saved.
+// One-field saves carry the value they started from (`expect`), so someone else's change made meanwhile
+// comes back as a conflict instead of being overwritten.
+let BASE = null;
+const SAVE = { inflight:0, failed:null, at:0 };
+const FIELD_SRC = {
+  "segment/status":["segments","status","status"], "segment/notes":["segments","notes","notes"], "segment/brief":["segments"], "segment/field":["segments"],
+  "run/field":["transport_runs"], "guest/field":["guests"], "guest/flag":["guests"], "design/field":["design_items"], "food/field":["food_items"],
+  "gift/field":["gift_items"], "gift/chosen":["gift_items","chosen","chosen"]
+};
+const baseRow = (coll, id) => BASE && (BASE[coll]||[]).find(r => String(r.id) === String(id));
+const isWrite = (path, body) => body !== undefined && !/^access\//.test(path) && path !== "session";
+async function api(path, body, opts){
+  opts = opts || {};
+  let b = body, ref = null;
+  const src = FIELD_SRC[path];
+  if (src && body && !(body instanceof FormData) && body.id != null) {
+    const field = src[1] || body.field, row = baseRow(src[0], body.id);
+    if (row && field in row && !("expect" in body)) b = Object.assign({}, body, { expect: row[field] });
+    ref = [src[0], body.id, field, src[2] ? body[src[2]] : body.value];
+  }
+  const w = isWrite(path, body);
+  if (w) { SAVE.inflight++; saveSt(); }
+  try {
+    const r = await apiRequest(path, { key:KEY, body:b, idem:opts.idem, timeout: opts.timeout || (/^(ai\/|food\/process-menu|guest\/import)/.test(path) ? 90000 : body instanceof FormData ? 120000 : 20000) });
+    if (w) { SAVE.at = Date.now(); SAVE.failed = null; if (ref) { const row = baseRow(ref[0], ref[1]); if (row) row[ref[2]] = typeof ref[3] === "boolean" ? (ref[3] ? 1 : 0) : ref[3]; } }
+    return r;
+  } catch(e) {
+    if (w) SAVE.failed = { path, err:e };
+    if (e.kind === "auth" && ROLE) { toast(apiErrorText(e, LANG==="he"), true); }
+    // field conflicts: show the current data again. Notes, budget and imports handle their own conflicts.
+    if (e.kind === "conflict" && !/^(notes|grid|grid\/cells|guest\/import\/apply)$/.test(path)) setTimeout(() => refresh(true), 50);
+    throw e;
+  } finally {
+    if (w) { SAVE.inflight--; saveSt(); }
+  }
 }
+function saveSt(){
+  const el = document.getElementById("saveSt"); if (!el) return;
+  const he = LANG === "he";
+  el.className = "savest";
+  if (SAVE.inflight) { el.classList.add("busy"); el.textContent = he ? "שומר…" : "Saving…"; return; }
+  if (SAVE.failed) { el.classList.add("bad"); el.textContent = (he ? "לא נשמר: " : "Not saved: ") + apiErrorText(SAVE.failed.err, he) + (SAVE.failed.err.kind === "conflict" ? (he ? " הנתונים העדכניים נטענו מחדש." : " The latest data was reloaded.") : ""); return; }
+  const conn = LOAD.fail ? (he ? "אין חיבור · הנתונים מ" : "Offline · data from ") + (LOAD.at ? EventClock.ago(LOAD.at, he) : "—") : LOAD.at ? (he ? "עודכן " : "Updated ") + EventClock.ago(LOAD.at, he) : "";
+  if (LOAD.fail) el.classList.add("bad");
+  el.textContent = (SAVE.at && Date.now() - SAVE.at < 60000 ? (he ? "✓ נשמר · " : "✓ Saved · ") : "") + conn;
+}
+const LOAD = { at:0, fail:false };
+setInterval(saveSt, 30000);
 let stateLoaded = false;
 // file links authenticate with a short-lived HttpOnly cookie, never the key in the URL
 let sessionAt = 0;
@@ -68,6 +111,8 @@ async function ensureSession(){
   try{ await api("session",{}); sessionAt = Date.now(); }catch(e){}
 }
 function applyState(s){
+    BASE = JSON.parse(JSON.stringify(s)); LOAD.at = Date.now(); LOAD.fail = false;
+    data.unavailable = s.unavailable || [];
     data.segments = s.segments; data.people = s.people; data.checklist = s.checklist;
     data.venues = s.venues || [];
     data.contacts = s.contacts || [];
@@ -88,11 +133,18 @@ function applyState(s){
     stateLoaded = true;
     render();
 }
-async function refresh(){
+// reload the data; while a save is on its way the screen keeps the edit until the server has it.
+// The scroll position and the field being typed in are kept.
+async function refresh(force){
+  if (SAVE.inflight && !force) return;
+  const y = window.scrollY, a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && document.getElementById("main").contains(a);
   try {
-    applyState(await api("state"));
+    const s = await api("state");
+    if (typing && !force) { BASE = JSON.parse(JSON.stringify(s)); LOAD.at = Date.now(); LOAD.fail = false; saveSt(); return; }
+    applyState(s);
+    window.scrollTo(0, y);
     ensureSession();
-  } catch(e){ toast("Connection issue — retrying…", true); }
+  } catch(e){ LOAD.fail = true; saveSt(); if (e.kind === "auth") toast(apiErrorText(e, LANG==="he"), true); }
 }
 
 // ---- Gate ----
@@ -116,7 +168,7 @@ async function tryEnter(){
     accessHello(s.level);
     applyState(s);
   } catch(e){
-    document.getElementById("gateErr").textContent = "That key wasn't accepted.";
+    document.getElementById("gateErr").textContent = e.kind === "auth" || e.message === "rejected" ? "That key wasn't accepted." : apiErrorText(e, false);
   }
 }
 // Sign-in log: one visit per tab, pinged every 5 minutes while it is open
@@ -244,8 +296,8 @@ function renderSchedule(){
     if(s.day!==curDay){ curDay=s.day; const d=DAYS[s.day];
       html+=`<div class="day-head"><span class="daynum">${d.num}</span><span class="date">${d.date}</span><span class="theme">${d.theme}</span></div>`; }
     const oc=openCountFor(s), np=segPeople(s.id).length;
-    html+=`<div class="seg-card${isView?' noclick':''}" data-id="${s.id}">
-      <div class="seg-time">${s.time}<span class="end">${s.end_time}</span></div>
+    html+=`<div class="seg-card${isView?' noclick':''}" data-id="${esc(s.id)}">
+      <div class="seg-time">${esc(s.time)}<span class="end">${esc(s.end_time)}</span></div>
       <div>
         <div class="seg-title">${esc(L(s,'title'))}</div>
         <div class="seg-venue">${esc(L(s,'venue'))}</div>
@@ -382,14 +434,14 @@ function renderLoose(){
   const items=data.checklist.filter(c=>!q||c.text.toLowerCase().includes(q))
     .slice().sort((a,b)=> rank(a)-rank(b) || a.id-b.id);
   const open=items.filter(i=>!i.done), done=items.filter(i=>i.done);
-  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${s.time} · ${L(s,'title')}`:"General"; };
+  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${esc(s.time)} · ${L(s,'title')}`:"General"; };
 
   function row(it){
-    return `<div class="loose-item ${it.done?'done':''}" data-id="${it.id}">
-      <div class="lcheck" data-toggle="${it.id}">${it.done?'\u2713':''}</div>
-      <div class="litext" data-open="${it.segment_id||''}">${esc(L(it,"text"))} ${ownerBadge(it.owner)}
+    return `<div class="loose-item ${it.done?'done':''}" data-id="${esc(it.id)}">
+      <div class="lcheck" data-toggle="${esc(it.id)}">${it.done?'\u2713':''}</div>
+      <div class="litext" data-open="${esc(it.segment_id||'')}">${esc(L(it,"text"))} ${ownerBadge(it.owner)}
         <span class="ctx">${esc(segTitle(it.segment_id))}${it.created_by?` · <span class="by">added by ${esc(it.created_by)}</span>`:''}</span></div>
-      <div class="lmeta">${ROLE==='admin'?`<button class="edit-btn" data-cedit="${it.id}" title="Edit text">\u270e</button>`:''}<button class="edit-btn" data-cassign="${it.id}" title="Assign">\ud83d\udc64</button>${(it.seeded===0||ROLE==='admin')?`<button class="del-btn" data-del="${it.id}" title="Delete">\u00d7</button>`:''}</div>
+      <div class="lmeta">${ROLE==='admin'?`<button class="edit-btn" data-cedit="${esc(it.id)}" title="Edit text">\u270e</button>`:''}<button class="edit-btn" data-cassign="${esc(it.id)}" title="Assign">\ud83d\udc64</button>${(it.seeded===0||ROLE==='admin')?`<button class="del-btn" data-del="${esc(it.id)}" title="Delete">\u00d7</button>`:''}</div>
     </div>`;
   }
   let html = `
@@ -430,9 +482,9 @@ function renderPeople(){
   const unconf=list.filter(m=>!m.confirmed), conf=list.filter(m=>m.confirmed);
   function row(m){
     return `<div class="loose-item ${m.confirmed?'done':''}">
-      <div class="lcheck" data-ptoggle="${m.id}">${m.confirmed?'\u2713':''}</div>
-      <div class="litext"><span data-open="${m.segment_id}">${esc(m.name)}</span><span class="ctx">${m.seg?`${DAYS[m.seg.day].num} · ${m.seg.time} · ${esc(m.seg.title)}`:''}</span></div>
-      <div class="lmeta">${isAdmin?`<button class="edit-btn" data-pedit="${m.id}" title="Rename">✎</button><button class="del-btn" data-pdel="${m.id}" title="Delete">×</button>`:''}</div></div>`;
+      <div class="lcheck" data-ptoggle="${esc(m.id)}">${m.confirmed?'\u2713':''}</div>
+      <div class="litext"><span data-open="${esc(m.segment_id)}">${esc(m.name)}</span><span class="ctx">${m.seg?`${DAYS[m.seg.day].num} · ${esc(m.seg.time)} · ${esc(m.seg.title)}`:''}</span></div>
+      <div class="lmeta">${isAdmin?`<button class="edit-btn" data-pedit="${esc(m.id)}" title="Rename">✎</button><button class="del-btn" data-pdel="${esc(m.id)}" title="Delete">×</button>`:''}</div></div>`;
   }
   el.innerHTML=`
     <div style="font-family:var(--serif);font-size:20px;margin-bottom:10px;">${unconf.length} unconfirmed · ${conf.length} confirmed</div>
@@ -465,7 +517,7 @@ function renderDrawer(id){
   dr.innerHTML=`
     <button class="drawer-close" id="dClose">\u2715</button>
     <div class="drawer-hd">
-      <div class="dtime">${d.num} · ${s.time}–${s.end_time} · ${d.date}</div>
+      <div class="dtime">${d.num} · ${esc(s.time)}–${esc(s.end_time)} · ${d.date}</div>
       <h2>${esc(L(s,'title'))}</h2>
       <div class="seg-venue" style="font-size:13px;">${esc(L(s,'venue'))}</div>
     </div>
@@ -495,14 +547,14 @@ function renderDrawer(id){
       </div>
       ${ppl.length?`<div class="field"><label>${t("dPeople")} (${ppl.filter(p=>p.confirmed).length}/${ppl.length} ${t("dConfirmed")})</label>
         <ul class="people-list">
-          ${ppl.map(p=>`<li class="${p.confirmed?'conf':''}"><span class="pcheck" data-ptoggle="${p.id}">${p.confirmed?'\u2713':''}</span><span class="pname">${esc(p.name)}</span>${ROLE==="admin"?`<span style="margin-left:auto;display:flex;gap:2px;"><button class="edit-btn" data-pedit="${p.id}" title="Rename">\u270e</button><button class="del-btn" data-pdel="${p.id}" title="Delete">\u00d7</button></span>`:''}</li>`).join('')}
+          ${ppl.map(p=>`<li class="${p.confirmed?'conf':''}"><span class="pcheck" data-ptoggle="${esc(p.id)}">${p.confirmed?'\u2713':''}</span><span class="pname">${esc(p.name)}</span>${ROLE==="admin"?`<span style="margin-left:auto;display:flex;gap:2px;"><button class="edit-btn" data-pedit="${esc(p.id)}" title="Rename">\u270e</button><button class="del-btn" data-pdel="${esc(p.id)}" title="Delete">\u00d7</button></span>`:''}</li>`).join('')}
         </ul>
         <div class="add-row"><input id="newPerson" placeholder="${t('dAddPerson')}"><button id="addPerson">Add</button></div>
       </div>`:`<div class="field"><label>People</label>
         <div class="add-row"><input id="newPerson" placeholder="Add a person…"><button id="addPerson">Add</button></div></div>`}
       <div class="field"><label>${t("dChecklist")}</label>
         <ul class="people-list">
-          ${checks.map(c=>`<li class="${c.done?'conf':''}"><span class="pcheck" data-ctoggle="${c.id}">${c.done?'\u2713':''}</span><span class="pname">${esc(L(c,"text"))}</span>${(c.seeded===0||ROLE==="admin")?`<button class="del-btn" data-cdel="${c.id}" title="Delete" style="margin-left:auto;">\u00d7</button>`:''}</li>`).join('')}
+          ${checks.map(c=>`<li class="${c.done?'conf':''}"><span class="pcheck" data-ctoggle="${esc(c.id)}">${c.done?'\u2713':''}</span><span class="pname">${esc(L(c,"text"))}</span>${(c.seeded===0||ROLE==="admin")?`<button class="del-btn" data-cdel="${esc(c.id)}" title="Delete" style="margin-left:auto;">\u00d7</button>`:''}</li>`).join('')}
         </ul>
         <div class="add-row"><input id="newSegCheck" placeholder="${t('dAddItem')}"><button id="addSegCheck">Add</button></div>
       </div>
@@ -654,9 +706,9 @@ function renderDrawer(id){
     if(!inp.files||!inp.files[0]){ toast("Choose a file first",true); return; }
     const fd=new FormData(); fd.append("file",inp.files[0]); fd.append("section","content"); fd.append("segment_id",id); fd.append("by",NAME||"");
     toast("Uploading…");
-    try{ const r=await fetch("/api/files/upload",{method:"POST",headers:{"x-token":KEY},body:fd}); const j=await r.json();
+    try{ const j=await api("files/upload",fd,{idem:newIdemKey()});
       if(j.error){toast(j.error,true);return;} inp.value=""; toast("Uploaded"); loadSegFiles(id); }
-    catch(e){ toast("Upload failed",true); }
+    catch(e){ toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
   };
 
   // admin edit / duplicate / delete
@@ -703,9 +755,9 @@ async function loadSegFiles(id){
     if(!files.length){ box.innerHTML=`<div class="save-hint">No files attached yet.</div>`; return; }
     box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dotted var(--line);font-size:13px;">
       <span>📄</span>
-      <a href="/api/files/download?id=${f.id}" style="flex:1;color:var(--sky);text-decoration:none;">${esc(f.filename)}</a>
+      <a href="/api/files/download?id=${esc(f.id)}" style="flex:1;color:var(--sky);text-decoration:none;">${esc(f.filename)}</a>
       <span style="font-size:11px;color:var(--ink-soft);">${fmtSize(f.size)}</span>
-      <button class="del-btn" data-sfid="${f.id}">×</button></div>`).join('');
+      <button class="del-btn" data-sfid="${esc(f.id)}">×</button></div>`).join('');
     box.querySelectorAll("[data-sfid]").forEach(b=>b.onclick=async()=>{ if(!confirm("Delete this file?"))return;
       try{ await api("files/delete",{id:parseInt(b.dataset.sfid)}); loadSegFiles(id);}catch(e){toast("Couldn't delete",true);} });
   }catch(e){ box.innerHTML=`<div class="save-hint">Files unavailable.</div>`; }
@@ -749,7 +801,7 @@ async function renderFiles(){
         <input type="file" id="contentFile" style="flex:1;font-size:12px;">
         <select id="contentSeg" class="search" style="min-width:180px;">
           <option value="">— link to event (optional) —</option>
-          ${data.segments.map(s=>`<option value="${s.id}">${DAYS[s.day].num} · ${s.time} · ${esc(s.title)}</option>`).join('')}
+          ${data.segments.map(s=>`<option value="${esc(s.id)}">${DAYS[s.day].num} · ${esc(s.time)} · ${esc(s.title)}</option>`).join('')}
         </select>
         <button id="contentUpload">Upload</button>
       </div>
@@ -772,6 +824,7 @@ async function renderFiles(){
   refreshFileList("content"); refreshFileList("general");
 }
 
+function accessLabel(a){ return a==="ops" ? DL("team","צוות") : a==="chief" ? DL("chief only","chief בלבד") : DL("admins only","מנהלים בלבד"); }
 async function refreshFileList(section){
   const listEl=document.getElementById(section==="content"?"contentList":"generalList");
   const files=await loadFiles(section);
@@ -781,11 +834,17 @@ async function refreshFileList(section){
     <div class="loose-item">
       <div style="grid-column:1;font-size:16px;">📄</div>
       <div class="litext" style="cursor:default;">
-        <a href="/api/files/download?id=${f.id}" style="color:var(--sky);text-decoration:none;font-weight:600;">${esc(f.filename)}</a>
-        <span class="ctx">${fmtSize(f.size)}${f.segment_id?` · ${esc(segLabel(f.segment_id))}`:''}${f.uploaded_by?` · ${esc(f.uploaded_by)}`:''}</span>
+        <a href="/api/files/download?id=${esc(f.id)}" style="color:var(--sky);text-decoration:none;font-weight:600;">${esc(f.filename)}</a>
+        <span class="ctx">${fmtSize(f.size)}${f.segment_id?` · ${esc(segLabel(f.segment_id))}`:''}${f.uploaded_by?` · ${esc(f.uploaded_by)}`:''} · ${accessLabel(f.access)}${f.access_reviewed?'':` · <span style="color:var(--terra)">${DL('access not reviewed','גישה לא נבדקה')}</span>`}</span>
+        ${ROLE==="admin"?`<label class="sr" for="acc-${esc(f.id)}">${DL('Who can open it','מי יכול לפתוח')}</label><select id="acc-${esc(f.id)}" data-facc="${esc(f.id)}" class="search" style="max-width:190px;margin-top:4px;">${[['ops',DL('Team (editors and admins)','צוות (עורכים ומנהלים)')],['admin',DL('Admins only','מנהלים בלבד')]].concat(CHIEF?[['chief',DL('Chief key only','מפתח chief בלבד')]]:[]).map(([v,l])=>`<option value="${v}" ${v===f.access?'selected':''}>${esc(l)}</option>`).join('')}</select>`:''}
       </div>
-      <div class="lmeta"><button class="del-btn" data-fid="${f.id}" title="Delete">×</button></div>
+      <div class="lmeta"><button class="del-btn" data-fid="${esc(f.id)}" title="Delete">×</button></div>
     </div>`).join('');
+  listEl.querySelectorAll("[data-facc]").forEach(sel=>sel.onchange=async()=>{
+    try{ await api("files/access",{id:parseInt(sel.dataset.facc), access:sel.value}); toast(DL("Access updated","הגישה עודכנה")); }
+    catch(e){ toast(apiErrorText(e, LANG==="he"),true); }
+    refreshFileList(section);
+  });
   listEl.querySelectorAll("[data-fid]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Delete this file?")) return;
     try{ await api("files/delete",{id:parseInt(b.dataset.fid)}); refreshFileList(section); toast("Deleted"); }catch(e){toast("Couldn't delete",true);}
@@ -803,11 +862,10 @@ async function doUpload(section, inputId, segId){
   fd.append("by", NAME||"");
   toast("Uploading "+file.name+"…");
   try{
-    const r=await fetch("/api/files/upload",{ method:"POST", headers:{ "x-token":KEY }, body:fd });
-    const j=await r.json();
+    const j=await api("files/upload",fd,{idem:newIdemKey()});
     if(j.error){ toast(j.error, true); return; }
     inp.value=""; toast("Uploaded"); refreshFileList(section);
-  }catch(e){ toast("Upload failed",true); }
+  }catch(e){ toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
 }
 
 // ---- TRANSPORT ----
@@ -856,7 +914,7 @@ function runBodyHtml(r){
           <div>${esc(s.time||'')}</div>
           <div>${esc(s.stop_label||'')}${s.hotel_match&&!n?` <span class="save-hint">${DL("no guests","אין אורחים")}</span>`:''}</div>
           <div>${n||'—'}</div>
-          ${canEdit?`<div><button class="del-btn" data-stopdel="${s.id}" title="${DL('Remove','הסרה')}">×</button></div>`:''}
+          ${canEdit?`<div><button class="del-btn" data-stopdel="${esc(s.id)}" title="${DL('Remove','הסרה')}">×</button></div>`:''}
         </div>`;
       }).join('')}
       <div style="display:grid;grid-template-columns:0.6fr 2fr 0.6fr ${canEdit?'28px':''};gap:8px;padding:9px 13px;font-size:13px;border-top:1px solid var(--line);background:var(--parchment);">
@@ -869,12 +927,12 @@ function runBodyHtml(r){
   if(canEdit){
     const hotels = [...new Set(data.guests.filter(g=>g.hotel).map(g=>g.hotel))].sort();
     html += `<div class="add-row" style="margin-top:9px;">
-      <input type="text" id="stTime-${r.id}" placeholder="${DL('Time','שעה')}" style="max-width:80px;">
-      <select id="stHotel-${r.id}" class="search" style="flex:1;">
+      <input type="text" id="stTime-${esc(r.id)}" placeholder="${DL('Time','שעה')}" style="max-width:80px;">
+      <select id="stHotel-${esc(r.id)}" class="search" style="flex:1;">
         <option value="">${DL("— pickup point —","— נקודת איסוף —")}</option>
         ${hotels.map(h=>`<option value="${esc(h)}">${esc(h)} (${stopRiders(h).length})</option>`).join('')}
       </select>
-      <button data-stopadd="${r.id}">${DL("Add stop","הוספת תחנה")}</button>
+      <button data-stopadd="${esc(r.id)}">${DL("Add stop","הוספת תחנה")}</button>
     </div>`;
   }
 
@@ -887,8 +945,8 @@ function runBodyHtml(r){
       </div></div>`;
   }
   html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn-ghost" data-runprint="${r.id}">${DL("Driver sheet","דף לנהג")}</button>
-      ${ROLE==="admin"?`<button class="btn-ghost" data-rdel="${r.id}" style="color:var(--terra);">${DL("Delete run","מחיקת הסעה")}</button>`:''}
+      <button class="btn-ghost" data-runprint="${esc(r.id)}">${DL("Driver sheet","דף לנהג")}</button>
+      ${ROLE==="admin"?`<button class="btn-ghost" data-rdel="${esc(r.id)}" style="color:var(--terra);">${DL("Delete run","מחיקת הסעה")}</button>`:''}
     </div>
   </div>
 
@@ -896,33 +954,33 @@ function runBodyHtml(r){
     <div class="g-lab">${DL("Vehicle & driver","רכב ונהג")}</div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;">
       ${canEdit?`
-      <input class="g-in" data-rf="vehicles" data-rid="${r.id}" value="${esc(r.vehicles||'')}" placeholder="${DL('Vehicles','רכבים')}" style="margin-bottom:7px;">
-      <input class="g-in" data-rf="capacity" data-rid="${r.id}" value="${esc(r.capacity||'')}" placeholder="${DL('Capacity','קיבולת')}" style="margin-bottom:7px;">
-      <input class="g-in" data-rf="driver" data-rid="${r.id}" value="${esc(r.driver||'')}" placeholder="${DL('Driver name','שם הנהג')}" style="margin-bottom:7px;">
-      <input class="g-in" data-rf="driver_phone" data-rid="${r.id}" value="${esc(r.driver_phone||'')}" placeholder="${DL('Driver mobile','נייד הנהג')}" style="margin-bottom:7px;">
-      <input class="g-in" data-rf="company" data-rid="${r.id}" value="${esc(r.company||'')}" placeholder="${DL('Bus company','חברת הסעות')}">`
+      <input class="g-in" data-rf="vehicles" data-rid="${esc(r.id)}" value="${esc(r.vehicles||'')}" placeholder="${DL('Vehicles','רכבים')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="capacity" data-rid="${esc(r.id)}" value="${esc(r.capacity||'')}" placeholder="${DL('Capacity','קיבולת')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="driver" data-rid="${esc(r.id)}" value="${esc(r.driver||'')}" placeholder="${DL('Driver name','שם הנהג')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="driver_phone" data-rid="${esc(r.id)}" value="${esc(r.driver_phone||'')}" placeholder="${DL('Driver mobile','נייד הנהג')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="company" data-rid="${esc(r.id)}" value="${esc(r.company||'')}" placeholder="${DL('Bus company','חברת הסעות')}">`
       :`<div class="g-val">${esc(r.vehicles||'—')}<br>${esc(r.driver||'')} ${esc(r.driver_phone||'')}<br>${esc(r.company||'')}</div>`}
     </div>
 
     <div class="g-lab" style="margin-top:13px;">${DL("Escort & notes","מלווה והערות")}</div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;">
       ${canEdit?`
-      <input class="g-in" data-rf="escort" data-rid="${r.id}" value="${esc(r.escort||'')}" placeholder="${DL('Foundation staff escort','מלווה מטעם הקרן')}" style="margin-bottom:7px;">
-      <textarea class="notes-area" data-rf="notes" data-rid="${r.id}" style="min-height:58px;" placeholder="${DL('Internal notes for the production team','הערות פנימיות לצוות ההפקה')}">${esc(r.notes||'')}</textarea>
-      <textarea class="notes-area" data-rf="driver_note" data-rid="${r.id}" style="min-height:58px;margin-top:7px;" placeholder="${DL('Note shown in the driver app — access, parking, luggage…','הערה שמופיעה באפליקציית הנהגים — גישה, חניה, מזוודות…')}">${esc(r.driver_note||'')}</textarea>
-      <input class="g-in" data-rf="dropoff" data-rid="${r.id}" value="${esc(r.dropoff||'')}" placeholder="${DL('Exact drop-off point','נקודת הורדה מדויקת')}" style="margin-top:7px;">
-      <input class="g-in" data-rf="dropoff_url" data-rid="${r.id}" value="${esc(r.dropoff_url||'')}" placeholder="${DL('Drop-off map link (Waze / Google Maps)','קישור מפה לנקודת ההורדה (Waze / גוגל מפות)')}" style="margin-top:7px;">`
+      <input class="g-in" data-rf="escort" data-rid="${esc(r.id)}" value="${esc(r.escort||'')}" placeholder="${DL('Foundation staff escort','מלווה מטעם הקרן')}" style="margin-bottom:7px;">
+      <textarea class="notes-area" data-rf="notes" data-rid="${esc(r.id)}" style="min-height:58px;" placeholder="${DL('Internal notes for the production team','הערות פנימיות לצוות ההפקה')}">${esc(r.notes||'')}</textarea>
+      <textarea class="notes-area" data-rf="driver_note" data-rid="${esc(r.id)}" style="min-height:58px;margin-top:7px;" placeholder="${DL('Note shown in the driver app — access, parking, luggage…','הערה שמופיעה באפליקציית הנהגים — גישה, חניה, מזוודות…')}">${esc(r.driver_note||'')}</textarea>
+      <input class="g-in" data-rf="dropoff" data-rid="${esc(r.id)}" value="${esc(r.dropoff||'')}" placeholder="${DL('Exact drop-off point','נקודת הורדה מדויקת')}" style="margin-top:7px;">
+      <input class="g-in" data-rf="dropoff_url" data-rid="${esc(r.id)}" value="${esc(r.dropoff_url||'')}" placeholder="${DL('Drop-off map link (Waze / Google Maps)','קישור מפה לנקודת ההורדה (Waze / גוגל מפות)')}" style="margin-top:7px;">`
       :`<div class="g-val">${esc(r.escort||'—')}<br>${esc(r.notes||'')}</div>`}
     </div>
 
     ${canEdit?`<label style="display:flex;align-items:center;gap:8px;margin-top:13px;font-size:12.5px;cursor:pointer;">
-      <input type="checkbox" data-rpdf="${r.id}" ${r.pdf_hide?'':'checked'}> ${DL("Show pickup time in the guest PDF","הצגת שעת איסוף בלוח הזמנים לאורחים")}
+      <input type="checkbox" data-rpdf="${esc(r.id)}" ${r.pdf_hide?'':'checked'}> ${DL("Show pickup time in the guest PDF","הצגת שעת איסוף בלוח הזמנים לאורחים")}
     </label>
     <div class="g-lab" style="margin-top:13px;">${DL("Status","סטטוס")}</div>
-    <select class="g-in" data-rf="status" data-rid="${r.id}">
+    <select class="g-in" data-rf="status" data-rid="${esc(r.id)}">
       ${Object.keys(R_STATUS).map(k=>`<option value="${k}" ${r.status===k?'selected':''}>${LANG==="he"?R_STATUS[k].he:R_STATUS[k].label}</option>`).join('')}
     </select>`:''}
-    <div class="save-hint" id="rHint-${r.id}" style="margin-top:9px;"></div>
+    <div class="save-hint" id="rHint-${esc(r.id)}" style="margin-top:9px;"></div>
   </div></div>`;
   return html;
 }
@@ -932,7 +990,7 @@ function runRowHtml(r){
   const st = rStatus(r.status);
   const pax = runPax(r.id);
   const stops = runStops(r.id);
-  return `<details class="d-row" data-rid="${r.id}"${isOpen?' open':''}>
+  return `<details class="d-row" data-rid="${esc(r.id)}"${isOpen?' open':''}>
     <summary style="grid-template-columns:0.6fr 2fr 1.4fr 0.6fr 1.2fr 26px;">
       <div style="font-family:var(--serif);font-size:15px;">${esc(r.depart_time||'')}</div>
       <div><strong>${esc(LANG==="he"&&r.title_he?r.title_he:r.title)}</strong>
@@ -942,7 +1000,7 @@ function runRowHtml(r){
       <div><span class="d-tag" style="background:${st.color};">${st.label.toUpperCase()}</span></div>
       <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
     </summary>
-    <div class="d-body" id="rBody-${r.id}">${runBodyHtml(r)}</div>
+    <div class="d-body" id="rBody-${esc(r.id)}">${runBodyHtml(r)}</div>
   </details>`;
 }
 
@@ -958,9 +1016,10 @@ function wireRunBody(r){
       const hint=document.getElementById('rHint-'+r.id);
       if(hint) hint.textContent='saving…';
       const go=async()=>{
+        try { await api("run/field",{id:r.id, field:f, value:el.value}); }
+        catch(e){ if(hint) hint.textContent=(LANG==="he"?"לא נשמר: ":"not saved: ")+apiErrorText(e, LANG==="he"); return; }
         r[f]=el.value;
-        await api("run/field",{id:r.id, field:f, value:el.value});
-        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint) hint.textContent=''; },1400); }
+        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint && hint.textContent==='saved') hint.textContent=''; },1400); }
         if(f==='status') renderTransport();
       };
       if(ev==='change') go(); else runTimers[k]=setTimeout(go,600);
@@ -981,8 +1040,9 @@ function wireRunBody(r){
   });
   const pdfCb=body.querySelector('[data-rpdf]');
   if(pdfCb) pdfCb.onchange=async()=>{
-    r.pdf_hide = pdfCb.checked?0:1;
-    await api("run/field",{id:r.id, field:"pdf_hide", value:r.pdf_hide});
+    const v = pdfCb.checked?0:1;
+    try { await api("run/field",{id:r.id, field:"pdf_hide", value:v}); } catch(e){ pdfCb.checked = !pdfCb.checked; throw e; }
+    r.pdf_hide = v;
     toast(pdfCb.checked?DL("Will show in the guest PDF","יוצג בלוח הזמנים"):DL("Hidden from the guest PDF","הוסתר מלוח הזמנים"));
   };
   const pr=body.querySelector('[data-runprint]');
@@ -1239,22 +1299,22 @@ function designBodyHtml(it){
   let html = `<div class="d-grid">
     <div>
       <div class="g-lab">${DL("Brief","בריף")}</div>
-      ${canEdit?`<textarea class="notes-area" data-df="brief" data-did="${it.id}" style="min-height:92px;">${esc(it.brief||'')}</textarea>`
+      ${canEdit?`<textarea class="notes-area" data-df="brief" data-did="${esc(it.id)}" style="min-height:92px;">${esc(it.brief||'')}</textarea>`
         :`<div class="g-note">${esc(it.brief||DL('No brief yet.','טרם הוזן בריף.'))}</div>`}
       <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Quantity","כמות")}</div>${canEdit?`<input class="g-in" data-df="qty" data-did="${it.id}" value="${esc(it.qty||'')}">`:`<div class="g-val">${esc(it.qty||'—')}</div>`}</div>
-        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Size","גודל")}</div>${canEdit?`<input class="g-in" data-df="size" data-did="${it.id}" value="${esc(it.size||'')}">`:`<div class="g-val">${esc(it.size||'—')}</div>`}</div>
-        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Print spec","מפרט דפוס")}</div>${canEdit?`<input class="g-in" data-df="spec" data-did="${it.id}" value="${esc(it.spec||'')}">`:`<div class="g-val">${esc(it.spec||'—')}</div>`}</div>
+        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Quantity","כמות")}</div>${canEdit?`<input class="g-in" data-df="qty" data-did="${esc(it.id)}" value="${esc(it.qty||'')}">`:`<div class="g-val">${esc(it.qty||'—')}</div>`}</div>
+        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Size","גודל")}</div>${canEdit?`<input class="g-in" data-df="size" data-did="${esc(it.id)}" value="${esc(it.size||'')}">`:`<div class="g-val">${esc(it.size||'—')}</div>`}</div>
+        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Print spec","מפרט דפוס")}</div>${canEdit?`<input class="g-in" data-df="spec" data-did="${esc(it.id)}" value="${esc(it.spec||'')}">`:`<div class="g-val">${esc(it.spec||'—')}</div>`}</div>
       </div>
       <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Design cost","עלות עיצוב")}</div>${canEdit?`<input class="g-in" data-df="design_cost" data-did="${it.id}" value="${esc(it.design_cost||'')}" placeholder="₪">`:`<div class="g-val">${esc(it.design_cost||'—')}</div>`}</div>
-        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Print cost","עלות דפוס")}</div>${canEdit?`<input class="g-in" data-df="print_cost" data-did="${it.id}" value="${esc(it.print_cost||'')}" placeholder="${DL('not quoted yet','טרם תומחר')}">`:`<div class="g-val">${esc(it.print_cost||'—')}</div>`}</div>
-        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Supplier","ספק")}</div>${canEdit?`<input class="g-in" data-df="supplier" data-did="${it.id}" value="${esc(it.supplier||'')}">`:`<div class="g-val">${esc(it.supplier||'—')}</div>`}</div>
-        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Art deadline","דדליין לקבצים")}</div>${canEdit?`<input class="g-in" data-df="deadline" data-did="${it.id}" value="${esc(it.deadline||'')}" placeholder="YYYY-MM-DD">`:`<div class="g-val">${esc(it.deadline||'—')}</div>`}</div>
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Design cost","עלות עיצוב")}</div>${canEdit?`<input class="g-in" data-df="design_cost" data-did="${esc(it.id)}" value="${esc(it.design_cost||'')}" placeholder="₪">`:`<div class="g-val">${esc(it.design_cost||'—')}</div>`}</div>
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Print cost","עלות דפוס")}</div>${canEdit?`<input class="g-in" data-df="print_cost" data-did="${esc(it.id)}" value="${esc(it.print_cost||'')}" placeholder="${DL('not quoted yet','טרם תומחר')}">`:`<div class="g-val">${esc(it.print_cost||'—')}</div>`}</div>
+        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Supplier","ספק")}</div>${canEdit?`<input class="g-in" data-df="supplier" data-did="${esc(it.id)}" value="${esc(it.supplier||'')}">`:`<div class="g-val">${esc(it.supplier||'—')}</div>`}</div>
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Art deadline","דדליין לקבצים")}</div>${canEdit?`<input class="g-in" data-df="deadline" data-did="${esc(it.id)}" value="${esc(it.deadline||'')}" placeholder="YYYY-MM-DD">`:`<div class="g-val">${esc(it.deadline||'—')}</div>`}</div>
       </div>
       ${it.notes?`<div style="margin-top:12px;"><div class="g-lab">${DL('Notes','הערות')}</div><div class="g-note" style="border-color:var(--gold);background:rgba(181,137,46,0.07);">${esc(it.notes)}</div></div>`:''}
       ${canEdit?`<div style="margin-top:12px;"><div class="g-lab">${DL('Status','סטטוס')}</div>
-        <select class="g-in" data-df="status" data-did="${it.id}" style="max-width:230px;">
+        <select class="g-in" data-df="status" data-did="${esc(it.id)}" style="max-width:230px;">
           ${Object.keys(D_STATUS).map(k=>`<option value="${k}" ${it.status===k?'selected':''}>${LANG==="he"?D_STATUS[k].he:D_STATUS[k].label}</option>`).join('')}
         </select></div>`:''}
     </div>
@@ -1263,14 +1323,14 @@ function designBodyHtml(it){
       <div class="g-lab">${DL("Proof","הגהה")}${latest?` · v${latest.version}`:''}</div>`;
 
   if(latest && latest.file_id){
-    const src=`/api/files/download?id=${latest.file_id}&inline=1`;
+    const src=`/api/files/download?id=${esc(latest.file_id)}&inline=1`;
     const isImg=(latest.file_type||'').startsWith('image/');
     html += `<div class="d-proof">
       ${isImg?`<img src="${src}" alt="Proof preview" style="width:100%;display:block;max-height:280px;object-fit:contain;background:var(--parchment);">`
              :`<iframe src="${src}" title="Proof preview" style="width:100%;height:280px;border:none;display:block;"></iframe>`}
       <div style="padding:8px 12px;font-size:11.5px;color:var(--ink-soft);border-top:1px solid var(--line);display:flex;justify-content:space-between;">
         <span>${esc(latest.file_name||'proof')}</span>
-        <a href="/api/files/download?id=${latest.file_id}" target="_blank">open ↗</a>
+        <a href="/api/files/download?id=${esc(latest.file_id)}" target="_blank">open ↗</a>
       </div>
     </div>`;
   } else {
@@ -1279,19 +1339,19 @@ function designBodyHtml(it){
 
   if(canEdit){
     html += `<label class="d-drop" style="margin-top:10px;">
-      <input type="file" data-dupload="${it.id}" accept=".pdf,image/*">
+      <input type="file" data-dupload="${esc(it.id)}" accept=".pdf,image/*">
       ${latest?DL('Upload a new version','העלאת גרסה חדשה'):DL('Drop a PDF or image, or click to browse','גררו PDF או תמונה, או לחצו לבחירה')}
-      <div class="save-hint" id="dUpHint-${it.id}"></div>
+      <div class="save-hint" id="dUpHint-${esc(it.id)}"></div>
     </label>`;
   }
 
   if(latest && latest.decision==="pending"){
     html += `<div class="d-signoff">
       <div class="g-lab" style="color:var(--sky);">${DL("Foundation sign-off","אישור הקרן")}</div>
-      <textarea class="notes-area" id="dComment-${it.id}" placeholder="${DL('Comments for the designer (optional)…','הערות למעצב (לא חובה)…')}" style="min-height:52px;"></textarea>
+      <textarea class="notes-area" id="dComment-${esc(it.id)}" placeholder="${DL('Comments for the designer (optional)…','הערות למעצב (לא חובה)…')}" style="min-height:52px;"></textarea>
       <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="btn-ghost" data-dapprove="${latest.id}" data-did="${it.id}" style="flex:1;background:var(--st-confirmed);color:#fff;border-color:var(--st-confirmed);font-weight:700;">${DL("Approve for print","אישור להדפסה")}</button>
-        <button class="btn-ghost" data-dchanges="${latest.id}" data-did="${it.id}" style="flex:1;color:var(--terra);border-color:var(--terra);">${DL("Request changes","בקשת שינויים")}</button>
+        <button class="btn-ghost" data-dapprove="${esc(latest.id)}" data-did="${esc(it.id)}" style="flex:1;background:var(--st-confirmed);color:#fff;border-color:var(--st-confirmed);font-weight:700;">${DL("Approve for print","אישור להדפסה")}</button>
+        <button class="btn-ghost" data-dchanges="${esc(latest.id)}" data-did="${esc(it.id)}" style="flex:1;color:var(--terra);border-color:var(--terra);">${DL("Request changes","בקשת שינויים")}</button>
       </div>
     </div>`;
   } else if(latest && latest.decision==="approved"){
@@ -1312,8 +1372,8 @@ function designBodyHtml(it){
   }
 
   html += `</div></div>
-  ${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-ddel="${it.id}" style="color:var(--terra);border-color:var(--line);">${DL("Delete item","מחיקת פריט")}</button></div>`:''}
-  <div class="save-hint" id="dHint-${it.id}" style="margin-top:10px;"></div>`;
+  ${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-ddel="${esc(it.id)}" style="color:var(--terra);border-color:var(--line);">${DL("Delete item","מחיקת פריט")}</button></div>`:''}
+  <div class="save-hint" id="dHint-${esc(it.id)}" style="margin-top:10px;"></div>`;
   return html;
 }
 
@@ -1321,7 +1381,7 @@ function designRowHtml(it){
   const isOpen = ui.openDesign && ui.openDesign.has(it.id);
   const st = dStatus(it.status);
   const proofs = itemProofs(it.id);
-  return `<details class="d-row" data-did="${it.id}"${isOpen?' open':''}>
+  return `<details class="d-row" data-did="${esc(it.id)}"${isOpen?' open':''}>
     <summary>
       <div><strong>${esc(LANG==="he"&&it.title_he?it.title_he:it.title)}</strong>
         <div class="d-sub">${esc(LANG==="he"?it.title:(it.title_he||''))}${it.design_cost&&it.design_cost!=='—'?` · ${esc(it.design_cost)}${/^\d+$/.test(it.design_cost)?' ₪':''}`:''}</div></div>
@@ -1331,7 +1391,7 @@ function designRowHtml(it){
       <div><span class="d-tag" style="background:${st.color};">${st.label.toUpperCase()}</span>${proofs.length?` <span class="save-hint">v${proofs[0].version}</span>`:''}</div>
       <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
     </summary>
-    <div class="d-body" id="dBody-${it.id}">${designBodyHtml(it)}</div>
+    <div class="d-body" id="dBody-${esc(it.id)}">${designBodyHtml(it)}</div>
   </details>`;
 }
 
@@ -1399,15 +1459,14 @@ async function doDesignUpload(it, dropped){
   const fd=new FormData();
   fd.append("file",file); fd.append("section","proof"); fd.append("segment_id",it.id); fd.append("by",NAME||"");
   try{
-    const r=await fetch("/api/files/upload",{method:"POST",headers:{"x-token":KEY},body:fd});
-    const j=await r.json();
+    const j=await api("files/upload",fd,{idem:newIdemKey()});
     if(j.error){ if(hint) hint.textContent=""; toast(j.error,true); return; }
     const p=await api("design/proof",{item_id:it.id, file_id:j.id, by:NAME||""});
     if(p.error){ if(hint) hint.textContent=""; toast(p.error,true); return; }
     if(hint) hint.textContent="";
     await refresh();
     toast(DL("Proof v"+p.version+" uploaded — awaiting approval","הגהה v"+p.version+" הועלתה — ממתינה לאישור"));
-  }catch(e){ if(hint) hint.textContent=""; toast("Upload failed",true); }
+  }catch(e){ if(hint) hint.textContent=""; toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
 }
 
 function renderDesign(){
@@ -1551,12 +1610,12 @@ function renderDesign(){
         ${rows.map(g=>{
           const late = g.deadline && dDaysLeft({deadline:g.deadline,status:g.status})<0;
           return `<div style="display:grid;grid-template-columns:24px 2.2fr 0.7fr 1.2fr 1fr;gap:10px;padding:10px 16px;font-size:13px;border-top:1px solid var(--line);align-items:center;${g.chosen&&!isLog?'background:rgba(107,113,69,0.07);':''}">
-            <div>${isLog?'':`<input type="checkbox" data-gchoose="${g.id}" ${g.chosen?'checked':''} ${(ROLE==="admin"||ROLE==="edit")?'':'disabled'}>`}</div>
+            <div>${isLog?'':`<input type="checkbox" data-gchoose="${esc(g.id)}" ${g.chosen?'checked':''} ${(ROLE==="admin"||ROLE==="edit")?'':'disabled'}>`}</div>
             <div>${esc(LANG==="he"&&g.title_he?g.title_he:g.title)}
               ${g.notes?`<div class="save-hint" style="margin-top:2px;">${esc(g.notes)}</div>`:''}</div>
             <div>${esc(g.qty||'')}</div>
             <div style="${late?'color:var(--terra);font-weight:700;':''}">${g.deadline?esc(fmtDay(g.deadline)):'—'}</div>
-            <div>${(ROLE==="admin"||ROLE==="edit")?`<input class="g-in" data-gf="supplier" data-gid2="${g.id}" value="${esc(g.supplier||'')}" placeholder="${DL('supplier','ספק')}" style="padding:5px 8px;font-size:12px;">`:esc(g.supplier||'')}</div>
+            <div>${(ROLE==="admin"||ROLE==="edit")?`<input class="g-in" data-gf="supplier" data-gid2="${esc(g.id)}" value="${esc(g.supplier||'')}" placeholder="${DL('supplier','ספק')}" style="padding:5px 8px;font-size:12px;">`:esc(g.supplier||'')}</div>
           </div>`;
         }).join('')}
       </div>`;
@@ -1572,7 +1631,7 @@ function renderDesign(){
         ${waiting.map(i=>{ const p=itemProofs(i.id)[0];
           return `<div style="padding:11px 17px;border-top:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;">
             <span><strong>${esc(i.title)}</strong>${p?` · v${p.version}`:''}</span>
-            <a href="#" data-dgo="${i.id}" style="color:var(--sky);">${DL("review","לבדיקה")} ↗</a>
+            <a href="#" data-dgo="${esc(i.id)}" style="color:var(--sky);">${DL("review","לבדיקה")} ↗</a>
           </div>`;}).join('')}
       </div>`;
   }
@@ -1651,7 +1710,7 @@ function guestNights(g){
 function fmtDay(d){
   if(!d) return "";
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
-  if(!m) return d;
+  if(!m) return esc(d);
   return parseInt(m[3],10)+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m[2],10)-1];
 }
 function guestDeskCounts(){
@@ -1680,30 +1739,30 @@ function guestBodyHtml(g){
     <div>
       <div class="g-lab">${DL("Contact","פרטי קשר")}</div>
       ${!isAdmin?`<div class="save-hint">${DL("Admin only","למנהלים בלבד")}</div>`:canEdit?`
-        <input class="g-in" data-gf="email" data-gid="${g.id}" value="${esc(g.email||'')}" placeholder="${DL('Email','אימייל')}" style="margin-bottom:6px;">
-        <input class="g-in" data-gf="phone" data-gid="${g.id}" value="${esc(g.phone||'')}" placeholder="${DL('Phone','טלפון')}" style="margin-bottom:6px;">
-        <input class="g-in" data-gf="city" data-gid="${g.id}" value="${esc(g.city||'')}" placeholder="${DL('City','עיר')}">`
+        <input class="g-in" data-gf="email" data-gid="${esc(g.id)}" value="${esc(g.email||'')}" placeholder="${DL('Email','אימייל')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="phone" data-gid="${esc(g.id)}" value="${esc(g.phone||'')}" placeholder="${DL('Phone','טלפון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="city" data-gid="${esc(g.id)}" value="${esc(g.city||'')}" placeholder="${DL('City','עיר')}">`
       :`<div class="g-val">${esc(g.email||'—')}<br>${esc(g.phone||'')}<br>${esc(g.city||'')}</div>`}
     </div>
     <div>
       <div class="g-lab">${DL("Travel documents","מסמכי נסיעה")}</div>
       ${!isAdmin?`<div class="save-hint">${DL("Admin only","למנהלים בלבד")}</div>`:canEdit?`
-        <input class="g-in" data-gf="passport_no" data-gid="${g.id}" value="${esc(g.passport_no||'')}" placeholder="${DL('Passport number','מספר דרכון')}" style="margin-bottom:6px;">
-        <input class="g-in" data-gf="passport_country" data-gid="${g.id}" value="${esc(g.passport_country||'')}" placeholder="${DL('Country of issue','מדינת הנפקה')}">`
+        <input class="g-in" data-gf="passport_no" data-gid="${esc(g.id)}" value="${esc(g.passport_no||'')}" placeholder="${DL('Passport number','מספר דרכון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="passport_country" data-gid="${esc(g.id)}" value="${esc(g.passport_country||'')}" placeholder="${DL('Country of issue','מדינת הנפקה')}">`
       :`<div class="g-val">${esc(g.passport_no||'—')}<br>${esc(g.passport_country||'')}</div>`}
       ${isAdmin&&!g.passport_no?`<div class="save-hint" style="color:var(--terra);margin-top:5px;">${DL("Needed for VAT exemption","נדרש לפטור ממע\"מ")}</div>`:''}
     </div>
     <div>
       <div class="g-lab">${DL("Accommodation","לינה")}</div>
       ${canEdit?`
-        <input class="g-in" data-gf="hotel" data-gid="${g.id}" value="${esc(g.hotel||'')}" placeholder="${DL('Hotel','מלון')}" style="margin-bottom:6px;">
-        <input class="g-in" data-gf="room_type" data-gid="${g.id}" value="${esc(g.room_type||'')}" placeholder="${DL('Room type','סוג חדר')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="hotel" data-gid="${esc(g.id)}" value="${esc(g.hotel||'')}" placeholder="${DL('Hotel','מלון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="room_type" data-gid="${esc(g.id)}" value="${esc(g.room_type||'')}" placeholder="${DL('Room type','סוג חדר')}" style="margin-bottom:6px;">
         <div style="display:flex;gap:6px;">
-          <input class="g-in" data-gf="checkin" data-gid="${g.id}" value="${esc(g.checkin||'')}" placeholder="YYYY-MM-DD">
-          <input class="g-in" data-gf="checkout" data-gid="${g.id}" value="${esc(g.checkout||'')}" placeholder="YYYY-MM-DD">
+          <input class="g-in" data-gf="checkin" data-gid="${esc(g.id)}" value="${esc(g.checkin||'')}" placeholder="YYYY-MM-DD">
+          <input class="g-in" data-gf="checkout" data-gid="${esc(g.id)}" value="${esc(g.checkout||'')}" placeholder="YYYY-MM-DD">
         </div>
-        <input class="g-in" data-gf="booking_conf" data-gid="${g.id}" value="${esc(g.booking_conf||'')}" placeholder="${DL('Booking confirmation','אישור הזמנה')}" style="margin-top:6px;">
-        <input class="g-in" data-gf="early_late" data-gid="${g.id}" value="${esc(g.early_late||'')}" placeholder="${DL('Early check-in / late check-out','צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר')}" style="margin-top:6px;">`
+        <input class="g-in" data-gf="booking_conf" data-gid="${esc(g.id)}" value="${esc(g.booking_conf||'')}" placeholder="${DL('Booking confirmation','אישור הזמנה')}" style="margin-top:6px;">
+        <input class="g-in" data-gf="early_late" data-gid="${esc(g.id)}" value="${esc(g.early_late||'')}" placeholder="${DL('Early check-in / late check-out','צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר')}" style="margin-top:6px;">`
       :`<div class="g-val">${esc(g.hotel||DL('Own arrangement','סידור עצמאי'))}<br>${esc(g.room_type||'')}<br>${fmtDay(g.checkin)} → ${fmtDay(g.checkout)}${g.booking_conf?'<br>'+DL('Confirmation','אישור')+': '+esc(g.booking_conf):''}${g.early_late?'<br>'+esc(g.early_late):''}</div>`}
       ${nights?`<div class="save-hint" style="margin-top:5px;">${nights}</div>`:''}
       ${g.accommodation_note?`<div class="save-hint" style="margin-top:5px;">Own: ${esc(g.accommodation_note)}</div>`:''}
@@ -1712,7 +1771,7 @@ function guestBodyHtml(g){
 
   html += `<div style="margin-top:16px;">
     <div class="g-lab">${DL("Dietary","תזונה")}</div>
-    ${canEdit?`<input class="g-in" data-gf="dietary" data-gid="${g.id}" value="${esc(g.dietary||'')}" placeholder="${DL('None recorded','לא נרשם')}" style="max-width:480px;">`
+    ${canEdit?`<input class="g-in" data-gf="dietary" data-gid="${esc(g.id)}" value="${esc(g.dietary||'')}" placeholder="${DL('None recorded','לא נרשם')}" style="max-width:480px;">`
       :`<div class="g-val">${esc(g.dietary||'—')}</div>`}
   </div>`;
 
@@ -1721,7 +1780,7 @@ function guestBodyHtml(g){
     <div class="g-sess">
       ${GUEST_SESSIONS.map(([sid,label])=>{
         const on = guestAttending(g.id, sid);
-        return `<label class="${on?'on':''}"><input type="checkbox" data-gsess="${sid}" data-gid="${g.id}" ${on?'checked':''}> ${label}</label>`;
+        return `<label class="${on?'on':''}"><input type="checkbox" data-gsess="${esc(sid)}" data-gid="${esc(g.id)}" ${on?'checked':''}> ${esc(label)}</label>`;
       }).join('')}
     </div>
   </div>`;
@@ -1730,7 +1789,7 @@ function guestBodyHtml(g){
     html += `<div style="margin-top:16px;">
       <div class="g-lab">${DL('Note from registration','הערה מטופס ההרשמה')} ${g.note_handled?'<span class="g-chip" style="background:rgba(107,113,69,0.16);color:var(--olive);">${DL("handled","טופל")}</span>':''}</div>
       <div class="g-note">${esc(g.guest_note)}</div>
-      ${canEdit?`<button class="btn-ghost" data-gnote="${g.id}" data-val="${g.note_handled?0:1}" style="margin-top:8px;">${g.note_handled?DL('Mark unhandled','סימון כלא טופל'):DL('Mark note handled','סימון כטופל')}</button>`:''}
+      ${canEdit?`<button class="btn-ghost" data-gnote="${esc(g.id)}" data-val="${g.note_handled?0:1}" style="margin-top:8px;">${g.note_handled?DL('Mark unhandled','סימון כלא טופל'):DL('Mark note handled','סימון כטופל')}</button>`:''}
     </div>`;
   }
 
@@ -1738,12 +1797,12 @@ function guestBodyHtml(g){
     html += `<div style="margin-top:16px;">
       <div class="g-lab">${DL("Needs review","דורש בדיקה")}</div>
       <div class="g-note" style="border-color:var(--gold);background:rgba(181,137,46,0.08);">${esc(g.review_note||DL('Flagged during import','סומן בעת הייבוא'))}
-      ${canEdit?`<br><button class="btn-ghost" data-gclear="${g.id}" style="margin-top:8px;">${DL("Reviewed — clear flag","נבדק — הסרת הסימון")}</button>`:''}</div>
+      ${canEdit?`<br><button class="btn-ghost" data-gclear="${esc(g.id)}" style="margin-top:8px;">${DL("Reviewed — clear flag","נבדק — הסרת הסימון")}</button>`:''}</div>
     </div>`;
   }
 
-  html += `${ROLE==="admin"?`<div style="margin-top:14px;"><button class="btn-ghost" data-gdel="${g.id}" style="color:var(--terra);border-color:var(--line);">${DL("Remove guest","הסרת אורח/ת")}</button></div>`:''}
-  <div class="save-hint" id="gHint-${g.id}" style="margin-top:10px;"></div>`;
+  html += `${ROLE==="admin"?`<div style="margin-top:14px;"><button class="btn-ghost" data-gdel="${esc(g.id)}" style="color:var(--terra);border-color:var(--line);">${DL("Remove guest","הסרת אורח/ת")}</button></div>`:''}
+  <div class="save-hint" id="gHint-${esc(g.id)}" style="margin-top:10px;"></div>`;
   return html;
 }
 
@@ -1754,7 +1813,7 @@ function guestRowHtml(g){
   if(g.dietary) flags.push(`<span class="g-chip ${g.dietary_severe?'sev':''}">${esc(g.dietary.slice(0,28))}</span>`);
   if(g.needs_review) flags.push(`<span class="g-chip rev">${DL("review","בדיקה")}</span>`);
   if(g.guest_note && !g.note_handled) flags.push(`<span class="g-chip" style="background:rgba(62,107,122,0.14);color:var(--sky);">${DL("note","הערה")}</span>`);
-  return `<details class="g-row" data-gid="${g.id}"${isOpen?' open':''}>
+  return `<details class="g-row" data-gid="${esc(g.id)}"${isOpen?' open':''}>
     <summary>
       <div><strong>${esc(g.first_name)} ${esc(g.last_name)}</strong>${partners.length?`<div class="sub">+ ${partners.map(p=>esc(p.first_name+' '+p.last_name)).join(', ')}</div>`:''}</div>
       <div>${esc(g.desk||'—')}</div>
@@ -1763,7 +1822,7 @@ function guestRowHtml(g){
       <div style="display:flex;gap:5px;flex-wrap:wrap;">${flags.join('')}</div>
       <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
     </summary>
-    <div class="g-body" id="gBody-${g.id}">${guestBodyHtml(g)}</div>
+    <div class="g-body" id="gBody-${esc(g.id)}">${guestBodyHtml(g)}</div>
   </details>`;
 }
 
@@ -1864,6 +1923,7 @@ function renderGuests(){
         <input type="file" id="gImportFile" accept=".xlsx,.xls,.csv" style="font-size:12px;max-width:230px;">
         <button class="btn-ghost" id="gImportBtn" style="background:var(--ink);color:var(--parchment);border-color:var(--ink);">${DL("Compare","השוואה")}</button>
       </div>
+      <label style="width:100%;font-size:12.5px;display:flex;gap:7px;align-items:center;"><input type="checkbox" id="gImportFull"> ${DL("This sheet is the complete guest list: also list registered guests who are missing from it (offered as cancellations, unticked)","הגיליון הוא רשימת האורחים המלאה: להציג גם אורחים רשומים שחסרים בו (כהצעות לביטול, לא מסומנות)")}</label>
       <div class="save-hint" id="gImportHint" style="width:100%;"></div>
     </div>
     <div id="gImportArea"></div>`;
@@ -2024,7 +2084,7 @@ function loadSheetJS(){
   return new Promise((res,rej)=>{
     if(window.XLSX) return res(window.XLSX);
     const s=document.createElement('script');
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.src="/vendor/xlsx/xlsx.full.min.js";
     s.onload=()=>res(window.XLSX); s.onerror=()=>rej(new Error("could not load the spreadsheet reader"));
     document.head.appendChild(s);
   });
@@ -2038,11 +2098,15 @@ const IMPORT_MAP = {
   "accommodation":"accommodation",
   "if you are taking care of your own accommodation, please let us know where you are staying":"accommodation_note",
   "anything you would like to share with us?":"guest_note",
-  "first name":"first_name", "last name":"last_name", "desk":"desk", "type":"ptype"
+  "first name":"first_name", "last name":"last_name", "desk":"desk", "type":"ptype",
+  "check-in":"checkin", "check in":"checkin", "check-in date":"checkin", "check in date":"checkin", "arrival date":"checkin", "arrival":"checkin",
+  "check-out":"checkout", "check out":"checkout", "check-out date":"checkout", "check out date":"checkout", "departure date":"checkout", "departure":"checkout",
+  "registration id":"reg_id", "registration number":"reg_id", "registration #":"reg_id", "reg id":"reg_id", "reg. id":"reg_id", "registration no.":"reg_id"
 };
 function xlDate(v){
   if(v==null||v==="") return "";
-  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  // SheetJS builds dates at local midnight: read the local date parts (toISOString would shift a day in Israel)
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0");
   if(typeof v==="number" && v>20000 && v<80000){
     const d=new Date(Date.UTC(1899,11,30)+v*86400000);
     return isNaN(d)?"":d.toISOString().slice(0,10);
@@ -2071,21 +2135,19 @@ async function doGuestImport(){
     for(let i=hi+1;i<rows.length;i++){
       const r=rows[i]; if(!r||!r.length) continue;
       const rec={};
-      hdr.forEach((h,ci)=>{ const f=IMPORT_MAP[h]; if(f && !rec[f]) rec[f]=String(r[ci]==null?"":r[ci]).trim(); });
+      hdr.forEach((h,ci)=>{ const f=IMPORT_MAP[h]; if(f && !rec[f]) rec[f]=(f==="checkin"||f==="checkout") ? xlDate(r[ci]) : String(r[ci]==null?"":r[ci]).trim(); });
       if(!rec.first_name) continue;
-      if(rec.checkin) rec.checkin=xlDate(rec.checkin);
-      if(rec.checkout) rec.checkout=xlDate(rec.checkout);
       out.push(rec);
     }
     if(!out.length){ hint.textContent=""; toast("No guest rows found in that sheet",true); return; }
     hint.textContent="Comparing "+out.length+" rows…";
-    const r=await api("guest/import",{rows:out});
-    if(r.error){ hint.textContent=""; toast(r.error,true); return; }
+    const full=!!(document.getElementById("gImportFull")||{}).checked;
+    const r=await api("guest/import",{rows:out, full_roster:full});
     hint.textContent="";
-    ui.importChanges=r.changes||[];
+    ui.importChanges=r.changes||[]; ui.importKey=newIdemKey();
     if(!ui.importChanges.length){ toast("No changes — the registry already matches"); renderImportArea(); return; }
     renderImportArea();
-  }catch(e){ hint.textContent=""; toast("Couldn't read that file",true); }
+  }catch(e){ hint.textContent=""; toast(e && e.kind ? apiErrorText(e, LANG==="he") : "Couldn't read that file",true); }
 }
 function renderImportArea(){
   const el=document.getElementById("gImportArea");
@@ -2095,17 +2157,21 @@ function renderImportArea(){
   if(!ch.length){ el.innerHTML=`<div class="save-hint" style="margin-bottom:18px;">${DL('No differences found.','לא נמצאו הבדלים.')}</div>`; return; }
   const tag=k=>k==="new"?'<span class="imp-tag" style="background:var(--st-confirmed);">NEW</span>'
     :k==="edit"?'<span class="imp-tag" style="background:var(--st-progress);">EDIT</span>'
-    :'<span class="imp-tag" style="background:var(--st-open);">GONE</span>';
+    :k==="gone"?'<span class="imp-tag" style="background:var(--st-open);">NOT IN SHEET</span>'
+    :k==="ambiguous"?'<span class="imp-tag" style="background:var(--terra);">AMBIGUOUS</span>'
+    :'<span class="imp-tag" style="background:var(--ink-soft);">DUPLICATE ROW</span>';
+  const selectable=c=>c.kind==="new"||c.kind==="edit"||c.kind==="gone";
+  const checkedByDefault=c=>(c.kind==="new"||c.kind==="edit") && !(c.problems&&c.problems.length);
   el.innerHTML=`<div style="border:1px solid var(--gold);border-radius:4px;overflow:hidden;margin-bottom:22px;">
     <div style="background:rgba(181,137,46,0.12);padding:10px 18px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;">
-      <span>${DL(`${ch.length} change${ch.length===1?'':'s'} found — review before applying`,`נמצאו ${ch.length} שינויים — לבדיקה לפני החלה`)}</span>
-      <span style="font-weight:400;color:var(--ink-soft);">${DL("nothing is saved until you approve","שום דבר לא נשמר עד לאישורכם")}</span>
+      <span>${DL(`${ch.length} difference${ch.length===1?'':'s'} found — review before applying`,`נמצאו ${ch.length} הבדלים — לבדיקה לפני החלה`)}</span>
+      <span style="font-weight:400;color:var(--ink-soft);">${DL("nothing is saved until you approve; cancellations and rows with problems start unticked","שום דבר לא נשמר עד לאישורכם; ביטולים ושורות עם בעיות לא מסומנים מראש")}</span>
     </div>
     <div style="background:#fff;max-height:340px;overflow:auto;">
       ${ch.map((c,i)=>`<div class="imp-row">
-        <input type="checkbox" data-impsel="${i}" checked>
+        ${selectable(c)?`<input type="checkbox" data-impsel="${i}" ${checkedByDefault(c)?'checked':''} aria-label="${esc(c.name)}">`:'<span style="width:13px;"></span>'}
         ${tag(c.kind)}
-        <span>${esc(c.name)}${c.kind==='edit'?' · '+c.diffs.map(d=>`${esc(d.field)}: <span style="text-decoration:line-through;color:var(--ink-soft);">${esc(d.from||'(empty)')}</span> → <strong>${esc(d.to)}</strong>`).join(', '):''}${c.kind==='gone'?DL(' · no longer in the sheet — mark cancelled?',' · כבר לא מופיע בגיליון — לסמן כבוטל?'):''}</span>
+        <span><bdi>${esc(c.name)}</bdi>${c.kind==='edit'?' · '+(c.diffs||[]).map(d=>`${esc(d.field)}: <span style="text-decoration:line-through;color:var(--ink-soft);">${esc(d.from||'(empty)')}</span> → <strong>${esc(d.to)}</strong>`).join(', '):''}${c.kind==='gone'?DL(' · registered but not in this sheet — mark cancelled?',' · רשום אבל לא בגיליון — לסמן כבוטל?'):''}${c.note?' · '+esc(c.note):''}${c.problems&&c.problems.length?` · <span style="color:var(--terra);">${c.problems.map(esc).join('; ')}</span>`:''}</span>
       </div>`).join('')}
     </div>
     <div style="background:var(--parchment);padding:11px 18px;display:flex;gap:9px;">
@@ -2114,15 +2180,24 @@ function renderImportArea(){
     </div>
   </div>`;
   document.getElementById("impDiscard").onclick=()=>{ ui.importChanges=null; renderGuests(); };
-  document.getElementById("impApply").onclick=async()=>{
+  const applyBtn=document.getElementById("impApply");
+  applyBtn.onclick=async()=>{
+    if(applyBtn.disabled) return;
     const picked=[];
     el.querySelectorAll("[data-impsel]").forEach(cb=>{ if(cb.checked) picked.push(ch[parseInt(cb.dataset.impsel)]); });
     if(!picked.length){ toast("Nothing selected",true); return; }
-    const r=await api("guest/import/apply",{changes:picked});
-    if(r.error){ toast(r.error,true); return; }
-    ui.importChanges=null;
-    await refresh();
-    toast(`Applied ${r.applied} change${r.applied===1?'':'s'}`);
+    const gone=picked.filter(c=>c.kind==="gone").length;
+    if(gone && !confirm(DL(`Mark ${gone} guest(s) as cancelled?`,`לסמן ${gone} אורחים כמבוטלים?`))) return;
+    applyBtn.disabled=true; applyBtn.textContent=DL("Applying…","מחיל…");
+    try{
+      const r=await api("guest/import/apply",{changes:picked},{idem:ui.importKey});
+      ui.importChanges=null;
+      await refresh(true);
+      toast(DL(`Applied ${r.applied} change${r.applied===1?'':'s'}`,`הוחלו ${r.applied} שינויים`)+(r.skipped?DL(` · ${r.skipped} already up to date`,` · ${r.skipped} כבר מעודכנים`):''));
+    }catch(e){
+      applyBtn.disabled=false; applyBtn.textContent=DL("Apply selected","החלת הנבחרים");
+      toast(e.kind==="conflict"?DL("The guest list changed since the comparison. Nothing was applied; compare again.","רשימת האורחים השתנתה מאז ההשוואה. שום דבר לא הוחל; השוו שוב."):apiErrorText(e, LANG==="he"),true);
+    }
   };
 }
 
@@ -2161,7 +2236,7 @@ function foodCourseHtml(item, menu){
       </div>
       ${c.items.map((it,ii)=>`
         <label class="food-opt ${it.selected?'sel':''} ${locked?'locked':''}">
-          <input type="radio" name="food-${item.id}-c${ci}" data-food="${item.id}" data-course="${ci}" data-item="${ii}" ${it.selected?'checked':''} ${locked?'disabled':''}>
+          <input type="radio" name="food-${esc(item.id)}-c${ci}" data-food="${esc(item.id)}" data-course="${ci}" data-item="${ii}" ${it.selected?'checked':''} ${locked?'disabled':''}>
           ${esc(it.name)}
         </label>`).join('')}
     </div>`;
@@ -2179,14 +2254,14 @@ function foodBodyHtml(item){
   const dietVal = item[dietField()]||'';
   let html = '';
   if(item.file_id){
-    html += `<div class="food-source">📄 <a href="/api/files/download?id=${item.file_id}" target="_blank">${esc(item.file_name||(he?'קובץ תפריט':'menu file'))}</a> · <a href="#" data-toggle-preview="${item.id}">${he?'הצג תצוגה מקדימה':'show preview'}</a>
-      <div class="food-pdf-embed" id="foodPdf-${item.id}" data-loaded="0" data-fileid="${item.file_id}" data-ctype="${esc(item.file_type||'')}"></div>
+    html += `<div class="food-source">📄 <a href="/api/files/download?id=${esc(item.file_id)}" target="_blank">${esc(item.file_name||(he?'קובץ תפריט':'menu file'))}</a> · <a href="#" data-toggle-preview="${esc(item.id)}">${he?'הצג תצוגה מקדימה':'show preview'}</a>
+      <div class="food-pdf-embed" id="foodPdf-${esc(item.id)}" data-loaded="0" data-fileid="${esc(item.file_id)}" data-ctype="${esc(item.file_type||'')}"></div>
     </div>`;
   }
   if(hasMenu){
     html += `<div class="food-course">${foodCourseHtml(item, menu)}</div>`;
     if(hasChoice && canEdit){
-      html += `<button class="btn-ghost food-lock-btn" data-fid="${item.id}" data-lock="${allLocked?'0':'1'}" style="margin-top:10px;${allLocked?'':'background:var(--ink);color:#fff;'}">${allLocked?(he?'ביטול נעילה לשינוי':'Unlock to change'):(he?'נעילת הבחירות':'Lock in choices')}</button>`;
+      html += `<button class="btn-ghost food-lock-btn" data-fid="${esc(item.id)}" data-lock="${allLocked?'0':'1'}" style="margin-top:10px;${allLocked?'':'background:var(--ink);color:#fff;'}">${allLocked?(he?'ביטול נעילה לשינוי':'Unlock to change'):(he?'נעילת הבחירות':'Lock in choices')}</button>`;
     }
   } else {
     html += `<div class="save-hint">${he?'טרם הועלה תפריט.':'No menu uploaded yet.'}</div>`;
@@ -2195,28 +2270,28 @@ function foodBodyHtml(item){
     html += `<div class="field" style="margin-top:16px;">
       <label>${item.file_id?(he?'החלפת קובץ תפריט':'Replace menu file'):(he?'העלאת תפריט':'Upload menu')}</label>
       <label class="food-upload-drop">
-        <input type="file" data-upload-fid="${item.id}" accept=".pdf,.png,.jpg,.jpeg,.webp,image/*">
+        <input type="file" data-upload-fid="${esc(item.id)}" accept=".pdf,.png,.jpg,.jpeg,.webp,image/*">
         ${he?'גררו PDF, PNG או JPG — או לחצו לבחירה. מעובד אוטומטית':'Drop a PDF, PNG or JPG — or click to browse. Processed automatically'}
       </label>
-      <div class="save-hint" id="foodUploadHint-${item.id}"></div>
+      <div class="save-hint" id="foodUploadHint-${esc(item.id)}"></div>
     </div>
-    <div class="field"><label>${he?'משקאות מוגשים':'Beverages served'}</label><textarea class="notes-area" data-ffield="${bevField()}" data-fid="${item.id}" style="min-height:44px;">${esc(bevVal)}</textarea></div>
+    <div class="field"><label>${he?'משקאות מוגשים':'Beverages served'}</label><textarea class="notes-area" data-ffield="${bevField()}" data-fid="${esc(item.id)}" style="min-height:44px;">${esc(bevVal)}</textarea></div>
     <div style="display:flex;gap:20px;">
-      <div class="field" style="flex:1;"><label>${he?'קייטרינג / ספק':'Caterer / vendor'}</label><input type="text" data-ffield="caterer" data-fid="${item.id}" value="${esc(item.caterer||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
-      <div class="field" style="flex:1;"><label>${he?'מספר סועדים':'Headcount'}</label><input type="text" data-ffield="headcount" data-fid="${item.id}" value="${esc(item.headcount||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
+      <div class="field" style="flex:1;"><label>${he?'קייטרינג / ספק':'Caterer / vendor'}</label><input type="text" data-ffield="caterer" data-fid="${esc(item.id)}" value="${esc(item.caterer||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
+      <div class="field" style="flex:1;"><label>${he?'מספר סועדים':'Headcount'}</label><input type="text" data-ffield="headcount" data-fid="${esc(item.id)}" value="${esc(item.headcount||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
     </div>
-    <div class="field"><label>${he?'הערות תזונה לפריט זה':'Dietary notes for this item'}</label><textarea class="notes-area" data-ffield="${dietField()}" data-fid="${item.id}" style="min-height:44px;">${esc(dietVal)}</textarea></div>`;
+    <div class="field"><label>${he?'הערות תזונה לפריט זה':'Dietary notes for this item'}</label><textarea class="notes-area" data-ffield="${dietField()}" data-fid="${esc(item.id)}" style="min-height:44px;">${esc(dietVal)}</textarea></div>`;
   } else if(dietVal){
     html += `<div class="field"><label>${he?'הערות תזונה':'Dietary notes'}</label><div class="val">${esc(dietVal)}</div></div>`;
   }
-  html += `${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-fdel="${item.id}" style="color:var(--terra);border-color:var(--line);">${he?'מחיקת פריט':'Delete item'}</button></div>`:''}
-  <div class="save-hint" id="foodHint-${item.id}"></div>`;
+  html += `${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-fdel="${esc(item.id)}" style="color:var(--terra);border-color:var(--line);">${he?'מחיקת פריט':'Delete item'}</button></div>`:''}
+  <div class="save-hint" id="foodHint-${esc(item.id)}"></div>`;
   return html;
 }
 
 function foodRowHtml(item){
   const isOpen = ui.openFood && ui.openFood.has(item.id);
-  return `<details class="food-row" data-fid="${item.id}"${isOpen?' open':''}>
+  return `<details class="food-row" data-fid="${esc(item.id)}"${isOpen?' open':''}>
     <summary>
       <div class="food-time">${esc(item.time||'')}${item.end_time?`<span class="end">– ${esc(item.end_time)}</span>`:''}</div>
       <div class="food-main">
@@ -2226,7 +2301,7 @@ function foodRowHtml(item){
       <span class="tag ${(item.meal_type==='drinks'||item.meal_type==='snack')?'people':'meal'}">${foodTypeLabel(item.meal_type)}</span>
       <span class="dot ${item.status}"><i></i>${STATUS_LABEL[item.status]}</span>
     </summary>
-    <div class="food-body" id="foodBody-${item.id}">${foodBodyHtml(item)}</div>
+    <div class="food-body" id="foodBody-${esc(item.id)}">${foodBodyHtml(item)}</div>
   </details>`;
 }
 
@@ -2356,8 +2431,7 @@ async function doFoodUpload(item, droppedFile){
   const fd = new FormData();
   fd.append("file", file); fd.append("section","menu"); fd.append("segment_id", item.id); fd.append("by", NAME||"");
   try{
-    const r = await fetch("/api/files/upload", { method:"POST", headers:{ "x-token":KEY }, body:fd });
-    const j = await r.json();
+    const j = await api("files/upload", fd, { idem:newIdemKey() });
     if(j.error){ if(hint) hint.textContent=""; toast(j.error, true); return; }
     item.file_id = j.id; item.file_name = file.name; item.file_type = file.type||"";
     if(hint) hint.textContent = he?"קורא את התפריט עם AI…":"Reading menu with AI…";
@@ -2535,8 +2609,8 @@ let gridActiveTab = 0;
 async function renderGrid(){
   const area=document.getElementById("gridArea");
   if(!area) return;
-  try { const g = await api("grid"); gridCache = g.tabs || []; }
-  catch(e){ area.innerHTML=`<div class="empty">Grid unavailable. Run the files migration.</div>`; return; }
+  try { const g = await api("grid"); gridCache = g.tabs || []; gridRev = g.rev || 0; gridBase = JSON.parse(JSON.stringify(gridCache)); }
+  catch(e){ area.innerHTML=`<div class="empty">${esc(DL("The budget sheet could not be loaded: ","לא ניתן לטעון את גיליון התקציב: ") + apiErrorText(e, LANG==="he"))}</div>`; return; }
   if(!gridCache.length) gridCache=[{name:"Sheet 1",columns:["Item","Owner","Status","Notes"],rows:[]}];
   if(gridActiveTab>=gridCache.length) gridActiveTab=0;
   drawGrid();
@@ -2593,14 +2667,48 @@ function drawGrid(){
   document.getElementById("gExport").onclick=()=>exportTabCSV(tab);
   area.querySelectorAll("[data-delrow]").forEach(b=>b.onclick=()=>{ tab.rows.splice(parseInt(b.dataset.delrow),1); drawGrid(); queueGridSave(); });
 }
-let gridT;
+// Budget saves: if only cell values changed, send them as cell edits (each applies only if the cell still holds
+// the value this screen started from, so two people editing different cells both keep their work). Adding or
+// removing rows, columns or sheets saves the whole sheet with its revision number; if someone else saved
+// since, the server refuses (409) and the sheet is reloaded with a message, instead of overwriting.
+let gridT, gridRev = 0, gridBase = null, gridSaving = false;
+function sameShape(a, b){ return a && b && a.length === b.length && a.every((t, i) => t.name === b[i].name && t.columns.length === b[i].columns.length && t.columns.every((c, j) => c === b[i].columns[j]) && t.rows.length === b[i].rows.length); }
+function gridEdits(){
+  const edits = [];
+  gridCache.forEach((t, ti) => t.rows.forEach((r, ri) => t.columns.forEach((_, ci) => {
+    const now = r[ci] == null ? "" : String(r[ci]), was = gridBase[ti].rows[ri][ci] == null ? "" : String(gridBase[ti].rows[ri][ci]);
+    if (now !== was) edits.push({ tab:ti, r:ri, c:ci, from:was, to:now });
+  })));
+  return edits;
+}
 function queueGridSave(){
   const h=document.getElementById("gHint"); if(h)h.textContent="saving…";
   clearTimeout(gridT);
-  gridT=setTimeout(async()=>{
-    try{ await api("grid",{tabs:gridCache, by:NAME}); if(h)h.textContent="saved"; setTimeout(()=>{if(h)h.textContent="";},1500);}
-    catch(e){ if(h)h.textContent="save failed"; }
-  },700);
+  gridT=setTimeout(saveGrid, 700);
+}
+async function saveGrid(){
+  const h=document.getElementById("gHint");
+  if (gridSaving) { gridT = setTimeout(saveGrid, 400); return; }
+  gridSaving = true;
+  const snapshot = JSON.parse(JSON.stringify(gridCache));
+  try {
+    if (sameShape(gridCache, gridBase)) {
+      const edits = gridEdits();
+      if (edits.length) { const r = await api("grid/cells", { edits, by:NAME }); gridRev = r.rev; }
+    } else {
+      const r = await api("grid", { tabs:gridCache, rev:gridRev, by:NAME }); gridRev = r.rev;
+    }
+    gridBase = snapshot;
+    if(h){ h.textContent="saved"; setTimeout(()=>{ if(h && h.textContent==="saved") h.textContent=""; },1500); }
+  } catch(e) {
+    if (e.kind === "conflict") {
+      const d = e.data || {};
+      if (d.tabs) { gridCache = d.tabs; gridRev = d.rev; gridBase = JSON.parse(JSON.stringify(gridCache)); drawGrid(); }
+      const cells = (d.conflicts || []).map(c => (gridCache[c.tab] ? gridCache[c.tab].name + " " : "") + "R" + (c.r + 1) + "C" + (c.c + 1)).join(", ");
+      const hh = document.getElementById("gHint");
+      if (hh) hh.textContent = DL("Not saved: someone else changed ", "לא נשמר: מישהו אחר שינה ") + (cells || DL("the sheet", "את הגיליון")) + DL(". The latest version is shown; enter your change again.", ". מוצגת הגרסה העדכנית; הזינו שוב את השינוי.");
+    } else if (h) h.textContent = (LANG==="he"?"לא נשמר: ":"not saved: ") + apiErrorText(e, LANG==="he");
+  } finally { gridSaving = false; }
 }
 function exportTabCSV(tab){
   const esc2=v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
@@ -2626,11 +2734,11 @@ function renderContacts(){
 
   function card(c){
     return `<div class="loose-item" style="grid-template-columns:1fr auto;">
-      <div class="litext" style="cursor:pointer;" data-edit="${c.id}">
+      <div class="litext" style="cursor:pointer;" data-edit="${esc(c.id)}">
         <b>${esc(c.name)}</b>${c.role?` <span style="color:var(--ink-soft);font-weight:400;">· ${esc(c.role)}</span>`:''}
         <span class="ctx">${c.phone?`📞 ${esc(c.phone)}`:''}${c.email?`  ✉ ${esc(c.email)}`:''}${c.venue?`  ◈ ${esc(c.venue)}`:''}${c.notes?`<br>${esc(c.notes)}`:''}</span>
       </div>
-      <div class="lmeta"><button class="del-btn" data-cdel="${c.id}" title="Delete">×</button></div>
+      <div class="lmeta"><button class="del-btn" data-cdel="${esc(c.id)}" title="Delete">×</button></div>
     </div>`;
   }
 
@@ -2738,10 +2846,11 @@ async function renderNotes(){
   ed.setAttribute("contenteditable","false");
   try{
     const r=await api("notes");
-    ed.innerHTML = r.body || "<p></p>";
+    notesRev = r.rev || 0;
+    ed.innerHTML = cleanNotesHtml(r.body) || "<p></p>";
     ed.setAttribute("contenteditable","true");
     document.getElementById("notesHint").textContent = r.updated_by ? `last edited by ${r.updated_by}` : "";
-  }catch(e){ ed.innerHTML="<p></p>"; ed.setAttribute("contenteditable","true"); document.getElementById("notesHint").textContent="(couldn't load — check the notes migration ran)"; }
+  }catch(e){ ed.innerHTML=""; document.getElementById("notesHint").textContent=DL("The notes could not be loaded: ","לא ניתן לטעון את ההערות: ")+apiErrorText(e, LANG==="he"); return; }
 
   // toolbar buttons
   document.querySelectorAll("#notesToolbar [data-cmd]").forEach(b=>{
@@ -2755,14 +2864,63 @@ async function renderNotes(){
 
   ed.addEventListener("input", scheduleNotesSave);
 }
+// Notes HTML is cleaned with an allowlist before it is shown and before it is sent (the server cleans it
+// again). Only formatting survives: no scripts, event handlers, images, frames or non-http(s) links.
+const NOTE_TAGS = new Set(["P","DIV","BR","B","STRONG","I","EM","U","S","STRIKE","UL","OL","LI","H1","H2","H3","H4","H5","H6","BLOCKQUOTE","SPAN","FONT","A","HR","SUB","SUP","PRE","CODE","TABLE","THEAD","TBODY","TR","TH","TD"]);
+const NOTE_STYLE = /^(color|background-color|font-size|font-weight|font-style|text-decoration|text-align)$/;
+function cleanNotesHtml(html){
+  const doc = new DOMParser().parseFromString("<body>" + String(html || "") + "</body>", "text/html");
+  const walk = node => {
+    [...node.childNodes].forEach(n => {
+      if (n.nodeType === 8) { n.remove(); return; }
+      if (n.nodeType !== 1) return;
+      if (!NOTE_TAGS.has(n.tagName)) {
+        if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|SVG|MATH|TEMPLATE|NOSCRIPT|IMG|VIDEO|AUDIO|FORM|INPUT|BUTTON|TEXTAREA|SELECT|LINK|META|BASE|TITLE|CANVAS)$/.test(n.tagName)) { n.remove(); return; }
+        walk(n); n.replaceWith(...n.childNodes); return;
+      }
+      [...n.attributes].forEach(a => {
+        const k = a.name.toLowerCase(), v = a.value;
+        let keep = false;
+        if (k === "href" && n.tagName === "A") { try { const u = new URL(v, location.href); keep = /^(https?|mailto|tel):$/.test(u.protocol); } catch(e){} }
+        else if (k === "style") { const st = v.split(";").map(d => d.split(":").map(x => x.trim())).filter(([p, val]) => p && val && NOTE_STYLE.test(p.toLowerCase()) && !/url\(|expression|javascript:/i.test(val)).map(([p, val]) => p + ": " + val).join("; "); if (st) { n.setAttribute("style", st); } else n.removeAttribute("style"); return; }
+        else if ((k === "color" || k === "size") && n.tagName === "FONT") keep = /^[#\w(), .%-]{1,40}$/.test(v);
+        else if (k === "dir") keep = /^(rtl|ltr|auto)$/i.test(v);
+        else if ((k === "colspan" || k === "rowspan") && /^\d{1,2}$/.test(v)) keep = true;
+        if (!keep) n.removeAttribute(a.name);
+      });
+      if (n.tagName === "A") { n.setAttribute("rel", "noopener noreferrer"); n.setAttribute("target", "_blank"); }
+      walk(n);
+    });
+  };
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+let notesRev = 0, notesSaving = false;
 function scheduleNotesSave(){
   const h=document.getElementById("notesHint"); if(h)h.textContent="saving…";
   clearTimeout(notesSaveT);
-  notesSaveT=setTimeout(async()=>{
-    const ed=document.getElementById("notesEditor"); if(!ed) return;
-    try{ await api("notes",{body:ed.innerHTML, by:NAME}); if(h)h.textContent="saved"; setTimeout(()=>{const x=document.getElementById("notesHint"); if(x&&x.textContent==="saved")x.textContent="";},1500); }
-    catch(e){ if(h)h.textContent="save failed"; }
-  },700);
+  notesSaveT=setTimeout(saveNotes,700);
+}
+async function saveNotes(overwrite){
+  const h=document.getElementById("notesHint");
+  const ed=document.getElementById("notesEditor"); if(!ed) return;
+  if (notesSaving) { notesSaveT = setTimeout(saveNotes, 400); return; }
+  notesSaving = true;
+  try{
+    const r = await api("notes",{body:cleanNotesHtml(ed.innerHTML), rev:notesRev, by:NAME});
+    notesRev = r.rev;
+    if(h){ h.textContent="saved"; setTimeout(()=>{const x=document.getElementById("notesHint"); if(x&&x.textContent==="saved")x.textContent="";},1500); }
+  }catch(e){
+    if (e.kind === "conflict" && e.data) {
+      // someone else saved meanwhile: keep what this person typed on screen, and let them choose
+      const d = e.data;
+      if (h) {
+        h.innerHTML = `${esc(DL("Not saved: ","לא נשמר: ") + (d.updated_by ? d.updated_by + DL(" changed the notes meanwhile.", " שינה/תה את ההערות בינתיים.") : DL("someone else changed the notes meanwhile.", "מישהו אחר שינה את ההערות בינתיים.")))} <button class="btn-ghost" id="nTheirs">${DL("Show their version","להציג את הגרסה שלהם")}</button> <button class="btn-ghost" id="nMine">${DL("Keep mine (overwrite)","לשמור את שלי (לדרוס)")}</button>`;
+        document.getElementById("nTheirs").onclick = () => { if (!confirm(DL("Replace what is on screen with the saved version? Your unsaved text will be lost.","להחליף את מה שעל המסך בגרסה השמורה? הטקסט שלא נשמר יאבד."))) return; ed.innerHTML = cleanNotesHtml(d.body) || "<p></p>"; notesRev = d.rev; h.textContent = ""; };
+        document.getElementById("nMine").onclick = () => { notesRev = d.rev; saveNotes(true); };
+      }
+    } else if(h) h.textContent=(LANG==="he"?"לא נשמר: ":"not saved: ")+apiErrorText(e, LANG==="he");
+  } finally { notesSaving = false; }
 }
 
 // ---- PRODUCTION TIMELINE ----
@@ -2798,12 +2956,12 @@ function renderTimeline(){
     else { when=`in ${d}d`; }
     const col=TL_COLORS[t.category]||TL_COLORS.General;
     return `<div class="loose-item ${t.done?'done':''}" style="grid-template-columns:22px 1fr auto;">
-      <div class="lcheck" data-tltoggle="${t.id}">${t.done?'\u2713':''}</div>
-      <div class="litext" style="cursor:pointer;" data-tledit="${t.id}">
+      <div class="lcheck" data-tltoggle="${esc(t.id)}">${t.done?'\u2713':''}</div>
+      <div class="litext" style="cursor:pointer;" data-tledit="${esc(t.id)}">
         <span style="display:inline-block;font-size:9px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:#fff;background:${col};padding:1px 6px;border-radius:3px;margin-right:6px;">${esc(t.category)}</span>${esc(t.title)}
         <span class="ctx">${fmtDate(t.due_date)}${when?` · <b style="color:${wcolor};">${when}</b>`:''}${t.owner?` · ${esc(t.owner)}`:''}${t.notes?`<br>${esc(t.notes)}`:''}</span>
       </div>
-      <div class="lmeta"><button class="edit-btn" data-tlassign="${t.id}" title="Assign">👤</button><button class="del-btn" data-tldel="${t.id}" title="Delete">×</button></div>
+      <div class="lmeta"><button class="edit-btn" data-tlassign="${esc(t.id)}" title="Assign">👤</button><button class="del-btn" data-tldel="${esc(t.id)}" title="Delete">×</button></div>
     </div>`;
   }
   function group(title,list,color){
@@ -3082,7 +3240,9 @@ function exportRunOfShowPDF(){
 }
 
 // ---- util ----
-function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+window.addEventListener("unhandledrejection", e => { const err = e.reason; if (err && err.kind) { e.preventDefault(); toast((LANG==="he" ? "לא נשמר: " : "Not saved: ") + apiErrorText(err, LANG==="he"), true); } });
+window.addEventListener("beforeunload", e => { if (SAVE.inflight) { e.preventDefault(); e.returnValue = ""; } });
 let toastT;
 function toast(msg,bad){ const t=document.getElementById("toast"); t.textContent=msg; t.className="toast on"+(bad?" offline":""); clearTimeout(toastT); toastT=setTimeout(()=>t.className="toast",2200); }
 

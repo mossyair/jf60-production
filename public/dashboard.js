@@ -1,0 +1,3262 @@
+const DAYS_I18N = {
+  en: {
+    1:{date:"Tue · 20 Oct 2026", num:"Day I", theme:"The days that were — the acts that shaped Jerusalem"},
+    2:{date:"Wed · 21 Oct 2026", num:"Day II", theme:"The work we do today"},
+    3:{date:"Thu · 22 Oct 2026", num:"Day III", theme:"The Future we are Building Together"}
+  },
+  he: {
+    1:{date:"שלישי · 20 אוק׳ 2026", num:"יום א׳", theme:"הימים שהיו — המעשים שעיצבו את ירושלים"},
+    2:{date:"רביעי · 21 אוק׳ 2026", num:"יום ב׳", theme:"העבודה שאנחנו עושים היום"},
+    3:{date:"חמישי · 22 אוק׳ 2026", num:"יום ג׳", theme:"העתיד שאנו בונים יחד"}
+  }
+};
+const STATUS_I18N = {
+  en:{open:"Open", progress:"In progress", confirmed:"Confirmed"},
+  he:{open:"פתוח", progress:"בתהליך", confirmed:"מאושר"}
+};
+// UI label dictionary (interface chrome). Content comes from the DB (_he columns).
+const T = {
+  en:{ schedule:"Schedule", checklist:"Checklist", people:"People", files:"Files", guests:"Guests", food:"Food & Drink", design:"Design & Print", transport:"Transport", contacts:"Contacts", notes:"Notes", timeline:"Timeline",
+       search:"Search…", addEvent:"+ Add event", ai:"✦ AI assistant", allDays:"All days", day:"Day", allStatus:"All status",
+       admin:"Admin", editor:"Editor", viewOnly:"View only", open:"Open", inProgress:"In progress", confirmed:"Confirmed", locked:"locked",
+       subtitle:"20–22 October 2026", theme:"Jerusalem — Yesterday, Today and Tomorrow", pdf:"⭳ PDF", ros:"⭳ Detailed schedule", rosTitle:"Detailed Conference Schedule", rosLabel:"Internal run of show", schedTitle:"Conference Schedule", meal:"Meal", printed:"Printed",
+       dStatus:"Status", dDesc:"Description", dDescLong:"Long description", dVenueContacts:"Venue contacts", dPeople:"People", dChecklist:"Checklist for this segment",
+       dNotes:"Notes", dFiles:"Content files for this event", dBrief:"Content brief — for production", dAdminEdit:"Admin · edit this event",
+       dAddPerson:"Add a person…", dAddItem:"Add item to this segment…", dAdd:"Add", dUpload:"Upload", dSave:"Save changes",
+       dDuplicate:"Duplicate (split)", dDelete:"Delete event", dNoContacts:"No structured contacts for this site yet — add them in the Contacts tab.",
+       dNoFiles:"No files attached yet.", dSpeakerNotes:"Speaker notes — Arik Grebelsky", dLogistics:"Logistics", dFurniture:"Furniture (rental brief)", dFurnNone:"No furniture booked for this session.", dConfirmed:"confirmed", dEnglish:"English", dHebrew:"עברית" },
+  he:{ schedule:"לוח זמנים", checklist:"צ׳קליסט", people:"אנשים", files:"קבצים", guests:"אורחים", food:"אוכל ושתייה", design:"עיצוב ודפוס", transport:"הסעות", contacts:"אנשי קשר", notes:"הערות", timeline:"ציר זמן",
+       search:"חיפוש…", addEvent:"+ הוסף אירוע", ai:"✦ עוזר AI", allDays:"כל הימים", day:"יום", allStatus:"כל הסטטוסים",
+       admin:"מנהל", editor:"עורך", viewOnly:"צפייה בלבד", open:"פתוח", inProgress:"בתהליך", confirmed:"מאושר", locked:"נעול",
+       subtitle:"20–22 באוקטובר 2026", theme:"ירושלים — אתמול, היום ומחר", pdf:"⭳ PDF", ros:"⭳ לו״ז מפורט", rosTitle:"לו״ז מפורט של הכנס", rosLabel:"לו״ז פנימי", schedTitle:"לוח זמנים לכנס", meal:"ארוחה", printed:"הודפס",
+       dStatus:"סטטוס", dDesc:"תיאור", dDescLong:"תיאור מורחב", dVenueContacts:"אנשי קשר במקום", dPeople:"אנשים", dChecklist:"צ׳קליסט למקטע זה",
+       dNotes:"הערות", dFiles:"קבצי תוכן לאירוע", dBrief:"בריף תוכן — להפקה", dAdminEdit:"מנהל · עריכת האירוע",
+       dAddPerson:"הוסף אדם…", dAddItem:"הוסף פריט למקטע…", dAdd:"הוסף", dUpload:"העלה", dSave:"שמור שינויים",
+       dDuplicate:"שכפל (פיצול)", dDelete:"מחק אירוע", dNoContacts:"אין עדיין אנשי קשר מובנים לאתר זה — הוסיפו בלשונית אנשי קשר.",
+       dNoFiles:"לא צורפו קבצים.", dSpeakerNotes:"הערות לדובר — אריק גְרֶבֶלְסְקִי", dLogistics:"לוגיסטיקה", dFurniture:"ריהוט (מפרט השכרה)", dFurnNone:"לא הוזמן ריהוט למפגש הזה.", dConfirmed:"מאושרים", dEnglish:"English", dHebrew:"עברית" }
+};
+let LANG = (function(){ try{ return sessionStorage.getItem("jf60lang")||"en"; }catch(e){ return "en"; } })();
+function t(k){ return (T[LANG]&&T[LANG][k])||T.en[k]||k; }
+// DAYS/STATUS_LABEL become language-aware getters
+const DAYS = new Proxy({}, { get:(_,d)=> (DAYS_I18N[LANG]||DAYS_I18N.en)[d] });
+function statusLabel(s){ return (STATUS_I18N[LANG]||STATUS_I18N.en)[s]||s; }
+const STATUS_LABEL = new Proxy({}, { get:(_,s)=> statusLabel(s) });
+// pick a field's value in the current language (falls back to EN if HE empty)
+function L(obj, enField){ if(LANG==="he"){ const he=obj[enField+"_he"]; if(he&&he.trim()) return he; } return obj[enField]||""; }
+function setLang(lang){ LANG=lang; try{ sessionStorage.setItem("jf60lang",lang); }catch(e){}
+  document.documentElement.setAttribute("dir", lang==="he"?"rtl":"ltr");
+  render();
+}
+
+let KEY = "", NAME = "", ROLE = null, CHIEF = false;
+let data = { segments:[], people:[], checklist:[], venues:[], contacts:[], timeline:[], team:[], food_items:[], dietary:[], guests:[], guest_sessions:[], design_items:[], design_proofs:[], transport_runs:[], run_stops:[], gift_items:[] };
+let ui = { view:"schedule", dayFilter:"all", statusFilter:"all", search:"", openId:null, foodDay:"all", foodType:"all", openFood:new Set(), guestDesk:"all", guestHotel:"all", guestGroupHotel:false, guestSearch:"", openGuest:new Set(), importChanges:null, designCat:"all", openDesign:new Set(), runDay:"all", openRun:new Set(), pdfBuses:true };
+
+// ---- API ----
+// Every request goes through apiRequest (timeout, error kinds). A write that fails throws, so nothing after it
+// (a "saved" hint, a toast) runs; the status line under the header shows Saving… / Saved / Not saved.
+// One-field saves carry the value they started from (`expect`), so someone else's change made meanwhile
+// comes back as a conflict instead of being overwritten.
+let BASE = null;
+const SAVE = { inflight:0, failed:null, at:0 };
+const FIELD_SRC = {
+  "segment/status":["segments","status","status"], "segment/notes":["segments","notes","notes"], "segment/brief":["segments"], "segment/field":["segments"],
+  "run/field":["transport_runs"], "guest/field":["guests"], "guest/flag":["guests"], "design/field":["design_items"], "food/field":["food_items"],
+  "gift/field":["gift_items"], "gift/chosen":["gift_items","chosen","chosen"]
+};
+const baseRow = (coll, id) => BASE && (BASE[coll]||[]).find(r => String(r.id) === String(id));
+const isWrite = (path, body) => body !== undefined && !/^access\//.test(path) && path !== "session";
+async function api(path, body, opts){
+  opts = opts || {};
+  let b = body, ref = null;
+  const src = FIELD_SRC[path];
+  if (src && body && !(body instanceof FormData) && body.id != null) {
+    const field = src[1] || body.field, row = baseRow(src[0], body.id);
+    if (row && field in row && !("expect" in body)) b = Object.assign({}, body, { expect: row[field] });
+    ref = [src[0], body.id, field, src[2] ? body[src[2]] : body.value];
+  }
+  const w = isWrite(path, body);
+  if (w) { SAVE.inflight++; saveSt(); }
+  try {
+    const r = await apiRequest(path, { key:KEY, body:b, idem:opts.idem, timeout: opts.timeout || (/^(ai\/|food\/process-menu|guest\/import)/.test(path) ? 90000 : body instanceof FormData ? 120000 : 20000) });
+    if (w) { SAVE.at = Date.now(); SAVE.failed = null; if (ref) { const row = baseRow(ref[0], ref[1]); if (row) row[ref[2]] = typeof ref[3] === "boolean" ? (ref[3] ? 1 : 0) : ref[3]; } }
+    return r;
+  } catch(e) {
+    if (w) SAVE.failed = { path, err:e };
+    if (e.kind === "auth" && ROLE) { toast(apiErrorText(e, LANG==="he"), true); }
+    // field conflicts: show the current data again. Notes, budget and imports handle their own conflicts.
+    if (e.kind === "conflict" && !/^(notes|grid|grid\/cells|guest\/import\/apply)$/.test(path)) setTimeout(() => refresh(true), 50);
+    throw e;
+  } finally {
+    if (w) { SAVE.inflight--; saveSt(); }
+  }
+}
+function saveSt(){
+  const el = document.getElementById("saveSt"); if (!el) return;
+  const he = LANG === "he";
+  el.className = "savest";
+  if (SAVE.inflight) { el.classList.add("busy"); el.textContent = he ? "שומר…" : "Saving…"; return; }
+  if (SAVE.failed) { el.classList.add("bad"); el.textContent = (he ? "לא נשמר: " : "Not saved: ") + apiErrorText(SAVE.failed.err, he) + (SAVE.failed.err.kind === "conflict" ? (he ? " הנתונים העדכניים נטענו מחדש." : " The latest data was reloaded.") : ""); return; }
+  const conn = LOAD.fail ? (he ? "אין חיבור · הנתונים מ" : "Offline · data from ") + (LOAD.at ? EventClock.ago(LOAD.at, he) : "—") : LOAD.at ? (he ? "עודכן " : "Updated ") + EventClock.ago(LOAD.at, he) : "";
+  if (LOAD.fail) el.classList.add("bad");
+  el.textContent = (SAVE.at && Date.now() - SAVE.at < 60000 ? (he ? "✓ נשמר · " : "✓ Saved · ") : "") + conn;
+}
+const LOAD = { at:0, fail:false };
+setInterval(saveSt, 30000);
+let stateLoaded = false;
+// file links authenticate with a short-lived HttpOnly cookie, never the key in the URL
+let sessionAt = 0;
+async function ensureSession(){
+  if(Date.now()-sessionAt < 3600e3) return;
+  try{ await api("session",{}); sessionAt = Date.now(); }catch(e){}
+}
+function applyState(s){
+    BASE = JSON.parse(JSON.stringify(s)); LOAD.at = Date.now(); LOAD.fail = false;
+    data.unavailable = s.unavailable || [];
+    data.segments = s.segments; data.people = s.people; data.checklist = s.checklist;
+    data.venues = s.venues || [];
+    data.contacts = s.contacts || [];
+    data.timeline = s.timeline || [];
+    data.team = s.team || [];
+    data.furniture = s.furniture_items || [];
+    data.food_items = s.food_items || [];
+    data.dietary = s.dietary || [];
+    data.guests = s.guests || [];
+    data.guest_sessions = s.guest_sessions || [];
+    data.design_items = s.design_items || [];
+    data.design_proofs = s.design_proofs || [];
+    data.transport_runs = s.transport_runs || [];
+    data.run_stops = s.run_stops || [];
+    data.gift_items = s.gift_items || [];
+    ROLE = s.level;
+    CHIEF = !!s.chief;
+    stateLoaded = true;
+    render();
+}
+// reload the data; while a save is on its way the screen keeps the edit until the server has it.
+// The scroll position and the field being typed in are kept.
+async function refresh(force){
+  if (SAVE.inflight && !force) return;
+  const y = window.scrollY, a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && document.getElementById("main").contains(a);
+  try {
+    const s = await api("state");
+    if (typing && !force) { BASE = JSON.parse(JSON.stringify(s)); LOAD.at = Date.now(); LOAD.fail = false; saveSt(); return; }
+    applyState(s);
+    window.scrollTo(0, y);
+    ensureSession();
+  } catch(e){ LOAD.fail = true; saveSt(); if (e.kind === "auth") toast(apiErrorText(e, LANG==="he"), true); }
+}
+
+// ---- Gate ----
+document.getElementById("gateBtn").onclick = tryEnter;
+document.getElementById("gateKey").addEventListener("keydown", e=>{ if(e.key==="Enter") tryEnter(); });
+document.getElementById("gateName").addEventListener("keydown", e=>{ if(e.key==="Enter") tryEnter(); });
+async function tryEnter(){
+  KEY = document.getElementById("gateKey").value.trim();
+  NAME = document.getElementById("gateName").value.trim();
+  if(!KEY){ document.getElementById("gateErr").textContent="Enter a key."; return; }
+  document.getElementById("gateErr").textContent="";
+  try {
+    const s = await api("state");
+    if(!s || !s.level) throw new Error("rejected");
+    if(s.redirect){ try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){} location.href=s.redirect; return; }
+    try { sessionStorage.setItem("jf60k", KEY); sessionStorage.setItem("jf60n", NAME); } catch(e){}
+    document.getElementById("gate").style.display="none";
+    document.getElementById("main").style.display="block";
+    await ensureSession();
+    if (uiPref()==="control") { location.href="/control"; return; }
+    accessHello(s.level);
+    applyState(s);
+  } catch(e){
+    document.getElementById("gateErr").textContent = e.kind === "auth" || e.message === "rejected" ? "That key wasn't accepted." : apiErrorText(e, false);
+  }
+}
+// Sign-in log: one visit per tab, pinged every 5 minutes while it is open
+function accessHello(level){
+  let v=null; try{ v=JSON.parse(sessionStorage.getItem("jf60v")||"null"); }catch(e){}
+  if(v && v.id && v.name===NAME && v.level===level) return;
+  api("access/hello",{ name:NAME, ui:"classic" }).then(r=>{ if(r&&r.id) try{ sessionStorage.setItem("jf60v", JSON.stringify({ id:r.id, name:NAME, level })); }catch(e){} }).catch(()=>{});
+}
+setInterval(()=>{ if(!KEY || document.visibilityState!=="visible") return; let v=null; try{ v=JSON.parse(sessionStorage.getItem("jf60v")||"null"); }catch(e){} if(v&&v.id) api("access/ping",{ id:v.id }).catch(()=>{}); }, 300000);
+// Control Room switch: each person's choice is remembered in their browser
+function uiPref(){ try { return localStorage.getItem("jf60-ui")||"classic"; } catch(e){ return "classic"; } }
+document.getElementById("toControl").addEventListener("click", ()=>{ try { localStorage.setItem("jf60-ui","control"); } catch(e){} });
+// auto-resume within a session
+(function(){
+  try {
+    const k = sessionStorage.getItem("jf60k"); const n = sessionStorage.getItem("jf60n");
+    if(k && uiPref()==="control"){ location.replace("/control"); return; }
+    if(k){ document.getElementById("gateKey").value=k; if(n) document.getElementById("gateName").value=n; }
+  } catch(e){}
+})();
+
+// ---- helpers ----
+function venueContacts(venue){ const v=data.venues.find(x=>x.venue===venue); return v?v.contacts:""; }
+function segPeople(id){ return data.people.filter(p=>p.segment_id===id); }
+function segChecks(id){ return data.checklist.filter(c=>c.segment_id===id); }
+function openCountFor(s){
+  return segChecks(s.id).filter(c=>!c.done).length + segPeople(s.id).filter(p=>!p.confirmed).length;
+}
+function counts(){
+  let open=0,prog=0,conf=0;
+  data.segments.forEach(s=>{ if(s.status==="open")open++; else if(s.status==="progress")prog++; else conf++; });
+  const total=data.segments.length||1;
+  return {open,prog,conf,pct:Math.round(conf/total*100)};
+}
+function matchSearch(s){
+  if(!ui.search) return true;
+  const q=ui.search.toLowerCase();
+  const hay=[s.title,s.venue,s.descr,...segPeople(s.id).map(p=>p.name),...segChecks(s.id).map(c=>c.text)].join(" ").toLowerCase();
+  return hay.includes(q);
+}
+
+// ---- render ----
+function render(){
+  const isView = ROLE==="view";
+  if(isView){ ui.view="schedule"; }
+  document.documentElement.setAttribute("dir", LANG==="he"?"rtl":"ltr");
+  const c=counts();
+  document.getElementById("cOpen").textContent=c.open;
+  document.getElementById("cProg").textContent=c.prog;
+  document.getElementById("cConf").textContent=c.conf;
+  document.getElementById("pbar").style.width=c.pct+"%";
+  document.getElementById("pctLabel").textContent=c.pct+"% "+t("locked");
+  const roleTxt = ROLE==="admin"?t("admin"):ROLE==="view"?t("viewOnly"):t("editor");
+  document.getElementById("roleWrap").innerHTML = ROLE ? ` · <span class="role-badge ${ROLE}">${roleTxt}</span>` : "";
+  // translate tab labels, search, subtitle, toggle button
+  document.querySelectorAll("#viewSwitch [data-t]").forEach(b=>{ b.textContent = t(b.dataset.t); });
+  const se=document.getElementById("search"); if(se) se.placeholder=t("search");
+  const sub=document.querySelector(".sub"); if(sub){ const rw=document.getElementById("roleWrap").outerHTML; sub.innerHTML = t("subtitle")+" "+rw; }
+  const ct=document.getElementById("confTheme"); if(ct) ct.textContent=t("theme");
+  const lt=document.getElementById("langToggle"); if(lt){ lt.textContent = LANG==="he"?"EN":"עב"; lt.onclick=()=>setLang(LANG==="he"?"en":"he"); }
+  const pb2=document.getElementById("pdfBtn"); if(pb2){ pb2.textContent=t("pdf"); pb2.onclick=exportSchedulePDF; }
+  const bt=document.getElementById("busToggle");
+  if(bt){
+    const on = ui.pdfBuses!==false;
+    bt.textContent = (LANG==="he"?"זמני הסעה":"Bus times")+": "+(on?(LANG==="he"?"מוצג":"on"):(LANG==="he"?"מוסתר":"off"));
+    bt.style.borderColor = on?"var(--olive)":"var(--line)";
+    bt.style.color = on?"var(--olive)":"var(--ink-soft)";
+    bt.style.fontWeight = on?"700":"400";
+    bt.onclick=()=>{ ui.pdfBuses = !on; render(); };
+  }
+  const rb=document.getElementById("rosBtn"); if(rb){ rb.textContent=t("ros"); rb.onclick=exportRunOfShowPDF; }
+  // stat labels
+  document.querySelectorAll(".hstat .l").forEach((el,i)=>{ el.textContent = [t("open"),t("inProgress"),t("confirmed")][i]||el.textContent; });
+
+  // View-only: show just the Schedule tab, hide the status counters
+  const vs=document.getElementById("viewSwitch");
+  if(isView){
+    vs.querySelectorAll("button").forEach(b=>{ b.style.display = b.dataset.view==="schedule" ? "" : "none"; });
+    const hs=document.querySelector(".header-stats"); if(hs)hs.style.display="none";
+    const pb=document.getElementById("pbar"); if(pb&&pb.parentElement&&pb.parentElement.parentElement)pb.parentElement.parentElement.style.display="none";
+  }
+
+  const chips=document.getElementById("chips");
+  if(ui.view==="schedule"){
+    chips.innerHTML =
+      ["all",1,2,3].map(d=>`<span class="chip ${ui.dayFilter==d?'active':''}" data-day="${d}">${d==='all'?t("allDays"):(LANG==="he"?DAYS[d].num:(t("day")+" "+d))}</span>`).join('')
+      +`<span style="width:1px;height:16px;background:var(--line);"></span>`
+      +["all","open","progress","confirmed"].map(st=>`<span class="chip st-${st} ${ui.statusFilter===st?'active':''}" data-status="${st}">${st==='all'?t("allStatus"):statusLabel(st)}</span>`).join('');
+    chips.querySelectorAll("[data-day]").forEach(x=>x.onclick=()=>{ui.dayFilter=x.dataset.day==='all'?'all':parseInt(x.dataset.day);render();});
+    chips.querySelectorAll("[data-status]").forEach(x=>x.onclick=()=>{ui.statusFilter=x.dataset.status;render();});
+  } else chips.innerHTML="";
+
+  if(ui.view==="schedule") renderSchedule();
+  else if(ui.view==="loose") renderLoose();
+  else if(ui.view==="people") renderPeople();
+  else if(ui.view==="files") renderFiles();
+  else if(ui.view==="guests") renderGuests();
+  else if(ui.view==="food") renderFood();
+  else if(ui.view==="design") renderDesign();
+  else if(ui.view==="transport") renderTransport();
+  else if(ui.view==="contacts") renderContacts();
+  else if(ui.view==="notes") renderNotes();
+  else renderTimeline();
+
+  if(ui.openId) renderDrawer(ui.openId);
+}
+
+document.getElementById("viewSwitch").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{ ui.view=b.dataset.view;
+    document.querySelectorAll("#viewSwitch button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); render(); };
+});
+document.getElementById("search").oninput=e=>{ ui.search=e.target.value; render(); };
+
+function renderSchedule(){
+  const el=document.getElementById("content");
+  let segs=data.segments.filter(matchSearch);
+  if(ui.dayFilter!=='all') segs=segs.filter(s=>s.day==ui.dayFilter);
+  if(ui.statusFilter!=='all') segs=segs.filter(s=>s.status===ui.statusFilter);
+  const addBtn = ROLE==="admin" ? `<div style="padding:14px 0 4px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn-ghost" id="addEventBtn" style="border-color:var(--olive);color:var(--olive);font-weight:600;">${t("addEvent")}</button><button class="btn-ghost" id="aiBtn" style="border-color:var(--gold);color:var(--gold-deep);font-weight:600;">${t("ai")}</button></div>` : "";
+  if(!segs.length){ el.innerHTML=addBtn+`<div class="empty"><div class="big">${DL('Nothing here','אין כאן כלום')}</div>${DL('Adjust filters or search.','שנו את הסינון או החיפוש.')}</div>`; if(ROLE==="admin"){document.getElementById("addEventBtn").onclick=openAddEvent; document.getElementById("aiBtn").onclick=openAI;} return; }
+  let html=addBtn,curDay=null;
+  const isView = ROLE==="view";
+  segs.forEach(s=>{
+    if(s.day!==curDay){ curDay=s.day; const d=DAYS[s.day];
+      html+=`<div class="day-head"><span class="daynum">${d.num}</span><span class="date">${d.date}</span><span class="theme">${d.theme}</span></div>`; }
+    const oc=openCountFor(s), np=segPeople(s.id).length;
+    html+=`<div class="seg-card${isView?' noclick':''}" data-id="${esc(s.id)}">
+      <div class="seg-time">${esc(s.time)}<span class="end">${esc(s.end_time)}</span></div>
+      <div>
+        <div class="seg-title">${esc(L(s,'title'))}</div>
+        <div class="seg-venue">${esc(L(s,'venue'))}</div>
+        <div class="seg-desc">${esc(L(s,'descr'))}</div>
+        ${isView?'':`<div class="seg-meta">
+          ${s.is_meal?'<span class="tag meal">Meal</span>':''}
+          ${np?`<span class="tag people">${np} people</span>`:''}
+          ${oc>0?`<span class="tag tbc">${oc} open</span>`:''}
+        </div>`}
+      </div>
+      ${isView?'':`<div class="seg-status"><span class="dot ${s.status}"><i></i>${STATUS_LABEL[s.status]}</span></div>`}
+    </div>`;
+  });
+  el.innerHTML=html;
+  if(!isView) el.querySelectorAll(".seg-card").forEach(x=>x.onclick=()=>{ui.openId=x.dataset.id;renderDrawer(x.dataset.id);});
+  if(ROLE==="admin"){ const ab=document.getElementById("addEventBtn"); if(ab)ab.onclick=openAddEvent; const aib=document.getElementById("aiBtn"); if(aib)aib.onclick=openAI; }
+}
+
+function openAI(){
+  const dr=document.getElementById("drawer"), back=document.getElementById("drawerBack");
+  dr.innerHTML=`
+    <button class="drawer-close" id="dClose">✕</button>
+    <div class="drawer-hd"><div class="dtime">✦ AI assistant · admin</div><h2>Describe your changes</h2></div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>What should change?</label>
+        <textarea id="ai_input" class="notes-area" style="min-height:96px;" placeholder="e.g. Add production items for the East-West Jerusalem Orchestra concert on the first evening — sound check, backline, conductor riser, mic plot, load-in time…"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-ghost" id="ai_go" style="background:var(--gold);color:#fff;border-color:var(--gold);padding:10px 18px;">Propose changes</button>
+        <span class="save-hint" id="ai_status"></span>
+      </div>
+      <div class="agent-hint" style="margin-top:14px;">
+        <b>How this works:</b> the AI proposes changes — it never edits anything directly. You'll see every change and approve before it's applied. It can add and edit events, people, and checklist items, but <b>cannot delete</b> anything.
+      </div>
+      <div id="ai_proposal" style="margin-top:16px;"></div>
+    </div>`;
+  back.classList.add("on"); dr.classList.add("on");
+  document.getElementById("dClose").onclick=closeDrawer; back.onclick=closeDrawer;
+  document.getElementById("ai_go").onclick=aiPropose;
+}
+
+let aiOps=[];
+async function aiPropose(){
+  const input=document.getElementById("ai_input").value.trim();
+  if(!input){ toast("Describe what you want first",true); return; }
+  const status=document.getElementById("ai_status");
+  const box=document.getElementById("ai_proposal");
+  status.textContent="thinking…"; box.innerHTML="";
+  try{
+    const r=await api("ai/propose",{instruction:input});
+    if(r.error){ status.textContent=""; box.innerHTML=`<div class="empty" style="padding:20px;">${esc(r.error)}${r.raw?`<div style="font-size:11px;margin-top:8px;opacity:.6;">${esc(r.raw)}</div>`:''}</div>`; return; }
+    status.textContent="";
+    aiOps=r.ops||[];
+    if(!aiOps.length){ box.innerHTML=`<div class="empty" style="padding:20px;">The AI didn't propose any changes. Try rephrasing.</div>`; return; }
+    box.innerHTML=renderProposal(r.summary, aiOps);
+    document.getElementById("ai_approve").onclick=aiApply;
+    document.getElementById("ai_discard").onclick=()=>{ aiOps=[]; box.innerHTML=`<div class="save-hint">Discarded.</div>`; };
+  }catch(e){ status.textContent=""; box.innerHTML=`<div class="empty" style="padding:20px;">Request failed. Check the AI key is set.</div>`; }
+}
+
+function opLabel(op){
+  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${s.title}`:id; };
+  if(op.type==="add_check") return `<b>Add checklist item</b> to ${esc(segTitle(op.segment_id))}:<br>“${esc(op.text)}”`;
+  if(op.type==="add_person") return `<b>Add person</b> to ${esc(segTitle(op.segment_id))}: ${esc(op.name)}`;
+  if(op.type==="add_event") return `<b>Add new event</b>: “${esc(op.title)}” · ${DAYS[op.day]?DAYS[op.day].num:('Day '+op.day)} ${esc(op.time)}–${esc(op.end_time)} @ ${esc(op.venue||'—')}`;
+  if(op.type==="edit_event"){ const parts=[]; if(op.title!=null)parts.push(`title→“${esc(op.title)}”`); if(op.venue!=null)parts.push(`venue→${esc(op.venue)}`); if(op.time!=null)parts.push(`start→${esc(op.time)}`); if(op.end_time!=null)parts.push(`end→${esc(op.end_time)}`); if(op.day!=null)parts.push(`day→${op.day}`); return `<b>Edit event</b> ${esc(segTitle(op.segment_id))}: ${parts.join(', ')}`; }
+  if(op.type==="edit_check") return `<b>Edit checklist item</b> → “${esc(op.text)}”`;
+  return esc(JSON.stringify(op));
+}
+function renderProposal(summary, ops){
+  return `<div style="border:1px solid var(--gold);border-radius:4px;overflow:hidden;">
+    <div style="background:rgba(181,137,46,0.1);padding:10px 14px;font-size:13px;font-weight:600;color:var(--gold-deep);">${esc(summary)}</div>
+    <div style="padding:6px 14px;">
+      ${ops.map(op=>`<div style="padding:9px 0;border-bottom:1px dotted var(--line);font-size:13px;line-height:1.5;"><span style="color:var(--olive);font-weight:700;">＋</span> ${opLabel(op)}</div>`).join('')}
+    </div>
+    <div style="padding:12px 14px;display:flex;gap:8px;background:rgba(214,203,182,0.2);">
+      <button class="btn-ghost" id="ai_approve" style="background:var(--olive);color:#fff;border-color:var(--olive);">Approve ${ops.length} change${ops.length!==1?'s':''}</button>
+      <button class="btn-ghost" id="ai_discard">Discard</button>
+    </div>
+  </div>`;
+}
+async function aiApply(){
+  if(!aiOps.length) return;
+  const btn=document.getElementById("ai_approve"); if(btn){btn.disabled=true;btn.textContent="Applying…";}
+  try{
+    const r=await api("ai/apply",{ops:aiOps});
+    if(r.error){ toast(r.error,true); return; }
+    await refresh(); closeDrawer(); toast(`Applied ${r.applied} change${r.applied!==1?'s':''}`);
+    aiOps=[];
+  }catch(e){ toast("Couldn't apply",true); }
+}
+
+function openAddEvent(){
+  const day = ui.dayFilter!=='all' ? ui.dayFilter : 1;
+  const dr=document.getElementById("drawer"), back=document.getElementById("drawerBack");
+  dr.innerHTML=`
+    <button class="drawer-close" id="dClose">✕</button>
+    <div class="drawer-hd"><div class="dtime">New event</div><h2>Add an event</h2></div>
+    <div class="drawer-body">
+      <div class="field"><label>Day</label>
+        <select id="ae_day" class="search" style="width:100%;">
+          ${[1,2,3].map(d=>`<option value="${d}" ${d==day?'selected':''}>${DAYS[d].num} · ${DAYS[d].date}</option>`).join('')}
+        </select></div>
+      <div style="display:flex;gap:10px;">
+        <div class="field" style="flex:1;"><label>Start</label><input id="ae_time" class="search" style="width:100%;" placeholder="09:00" value="09:00"></div>
+        <div class="field" style="flex:1;"><label>End</label><input id="ae_end" class="search" style="width:100%;" placeholder="10:00" value="10:00"></div>
+      </div>
+      <div class="field"><label>Title</label><input id="ae_title" class="search" style="width:100%;" placeholder="Event title"></div>
+      <div class="field"><label>Venue</label><input id="ae_venue" class="search" style="width:100%;" placeholder="Venue"></div>
+      <div class="field"><label>Description</label><textarea id="ae_desc" class="notes-area"></textarea></div>
+      <button class="btn-ghost" id="ae_save" style="background:var(--olive);color:#fff;border-color:var(--olive);padding:10px 18px;">Create event</button>
+    </div>`;
+  back.classList.add("on"); dr.classList.add("on");
+  document.getElementById("dClose").onclick=closeDrawer; back.onclick=closeDrawer;
+  document.getElementById("ae_save").onclick=async()=>{
+    const payload={ day:document.getElementById("ae_day").value, time:document.getElementById("ae_time").value,
+      end_time:document.getElementById("ae_end").value, title:document.getElementById("ae_title").value,
+      venue:document.getElementById("ae_venue").value, descr:document.getElementById("ae_desc").value };
+    if(!payload.title.trim()){ toast("Add a title",true); return; }
+    try{ await api("segment/add",payload); await refresh(); closeDrawer(); toast("Event added"); }
+    catch(e){ toast("Couldn't add event",true); }
+  };
+}
+
+function renderLoose(){
+  const el=document.getElementById("content");
+  const q=ui.search.toLowerCase();
+  // chronological order: general items first, then by event day/time following the schedule
+  const segOrder = {};
+  data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0))
+    .forEach((sg,i)=>{ segOrder[sg.id]= i+1; });
+  const rank = it => it.segment_id ? (segOrder[it.segment_id]||9998) : 0;
+  const items=data.checklist.filter(c=>!q||c.text.toLowerCase().includes(q))
+    .slice().sort((a,b)=> rank(a)-rank(b) || a.id-b.id);
+  const open=items.filter(i=>!i.done), done=items.filter(i=>i.done);
+  const segTitle=id=>{ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${esc(s.time)} · ${L(s,'title')}`:"General"; };
+
+  function row(it){
+    return `<div class="loose-item ${it.done?'done':''}" data-id="${esc(it.id)}">
+      <div class="lcheck" data-toggle="${esc(it.id)}">${it.done?'\u2713':''}</div>
+      <div class="litext" data-open="${esc(it.segment_id||'')}">${esc(L(it,"text"))} ${ownerBadge(it.owner)}
+        <span class="ctx">${esc(segTitle(it.segment_id))}${it.created_by?` · <span class="by">added by ${esc(it.created_by)}</span>`:''}</span></div>
+      <div class="lmeta">${ROLE==='admin'?`<button class="edit-btn" data-cedit="${esc(it.id)}" title="Edit text">\u270e</button>`:''}<button class="edit-btn" data-cassign="${esc(it.id)}" title="Assign">\ud83d\udc64</button>${(it.seeded===0||ROLE==='admin')?`<button class="del-btn" data-del="${esc(it.id)}" title="Delete">\u00d7</button>`:''}</div>
+    </div>`;
+  }
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--serif);font-size:20px;">${open.length} open item${open.length!==1?'s':''} to close</div>
+      <button class="btn-ghost" id="teamBtn">👥 Team</button>
+    </div>
+    <div class="add-row">
+      <input id="newCheck" placeholder="Add a new checklist item…">
+      <button id="addCheck">Add item</button>
+    </div>
+    ${open.length? open.map(row).join('') : `<div class="empty"><div class="big">All clear</div>Every item is closed.</div>`}
+    ${done.length? `<div style="margin-top:26px;opacity:0.62;"><h3 style="font-family:var(--serif);font-size:15px;color:var(--ink-soft);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:4px;">Closed (${done.length})</h3>${done.map(row).join('')}</div>`:''}
+  `;
+  el.innerHTML=html;
+  el.querySelectorAll("[data-toggle]").forEach(x=>x.onclick=async()=>{ await toggleCheck(x.dataset.toggle); });
+  const tb=document.getElementById("teamBtn"); if(tb)tb.onclick=manageTeam;
+  el.querySelectorAll("[data-cedit]").forEach(x=>x.onclick=async()=>{
+    const it=data.checklist.find(i=>i.id==x.dataset.cedit); if(!it) return;
+    const txt=prompt("Edit checklist item:", it.text); if(txt===null||!txt.trim()) return;
+    try{ await api("check/edit",{id:parseInt(x.dataset.cedit), text:txt.trim()}); await refresh(); toast("Updated"); }
+    catch(e){ toast("Couldn't update",true); }
+  });
+  el.querySelectorAll("[data-cassign]").forEach(x=>x.onclick=()=>{ const it=data.checklist.find(i=>i.id==x.dataset.cassign); assignTask("check", x.dataset.cassign, it?it.owner:""); });
+  el.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{ await delCheck(x.dataset.del); });
+  el.querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{ if(x.dataset.open){ ui.openId=x.dataset.open; renderDrawer(x.dataset.open);} });
+  const addBtn=document.getElementById("addCheck"), inp=document.getElementById("newCheck");
+  addBtn.onclick=()=>addCheck(inp.value, null);
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") addCheck(inp.value,null); });
+}
+
+function renderPeople(){
+  const el=document.getElementById("content");
+  const q=ui.search.toLowerCase();
+  const isAdmin = ROLE==="admin";
+  const list=data.people.filter(p=>!q||p.name.toLowerCase().includes(q))
+    .map(p=>{ const s=data.segments.find(x=>x.id===p.segment_id); return {...p, seg:s}; });
+  const unconf=list.filter(m=>!m.confirmed), conf=list.filter(m=>m.confirmed);
+  function row(m){
+    return `<div class="loose-item ${m.confirmed?'done':''}">
+      <div class="lcheck" data-ptoggle="${esc(m.id)}">${m.confirmed?'\u2713':''}</div>
+      <div class="litext"><span data-open="${esc(m.segment_id)}">${esc(m.name)}</span><span class="ctx">${m.seg?`${DAYS[m.seg.day].num} · ${esc(m.seg.time)} · ${esc(m.seg.title)}`:''}</span></div>
+      <div class="lmeta">${isAdmin?`<button class="edit-btn" data-pedit="${esc(m.id)}" title="Rename">✎</button><button class="del-btn" data-pdel="${esc(m.id)}" title="Delete">×</button>`:''}</div></div>`;
+  }
+  el.innerHTML=`
+    <div style="font-family:var(--serif);font-size:20px;margin-bottom:10px;">${unconf.length} unconfirmed · ${conf.length} confirmed</div>
+    <div class="loose-group"><h3>Awaiting confirmation</h3>${unconf.length?unconf.map(row).join(''):'<div class="empty">Everyone confirmed.</div>'}</div>
+    ${conf.length?`<div class="loose-group" style="opacity:.65;"><h3 style="font-size:15px;">Confirmed</h3>${conf.map(row).join('')}</div>`:''}`;
+  el.querySelectorAll("[data-ptoggle]").forEach(x=>x.onclick=async()=>{ await togglePerson(x.dataset.ptoggle); });
+  el.querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{ ui.openId=x.dataset.open; renderDrawer(x.dataset.open); });
+  el.querySelectorAll("[data-pedit]").forEach(x=>x.onclick=async()=>{ await editPersonName(x.dataset.pedit); });
+  el.querySelectorAll("[data-pdel]").forEach(x=>x.onclick=async()=>{ await deletePerson(x.dataset.pdel); });
+}
+
+async function editPersonName(id){
+  const p=data.people.find(x=>x.id==id); if(!p) return;
+  const name=prompt("Edit name:", p.name);
+  if(name===null || !name.trim()) return;
+  try{ await api("person/edit",{id:parseInt(id), name:name.trim()}); await refresh(); toast("Renamed"); }
+  catch(e){ toast("Couldn't rename",true); }
+}
+async function deletePerson(id){
+  if(!confirm("Delete this person?")) return;
+  try{ await api("person/delete",{id:parseInt(id)}); await refresh(); toast("Deleted"); }
+  catch(e){ toast("Couldn't delete",true); }
+}
+
+function renderDrawer(id){
+  const NOCONTACTS_MSG = t("dNoContacts");
+  const s=data.segments.find(x=>x.id===id); if(!s) return;
+  const d=DAYS[s.day]; const ppl=segPeople(id); const checks=segChecks(id);
+  const dr=document.getElementById("drawer"), back=document.getElementById("drawerBack");
+  dr.innerHTML=`
+    <button class="drawer-close" id="dClose">\u2715</button>
+    <div class="drawer-hd">
+      <div class="dtime">${d.num} · ${esc(s.time)}–${esc(s.end_time)} · ${d.date}</div>
+      <h2>${esc(L(s,'title'))}</h2>
+      <div class="seg-venue" style="font-size:13px;">${esc(L(s,'venue'))}</div>
+    </div>
+    <div class="drawer-body">
+      <div class="field"><label>${t("dStatus")}</label>
+        <div class="status-picker">
+          ${["open","progress","confirmed"].map(st=>`<button data-st="${st}" class="${s.status===st?'sel '+st:''}">${STATUS_LABEL[st]}</button>`).join('')}
+        </div></div>
+      <div class="field"><label>${t("dDesc")}</label>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <textarea class="notes-area" id="descEdit" style="min-height:60px;">${esc(s.descr||'')}</textarea>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin:6px 0 2px;">עברית</div>
+        <textarea class="notes-area" id="descEditHe" dir="rtl" style="min-height:60px;text-align:right;">${esc(s.descr_he||'')}</textarea>
+        <div class="save-hint" id="descHint"></div>
+      </div>
+      <div class="field"><label>${t("dDescLong")}</label>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <textarea class="notes-area" id="descLongEdit" style="min-height:100px;">${esc(s.descr_long||'')}</textarea>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin:6px 0 2px;">עברית</div>
+        <textarea class="notes-area" id="descLongEditHe" dir="rtl" style="min-height:100px;text-align:right;">${esc(s.descr_long_he||'')}</textarea>
+        <div class="save-hint" id="descLongHint"></div>
+      </div>
+      <div class="field"><label>${t("dVenueContacts")} · ${esc(L(s,'venue'))}</label>
+        ${(()=>{ const cs=contactsForVenue(s.venue); return cs.length? `<div style="margin-bottom:10px;">${cs.map(c=>`<div style="padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;"><b>${esc(c.name)}</b>${c.role?` · ${esc(c.role)}`:''}${c.phone?`<br><span style="color:var(--sky);">📞 ${esc(c.phone)}</span>`:''}</div>`).join('')}<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Manage these in the Contacts tab.</div></div>` : `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${NOCONTACTS_MSG}</div>`; })()}
+        <textarea class="notes-area" id="venueContacts" placeholder="Contact people for this venue — name, role, phone, email. Shared across all segments at ${esc(s.venue)}.">${esc(venueContacts(s.venue))}</textarea>
+        <div class="save-hint" id="venueHint"></div>
+      </div>
+      ${ppl.length?`<div class="field"><label>${t("dPeople")} (${ppl.filter(p=>p.confirmed).length}/${ppl.length} ${t("dConfirmed")})</label>
+        <ul class="people-list">
+          ${ppl.map(p=>`<li class="${p.confirmed?'conf':''}"><span class="pcheck" data-ptoggle="${esc(p.id)}">${p.confirmed?'\u2713':''}</span><span class="pname">${esc(p.name)}</span>${ROLE==="admin"?`<span style="margin-left:auto;display:flex;gap:2px;"><button class="edit-btn" data-pedit="${esc(p.id)}" title="Rename">\u270e</button><button class="del-btn" data-pdel="${esc(p.id)}" title="Delete">\u00d7</button></span>`:''}</li>`).join('')}
+        </ul>
+        <div class="add-row"><input id="newPerson" placeholder="${t('dAddPerson')}"><button id="addPerson">Add</button></div>
+      </div>`:`<div class="field"><label>People</label>
+        <div class="add-row"><input id="newPerson" placeholder="Add a person…"><button id="addPerson">Add</button></div></div>`}
+      <div class="field"><label>${t("dChecklist")}</label>
+        <ul class="people-list">
+          ${checks.map(c=>`<li class="${c.done?'conf':''}"><span class="pcheck" data-ctoggle="${esc(c.id)}">${c.done?'\u2713':''}</span><span class="pname">${esc(L(c,"text"))}</span>${(c.seeded===0||ROLE==="admin")?`<button class="del-btn" data-cdel="${esc(c.id)}" title="Delete" style="margin-left:auto;">\u00d7</button>`:''}</li>`).join('')}
+        </ul>
+        <div class="add-row"><input id="newSegCheck" placeholder="${t('dAddItem')}"><button id="addSegCheck">Add</button></div>
+      </div>
+      <div class="field" style="border-top:2px solid var(--gold);padding-top:14px;margin-top:6px;">
+        <label style="color:var(--gold-deep);font-size:11px;">📋 Content brief — for production</label>
+        <div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px;">Content fills this in; production reads it to plan. Saves automatically.</div>
+        <div style="margin-bottom:8px;">
+          <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);">Content status</span>
+          <div class="status-picker" style="margin-top:4px;">
+            ${[['draft','Draft'],['review','In review'],['locked','Locked']].map(([v,lab])=>`<button data-cs="${v}" class="${(s.content_status||'draft')===v?'sel '+(v==='locked'?'confirmed':v==='review'?'progress':'open'):''}">${lab}</button>`).join('')}
+          </div>
+        </div>
+        ${[
+          ['brief_runsheet','Internal run-of-show','e.g. 14:00 doors · 14:10 welcome · 14:20 panel starts · 15:35 Q&A · 16:00 close'],
+          ['brief_location','Location within venue','Which room / hall / stage / outdoor area'],
+          ['brief_av','AV & tech requirements','Sound, mics (how many/type), screens, projection, lighting, recording'],
+          ['brief_staging','Staging & setup','Seating layout, furniture, stage, signage, branding'],
+          ['brief_materials','Materials needed','Printed items, props, gifts, name badges'],
+          ['brief_catering','Catering notes','Timing relative to content, service style, dietary'],
+          ['brief_speakers','Speaker / participant requirements','Green room, arrival time, briefing, tech check, accessibility']
+        ].map(([f,lab,ph])=>`
+          <div style="margin-bottom:10px;">
+            <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sky);font-weight:700;">${lab}</span>
+            <textarea class="notes-area brief-f" data-bf="${f}" style="min-height:52px;margin-top:3px;" placeholder="${esc(ph)}">${esc(s[f]||'')}</textarea>
+          </div>`).join('')}
+        <div class="save-hint" id="briefHint"></div>
+      </div>
+      ${(() => { const fu = (data.furniture||[]).filter(f => (f.segment_ids||'').split(',').map(x=>x.trim()).includes(id)); if (!fu.length) return `<div class="field"><label>🪑 ${t("dFurniture")}</label><div style="font-size:13px;opacity:.7;">${t("dFurnNone")}</div></div>`;
+        const setups = fu.map(f=>f.setup).filter((v,i,a)=>a.indexOf(v)===i);
+        return `<div class="field"><label>🪑 ${t("dFurniture")}</label>${setups.map(st => { const its = fu.filter(f=>f.setup===st);
+          return `<div dir="rtl" style="text-align:right;font-size:12px;font-weight:700;margin:6px 0 2px;">${esc(st)}${its[0].stays_until?' · '+esc(its[0].stays_until):''}</div>` + its.map(f => `<div dir="rtl" style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line,#e5e0d6);"><span>${esc(f.item)}${f.size?' · '+esc(f.size):''}${f.notes?' <span style="opacity:.65">· '+esc(f.notes)+'</span>':''}</span><b>${f.qty==null?'—':f.qty}${f.qty_note?' · '+esc(f.qty_note):''}</b></div>`).join(''); }).join('')}</div>`; })()}
+      <div class="field" style="border-top:2px solid var(--sky);padding-top:14px;margin-top:6px;">
+        <label style="color:var(--sky);">🎤 ${t("dSpeakerNotes")}</label>
+        <textarea class="notes-area nb-f" data-nb="notes_speaker" style="min-height:70px;">${esc(s.notes_speaker||'')}</textarea>
+        <div class="save-hint" id="nbHintSpeaker"></div>
+      </div>
+      <div class="field">
+        <label style="color:var(--olive);">🚚 ${t("dLogistics")}</label>
+        <textarea class="notes-area nb-f" data-nb="notes_logistics" style="min-height:70px;">${esc(s.notes_logistics||'')}</textarea>
+        <div class="save-hint" id="nbHintLogistics"></div>
+      </div>
+      <div class="field"><label>${t("dNotes")}</label>
+        <textarea class="notes-area" id="notes" placeholder="Vendor contacts, confirmations, open questions…">${esc(s.notes||'')}</textarea>
+        <div class="save-hint" id="saveHint"></div>
+      </div>
+      <div class="field"><label>${t("dFiles")}</label>
+        <div id="segFiles"><div class="save-hint">Loading…</div></div>
+        <div class="add-row"><input type="file" id="segFileInput" style="flex:1;font-size:12px;"><button id="segFileUpload">Upload</button></div>
+      </div>
+      ${ROLE==="admin"?`<div class="field" style="border-top:2px solid var(--line);padding-top:16px;margin-top:8px;">
+        <label style="color:var(--terra);">${t("dAdminEdit")}</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <select id="ed_day" class="search" style="flex:1;">${[1,2,3].map(d=>`<option value="${d}" ${d==s.day?'selected':''}>${DAYS[d].num}</option>`).join('')}</select>
+          <input id="ed_time" class="search" style="width:74px;" value="${esc(s.time)}">
+          <input id="ed_end" class="search" style="width:74px;" value="${esc(s.end_time)}">
+        </div>
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">ENGLISH</div>
+        <input id="ed_title" class="search" style="width:100%;margin-bottom:6px;" value="${esc(s.title)}" placeholder="Title">
+        <input id="ed_venue" class="search" style="width:100%;margin-bottom:8px;" value="${esc(s.venue)}" placeholder="Venue">
+        <div style="font-size:10px;letter-spacing:.06em;color:var(--sky);font-weight:700;margin-bottom:2px;">עברית</div>
+        <input id="ed_title_he" class="search" dir="rtl" style="width:100%;margin-bottom:6px;text-align:right;" value="${esc(s.title_he||'')}" placeholder="כותרת">
+        <input id="ed_venue_he" class="search" dir="rtl" style="width:100%;margin-bottom:8px;text-align:right;" value="${esc(s.venue_he||'')}" placeholder="מיקום">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-ghost" id="ed_save" style="background:var(--sky);color:#fff;border-color:var(--sky);">Save changes</button>
+          <button class="btn-ghost" id="ed_dup" title="Make a copy — use this to split one event into two">Duplicate (split)</button>
+          <button class="btn-ghost" id="ed_del" style="color:var(--terra);border-color:var(--terra);">Delete event</button>
+        </div>
+        <div class="save-hint" id="ed_hint"></div>
+      </div>`:''}
+    </div>`;
+  back.classList.add("on"); dr.classList.add("on");
+  document.getElementById("dClose").onclick=closeDrawer; back.onclick=closeDrawer;
+  dr.querySelectorAll(".status-picker button").forEach(b=>b.onclick=async()=>{ await setStatus(id,b.dataset.st); });
+  dr.querySelectorAll("[data-ptoggle]").forEach(b=>b.onclick=async()=>{ await togglePerson(b.dataset.ptoggle); });
+  dr.querySelectorAll("[data-pedit]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await editPersonName(b.dataset.pedit); if(ui.openId)renderDrawer(ui.openId); });
+  dr.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await deletePerson(b.dataset.pdel); if(ui.openId)renderDrawer(ui.openId); });
+  dr.querySelectorAll("[data-ctoggle]").forEach(b=>b.onclick=async()=>{ await toggleCheck(b.dataset.ctoggle); });
+  dr.querySelectorAll("[data-cdel]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await delCheck(b.dataset.cdel); if(ui.openId)renderDrawer(ui.openId); });
+  const ap=document.getElementById("addPerson"), npi=document.getElementById("newPerson");
+  ap.onclick=()=>addPerson(id,npi.value); npi.addEventListener("keydown",e=>{if(e.key==="Enter")addPerson(id,npi.value);});
+  const asc=document.getElementById("addSegCheck"), nsc=document.getElementById("newSegCheck");
+  asc.onclick=()=>addCheck(nsc.value,id); nsc.addEventListener("keydown",e=>{if(e.key==="Enter")addCheck(nsc.value,id);});
+  let tn; const notes=document.getElementById("notes");
+  notes.addEventListener("input",()=>{ clearTimeout(tn); document.getElementById("saveHint").textContent="saving…";
+    tn=setTimeout(async()=>{ await api("segment/notes",{id,notes:notes.value}); s.notes=notes.value; document.getElementById("saveHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("saveHint");if(h)h.textContent="";},1500); },600); });
+
+  let td; const descEl=document.getElementById("descEdit");
+  if(descEl) descEl.addEventListener("input",()=>{ clearTimeout(td); document.getElementById("descHint").textContent="saving…";
+    td=setTimeout(async()=>{ await api("segment/field",{id,field:"descr",value:descEl.value}); s.descr=descEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdh; const descHeEl=document.getElementById("descEditHe");
+  if(descHeEl) descHeEl.addEventListener("input",()=>{ clearTimeout(tdh); document.getElementById("descHint").textContent="saving…";
+    tdh=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_he",value:descHeEl.value}); s.descr_he=descHeEl.value; document.getElementById("descHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdl; const descLongEl=document.getElementById("descLongEdit");
+  if(descLongEl) descLongEl.addEventListener("input",()=>{ clearTimeout(tdl); document.getElementById("descLongHint").textContent="saving…";
+    tdl=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_long",value:descLongEl.value}); s.descr_long=descLongEl.value; document.getElementById("descLongHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descLongHint");if(h)h.textContent="";},1500); },600); });
+
+  let tdlh; const descLongHeEl=document.getElementById("descLongEditHe");
+  if(descLongHeEl) descLongHeEl.addEventListener("input",()=>{ clearTimeout(tdlh); document.getElementById("descLongHint").textContent="saving…";
+    tdlh=setTimeout(async()=>{ await api("segment/field",{id,field:"descr_long_he",value:descLongHeEl.value}); s.descr_long_he=descLongHeEl.value; document.getElementById("descLongHint").textContent="saved"; setTimeout(()=>{const h=document.getElementById("descLongHint");if(h)h.textContent="";},1500); },600); });
+
+  let tv; const vcEl=document.getElementById("venueContacts");
+  if(vcEl) vcEl.addEventListener("input",()=>{ clearTimeout(tv); document.getElementById("venueHint").textContent="saving…";
+    tv=setTimeout(async()=>{ await api("venue/contacts",{venue:s.venue,contacts:vcEl.value});
+      const v=data.venues.find(x=>x.venue===s.venue); if(v)v.contacts=vcEl.value; else data.venues.push({venue:s.venue,contacts:vcEl.value});
+      document.getElementById("venueHint").textContent="saved (all "+esc(s.venue)+" segments)"; setTimeout(()=>{const h=document.getElementById("venueHint");if(h)h.textContent="";},1800); },600); });
+
+  // segment content files
+  // speaker / logistics note boxes autosave
+  let nbT={};
+  dr.querySelectorAll(".nb-f").forEach(ta=>{
+    ta.addEventListener("input",()=>{
+      const f=ta.dataset.nb;
+      const hid = f==="notes_speaker" ? "nbHintSpeaker" : "nbHintLogistics";
+      const h=document.getElementById(hid); if(h)h.textContent="saving…";
+      clearTimeout(nbT[f]);
+      nbT[f]=setTimeout(async()=>{
+        try{ await api("segment/brief",{id, field:f, value:ta.value}); s[f]=ta.value;
+          if(h){h.textContent="saved"; setTimeout(()=>{const x=document.getElementById(hid); if(x&&x.textContent==="saved")x.textContent="";},1500);} }
+        catch(e){ if(h)h.textContent="save failed"; }
+      },700);
+    });
+  });
+
+  // content brief autosave
+  let briefT={};
+  dr.querySelectorAll(".brief-f").forEach(ta=>{
+    ta.addEventListener("input",()=>{
+      const f=ta.dataset.bf;
+      const h=document.getElementById("briefHint"); if(h)h.textContent="saving…";
+      clearTimeout(briefT[f]);
+      briefT[f]=setTimeout(async()=>{
+        try{ await api("segment/brief",{id, field:f, value:ta.value}); s[f]=ta.value;
+          if(h){h.textContent="saved"; setTimeout(()=>{const x=document.getElementById("briefHint"); if(x&&x.textContent==="saved")x.textContent="";},1500);} }
+        catch(e){ if(h)h.textContent="save failed"; }
+      },700);
+    });
+  });
+  dr.querySelectorAll("[data-cs]").forEach(b=>b.onclick=async()=>{
+    try{ await api("segment/brief",{id, field:"content_status", value:b.dataset.cs}); s.content_status=b.dataset.cs; renderDrawer(id); toast("Content status updated"); }
+    catch(e){ toast("Couldn't update",true); }
+  });
+
+  loadSegFiles(id);
+  const segUp=document.getElementById("segFileUpload");
+  if(segUp) segUp.onclick=async()=>{
+    const inp=document.getElementById("segFileInput");
+    if(!inp.files||!inp.files[0]){ toast("Choose a file first",true); return; }
+    const fd=new FormData(); fd.append("file",inp.files[0]); fd.append("section","content"); fd.append("segment_id",id); fd.append("by",NAME||"");
+    toast("Uploading…");
+    try{ const j=await api("files/upload",fd,{idem:newIdemKey()});
+      if(j.error){toast(j.error,true);return;} inp.value=""; toast("Uploaded"); loadSegFiles(id); }
+    catch(e){ toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
+  };
+
+  // admin edit / duplicate / delete
+  if(ROLE==="admin"){
+    const edSave=document.getElementById("ed_save");
+    if(edSave) edSave.onclick=async()=>{
+      const hint=document.getElementById("ed_hint");
+      const val=(elId)=>{ const el=document.getElementById(elId); return el?el.value:null; };
+      const say=(msg,bad)=>{ if(hint){ hint.textContent=msg; hint.style.color=bad?"var(--terra)":"var(--ink-soft)"; } if(bad) toast(msg,true); };
+      try{
+        const day=val("ed_day"), time=val("ed_time"), end=val("ed_end"), title=val("ed_title"), venue=val("ed_venue");
+        if(day===null||time===null||title===null){ say("Edit fields missing — reopen the event",true); return; }
+        const t2=(time||"").trim(), e2=(end||"").trim();
+        const ok=v=>!v || /^\d{1,2}:\d{2}$/.test(v);
+        if(!ok(t2)||!ok(e2)){ say("Time must look like 09:00",true); return; }
+        say("Saving…");
+        const r1=await api("segment/edit",{id, day, time:t2, end_time:e2, title, venue});
+        if(r1&&r1.error){ say(r1.error,true); return; }
+        const heTitle=val("ed_title_he"), heVenue=val("ed_venue_he");
+        if(heTitle!==null){ const r2=await api("segment/field",{id, field:"title_he", value:heTitle}); if(r2&&r2.error){ say(r2.error,true); return; } }
+        if(heVenue!==null){ const r3=await api("segment/field",{id, field:"venue_he", value:heVenue}); if(r3&&r3.error){ say(r3.error,true); return; } }
+        await refresh(); closeDrawer(); toast("Saved");
+      }catch(e){ say("Couldn't save — "+(e&&e.message?e.message:"connection issue"),true); }
+    };
+    const edDup=document.getElementById("ed_dup");
+    if(edDup) edDup.onclick=async()=>{
+      if(!confirm("Duplicate this event? A copy will be added right after it — then edit each half to split.")) return;
+      try{ const r=await api("segment/duplicate",{id}); await refresh(); closeDrawer(); toast("Duplicated — edit each copy to split"); if(r.id){ui.openId=r.id; renderDrawer(r.id);} }
+      catch(e){ toast("Couldn't duplicate",true); }
+    };
+    const edDel=document.getElementById("ed_del");
+    if(edDel) edDel.onclick=async()=>{
+      if(!confirm("Delete this event permanently? Its people and checklist items will also be removed.")) return;
+      try{ await api("segment/delete",{id}); await refresh(); closeDrawer(); toast("Event deleted"); }
+      catch(e){ toast("Couldn't delete",true); }
+    };
+  }
+}
+async function loadSegFiles(id){
+  const box=document.getElementById("segFiles"); if(!box) return;
+  try{
+    const r=await api("files?segment_id="+encodeURIComponent(id));
+    const files=r.files||[];
+    if(!files.length){ box.innerHTML=`<div class="save-hint">No files attached yet.</div>`; return; }
+    box.innerHTML=files.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dotted var(--line);font-size:13px;">
+      <span>📄</span>
+      <a href="/api/files/download?id=${esc(f.id)}" style="flex:1;color:var(--sky);text-decoration:none;">${esc(f.filename)}</a>
+      <span style="font-size:11px;color:var(--ink-soft);">${fmtSize(f.size)}</span>
+      <button class="del-btn" data-sfid="${esc(f.id)}">×</button></div>`).join('');
+    box.querySelectorAll("[data-sfid]").forEach(b=>b.onclick=async()=>{ if(!confirm("Delete this file?"))return;
+      try{ await api("files/delete",{id:parseInt(b.dataset.sfid)}); loadSegFiles(id);}catch(e){toast("Couldn't delete",true);} });
+  }catch(e){ box.innerHTML=`<div class="save-hint">Files unavailable.</div>`; }
+}
+function closeDrawer(){ ui.openId=null; document.getElementById("drawerBack").classList.remove("on"); document.getElementById("drawer").classList.remove("on"); }
+
+// ---- mutations (optimistic + refresh) ----
+async function setStatus(id,st){ const s=data.segments.find(x=>x.id===id); s.status=st; render(); try{await api("segment/status",{id,status:st});}catch(e){toast("Save failed",true);} }
+async function togglePerson(id){ const p=data.people.find(x=>x.id==id); if(p)p.confirmed=p.confirmed?0:1; render(); try{await api("person/toggle",{id:parseInt(id)});}catch(e){toast("Save failed",true);} }
+async function toggleCheck(id){ const c=data.checklist.find(x=>x.id==id); if(c)c.done=c.done?0:1; render(); try{await api("check/toggle",{id:parseInt(id)});}catch(e){toast("Save failed",true);} }
+async function addCheck(text,segId){ text=(text||'').trim(); if(!text) return;
+  try{ const r=await api("check/add",{segment_id:segId,text,by:NAME}); await refresh(); toast("Item added"); }catch(e){toast("Couldn't add",true);} }
+async function delCheck(id){ if(!confirm("Delete this item?")) return;
+  try{ const r=await api("check/delete",{id:parseInt(id)}); if(r.error){toast(r.error,true);return;} await refresh(); toast("Deleted"); }catch(e){toast("Couldn't delete",true);} }
+async function addPerson(segId,name){ name=(name||'').trim(); if(!name) return;
+  try{ await api("person/add",{segment_id:segId,name}); await refresh(); toast("Person added"); }catch(e){toast("Couldn't add",true);} }
+
+// ---- FILES VIEW ----
+let filesCache = { content:null, general:null };
+let gridCache = null;
+
+function fmtSize(n){ if(!n) return ""; if(n<1024) return n+" B"; if(n<1048576) return (n/1024).toFixed(0)+" KB"; return (n/1048576).toFixed(1)+" MB"; }
+function segLabel(id){ const s=data.segments.find(x=>x.id===id); return s?`${DAYS[s.day].num} · ${s.title}`:""; }
+
+async function loadFiles(section){
+  try { const r = await api("files?section="+section); return r.files||[]; }
+  catch(e){ return []; }
+}
+
+async function renderFiles(){
+  const el=document.getElementById("content");
+  const isAdmin = ROLE==="admin";
+  el.innerHTML = `
+    ${isAdmin && CHIEF?`<div class="loose-group" id="gridWrap">
+      <h3>${DL("Budget spreadsheet","גיליון תקציב")} <span style="font-size:11px;color:var(--terra);font-weight:700;letter-spacing:.04em;">${DL("CHIEF KEY ONLY","מפתח chief בלבד")}</span></h3>
+      <div id="gridArea"><div class="empty">${DL("Loading grid…","טוען גיליון…")}</div></div>
+    </div>`:''}
+    <div class="loose-group">
+      <h3>${DL("Content files","קבצי תוכן")} <span style="font-size:11px;color:var(--ink-soft);">${DL("— linked to events","— מקושרים לאירועים")}</span></h3>
+      <div class="add-row">
+        <input type="file" id="contentFile" style="flex:1;font-size:12px;">
+        <select id="contentSeg" class="search" style="min-width:180px;">
+          <option value="">— link to event (optional) —</option>
+          ${data.segments.map(s=>`<option value="${esc(s.id)}">${DAYS[s.day].num} · ${esc(s.time)} · ${esc(s.title)}</option>`).join('')}
+        </select>
+        <button id="contentUpload">Upload</button>
+      </div>
+      <div id="contentList"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="loose-group">
+      <h3>${DL("General files","קבצים כלליים")}</h3>
+      <div class="add-row">
+        <input type="file" id="generalFile" style="flex:1;font-size:12px;">
+        <button id="generalUpload">Upload</button>
+      </div>
+      <div id="generalList"><div class="empty">Loading…</div></div>
+    </div>
+  `;
+  if(isAdmin && CHIEF) renderGrid();
+  // wire uploads
+  document.getElementById("contentUpload").onclick=()=>doUpload("content", "contentFile", document.getElementById("contentSeg").value);
+  document.getElementById("generalUpload").onclick=()=>doUpload("general", "generalFile", null);
+  // load lists
+  refreshFileList("content"); refreshFileList("general");
+}
+
+function accessLabel(a){ return a==="ops" ? DL("team","צוות") : a==="chief" ? DL("chief only","chief בלבד") : DL("admins only","מנהלים בלבד"); }
+async function refreshFileList(section){
+  const listEl=document.getElementById(section==="content"?"contentList":"generalList");
+  const files=await loadFiles(section);
+  filesCache[section]=files;
+  if(!files.length){ listEl.innerHTML=`<div class="empty" style="padding:24px;">No files yet.</div>`; return; }
+  listEl.innerHTML=files.map(f=>`
+    <div class="loose-item">
+      <div style="grid-column:1;font-size:16px;">📄</div>
+      <div class="litext" style="cursor:default;">
+        <a href="/api/files/download?id=${esc(f.id)}" style="color:var(--sky);text-decoration:none;font-weight:600;">${esc(f.filename)}</a>
+        <span class="ctx">${fmtSize(f.size)}${f.segment_id?` · ${esc(segLabel(f.segment_id))}`:''}${f.uploaded_by?` · ${esc(f.uploaded_by)}`:''} · ${accessLabel(f.access)}${f.access_reviewed?'':` · <span style="color:var(--terra)">${DL('access not reviewed','גישה לא נבדקה')}</span>`}</span>
+        ${ROLE==="admin"?`<label class="sr" for="acc-${esc(f.id)}">${DL('Who can open it','מי יכול לפתוח')}</label><select id="acc-${esc(f.id)}" data-facc="${esc(f.id)}" class="search" style="max-width:190px;margin-top:4px;">${[['ops',DL('Team (editors and admins)','צוות (עורכים ומנהלים)')],['admin',DL('Admins only','מנהלים בלבד')]].concat(CHIEF?[['chief',DL('Chief key only','מפתח chief בלבד')]]:[]).map(([v,l])=>`<option value="${v}" ${v===f.access?'selected':''}>${esc(l)}</option>`).join('')}</select>`:''}
+      </div>
+      <div class="lmeta"><button class="del-btn" data-fid="${esc(f.id)}" title="Delete">×</button></div>
+    </div>`).join('');
+  listEl.querySelectorAll("[data-facc]").forEach(sel=>sel.onchange=async()=>{
+    try{ await api("files/access",{id:parseInt(sel.dataset.facc), access:sel.value}); toast(DL("Access updated","הגישה עודכנה")); }
+    catch(e){ toast(apiErrorText(e, LANG==="he"),true); }
+    refreshFileList(section);
+  });
+  listEl.querySelectorAll("[data-fid]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Delete this file?")) return;
+    try{ await api("files/delete",{id:parseInt(b.dataset.fid)}); refreshFileList(section); toast("Deleted"); }catch(e){toast("Couldn't delete",true);}
+  });
+}
+
+async function doUpload(section, inputId, segId){
+  const inp=document.getElementById(inputId);
+  if(!inp.files||!inp.files[0]){ toast("Choose a file first",true); return; }
+  const file=inp.files[0];
+  const fd=new FormData();
+  fd.append("file", file);
+  fd.append("section", section);
+  if(segId) fd.append("segment_id", segId);
+  fd.append("by", NAME||"");
+  toast("Uploading "+file.name+"…");
+  try{
+    const j=await api("files/upload",fd,{idem:newIdemKey()});
+    if(j.error){ toast(j.error, true); return; }
+    inp.value=""; toast("Uploaded"); refreshFileList(section);
+  }catch(e){ toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
+}
+
+// ---- TRANSPORT ----
+const R_STATUS = {
+  no_driver:{label:"No driver", he:"אין נהג", color:"var(--st-open)"},
+  to_confirm:{label:"To confirm", he:"לאישור", color:"var(--st-progress)"},
+  needs_decision:{label:"Needs decision", he:"נדרשת החלטה", color:"var(--st-progress)"},
+  booked:{label:"Booked", he:"הוזמן", color:"var(--st-confirmed)"}
+};
+function rStatus(s){
+  const r=R_STATUS[s];
+  if(!r) return {label:s||"—", color:"var(--ink-soft)"};
+  return {label: LANG==="he"?r.he:r.label, color:r.color};
+}
+function runStops(runId){
+  return data.run_stops.filter(s=>s.run_id===runId).sort((a,b)=>a.sort_order-b.sort_order);
+}
+// riders for a stop come live from the Guest Registry, so an updated
+// registry immediately changes every manifest.
+function stopRiders(hotel){
+  if(!hotel) return [];
+  return data.guests.filter(g=>g.status==="active" && (g.hotel||"")===hotel);
+}
+function runPax(runId){
+  return runStops(runId).reduce((n,s)=>n+stopRiders(s.hotel_match).length,0);
+}
+function guestsWithoutHotel(){
+  return data.guests.filter(g=>g.status==="active" && !g.hotel);
+}
+
+function runBodyHtml(r){
+  const canEdit = ROLE==="admin" || ROLE==="edit";
+  const stops = runStops(r.id);
+  const he = LANG==="he";
+  let html = `<div class="d-grid">
+    <div>
+      <div class="g-lab">${DL("Stops","תחנות")}</div>`;
+  if(stops.length){
+    html += `<div class="g-table">
+      <div style="display:grid;grid-template-columns:0.6fr 2fr 0.6fr ${canEdit?'28px':''};gap:8px;padding:8px 13px;background:var(--parchment);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;">
+        <div>${DL("Time","שעה")}</div><div>${DL("Stop","תחנה")}</div><div>${DL("Pax","נוסעים")}</div>${canEdit?'<div></div>':''}
+      </div>
+      ${stops.map(s=>{
+        const n=stopRiders(s.hotel_match).length;
+        return `<div style="display:grid;grid-template-columns:0.6fr 2fr 0.6fr ${canEdit?'28px':''};gap:8px;padding:9px 13px;font-size:13px;border-top:1px solid var(--line);align-items:center;">
+          <div>${esc(s.time||'')}</div>
+          <div>${esc(s.stop_label||'')}${s.hotel_match&&!n?` <span class="save-hint">${DL("no guests","אין אורחים")}</span>`:''}</div>
+          <div>${n||'—'}</div>
+          ${canEdit?`<div><button class="del-btn" data-stopdel="${esc(s.id)}" title="${DL('Remove','הסרה')}">×</button></div>`:''}
+        </div>`;
+      }).join('')}
+      <div style="display:grid;grid-template-columns:0.6fr 2fr 0.6fr ${canEdit?'28px':''};gap:8px;padding:9px 13px;font-size:13px;border-top:1px solid var(--line);background:var(--parchment);">
+        <div>${esc(r.arrive_time||'')}</div><div><strong>${DL("Arrive","הגעה")} — ${esc(LANG==="he"&&r.destination_he?r.destination_he:r.destination||'')}</strong></div><div><strong>${runPax(r.id)}</strong></div>${canEdit?'<div></div>':''}
+      </div>
+    </div>`;
+  } else {
+    html += `<div class="save-hint" style="padding:8px 0;">${DL("No stops yet — add the pickup points below.","טרם הוגדרו תחנות — הוסיפו נקודות איסוף למטה.")}</div>`;
+  }
+  if(canEdit){
+    const hotels = [...new Set(data.guests.filter(g=>g.hotel).map(g=>g.hotel))].sort();
+    html += `<div class="add-row" style="margin-top:9px;">
+      <input type="text" id="stTime-${esc(r.id)}" placeholder="${DL('Time','שעה')}" style="max-width:80px;">
+      <select id="stHotel-${esc(r.id)}" class="search" style="flex:1;">
+        <option value="">${DL("— pickup point —","— נקודת איסוף —")}</option>
+        ${hotels.map(h=>`<option value="${esc(h)}">${esc(h)} (${stopRiders(h).length})</option>`).join('')}
+      </select>
+      <button data-stopadd="${esc(r.id)}">${DL("Add stop","הוספת תחנה")}</button>
+    </div>`;
+  }
+
+  // manifest
+  const manifest = stops.map(s=>({stop:s, riders:stopRiders(s.hotel_match)})).filter(x=>x.riders.length);
+  if(manifest.length){
+    html += `<div style="margin-top:16px;"><div class="g-lab">${DL("Manifest","רשימת נוסעים")} · ${runPax(r.id)}</div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:11px 13px;font-size:12.5px;line-height:1.9;max-height:170px;overflow:auto;">
+        ${manifest.map(m=>`<div><strong>${esc(m.stop.stop_label)}</strong> — ${m.riders.map(g=>esc(g.first_name+' '+g.last_name)).join(' · ')}</div>`).join('')}
+      </div></div>`;
+  }
+  html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-ghost" data-runprint="${esc(r.id)}">${DL("Driver sheet","דף לנהג")}</button>
+      ${ROLE==="admin"?`<button class="btn-ghost" data-rdel="${esc(r.id)}" style="color:var(--terra);">${DL("Delete run","מחיקת הסעה")}</button>`:''}
+    </div>
+  </div>
+
+  <div>
+    <div class="g-lab">${DL("Vehicle & driver","רכב ונהג")}</div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;">
+      ${canEdit?`
+      <input class="g-in" data-rf="vehicles" data-rid="${esc(r.id)}" value="${esc(r.vehicles||'')}" placeholder="${DL('Vehicles','רכבים')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="capacity" data-rid="${esc(r.id)}" value="${esc(r.capacity||'')}" placeholder="${DL('Capacity','קיבולת')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="driver" data-rid="${esc(r.id)}" value="${esc(r.driver||'')}" placeholder="${DL('Driver name','שם הנהג')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="driver_phone" data-rid="${esc(r.id)}" value="${esc(r.driver_phone||'')}" placeholder="${DL('Driver mobile','נייד הנהג')}" style="margin-bottom:7px;">
+      <input class="g-in" data-rf="company" data-rid="${esc(r.id)}" value="${esc(r.company||'')}" placeholder="${DL('Bus company','חברת הסעות')}">`
+      :`<div class="g-val">${esc(r.vehicles||'—')}<br>${esc(r.driver||'')} ${esc(r.driver_phone||'')}<br>${esc(r.company||'')}</div>`}
+    </div>
+
+    <div class="g-lab" style="margin-top:13px;">${DL("Escort & notes","מלווה והערות")}</div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;">
+      ${canEdit?`
+      <input class="g-in" data-rf="escort" data-rid="${esc(r.id)}" value="${esc(r.escort||'')}" placeholder="${DL('Foundation staff escort','מלווה מטעם הקרן')}" style="margin-bottom:7px;">
+      <textarea class="notes-area" data-rf="notes" data-rid="${esc(r.id)}" style="min-height:58px;" placeholder="${DL('Internal notes for the production team','הערות פנימיות לצוות ההפקה')}">${esc(r.notes||'')}</textarea>
+      <textarea class="notes-area" data-rf="driver_note" data-rid="${esc(r.id)}" style="min-height:58px;margin-top:7px;" placeholder="${DL('Note shown in the driver app — access, parking, luggage…','הערה שמופיעה באפליקציית הנהגים — גישה, חניה, מזוודות…')}">${esc(r.driver_note||'')}</textarea>
+      <input class="g-in" data-rf="dropoff" data-rid="${esc(r.id)}" value="${esc(r.dropoff||'')}" placeholder="${DL('Exact drop-off point','נקודת הורדה מדויקת')}" style="margin-top:7px;">
+      <input class="g-in" data-rf="dropoff_url" data-rid="${esc(r.id)}" value="${esc(r.dropoff_url||'')}" placeholder="${DL('Drop-off map link (Waze / Google Maps)','קישור מפה לנקודת ההורדה (Waze / גוגל מפות)')}" style="margin-top:7px;">`
+      :`<div class="g-val">${esc(r.escort||'—')}<br>${esc(r.notes||'')}</div>`}
+    </div>
+
+    ${canEdit?`<label style="display:flex;align-items:center;gap:8px;margin-top:13px;font-size:12.5px;cursor:pointer;">
+      <input type="checkbox" data-rpdf="${esc(r.id)}" ${r.pdf_hide?'':'checked'}> ${DL("Show pickup time in the guest PDF","הצגת שעת איסוף בלוח הזמנים לאורחים")}
+    </label>
+    <div class="g-lab" style="margin-top:13px;">${DL("Status","סטטוס")}</div>
+    <select class="g-in" data-rf="status" data-rid="${esc(r.id)}">
+      ${Object.keys(R_STATUS).map(k=>`<option value="${k}" ${r.status===k?'selected':''}>${LANG==="he"?R_STATUS[k].he:R_STATUS[k].label}</option>`).join('')}
+    </select>`:''}
+    <div class="save-hint" id="rHint-${esc(r.id)}" style="margin-top:9px;"></div>
+  </div></div>`;
+  return html;
+}
+
+function runRowHtml(r){
+  const isOpen = ui.openRun && ui.openRun.has(r.id);
+  const st = rStatus(r.status);
+  const pax = runPax(r.id);
+  const stops = runStops(r.id);
+  return `<details class="d-row" data-rid="${esc(r.id)}"${isOpen?' open':''}>
+    <summary style="grid-template-columns:0.6fr 2fr 1.4fr 0.6fr 1.2fr 26px;">
+      <div style="font-family:var(--serif);font-size:15px;">${esc(r.depart_time||'')}</div>
+      <div><strong>${esc(LANG==="he"&&r.title_he?r.title_he:r.title)}</strong>
+        <div class="d-sub">${esc(LANG==="he"?r.title:(r.title_he||''))}</div></div>
+      <div style="font-size:12px;">${stops.length?stops.map(s=>esc(s.stop_label)).join(' · '):DL('no stops set','ללא תחנות')}</div>
+      <div>${pax||'—'}</div>
+      <div><span class="d-tag" style="background:${st.color};">${st.label.toUpperCase()}</span></div>
+      <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
+    </summary>
+    <div class="d-body" id="rBody-${esc(r.id)}">${runBodyHtml(r)}</div>
+  </details>`;
+}
+
+let runTimers = {};
+function wireRunBody(r){
+  const body=document.getElementById('rBody-'+r.id);
+  if(!body) return;
+  body.querySelectorAll('[data-rf]').forEach(el=>{
+    const ev = el.tagName==='SELECT'?'change':'input';
+    el.addEventListener(ev, ()=>{
+      const f=el.dataset.rf, k=r.id+'-'+f;
+      clearTimeout(runTimers[k]);
+      const hint=document.getElementById('rHint-'+r.id);
+      if(hint) hint.textContent='saving…';
+      const go=async()=>{
+        try { await api("run/field",{id:r.id, field:f, value:el.value}); }
+        catch(e){ if(hint) hint.textContent=(LANG==="he"?"לא נשמר: ":"not saved: ")+apiErrorText(e, LANG==="he"); return; }
+        r[f]=el.value;
+        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint && hint.textContent==='saved') hint.textContent=''; },1400); }
+        if(f==='status') renderTransport();
+      };
+      if(ev==='change') go(); else runTimers[k]=setTimeout(go,600);
+    });
+  });
+  const sa=body.querySelector('[data-stopadd]');
+  if(sa) sa.onclick=async()=>{
+    const h=document.getElementById('stHotel-'+r.id).value;
+    const t=document.getElementById('stTime-'+r.id).value.trim();
+    if(!h){ toast(DL("Choose a pickup point","בחרו נקודת איסוף"),true); return; }
+    const res=await api("stop/add",{run_id:r.id, time:t, stop_label:h, hotel_match:h});
+    if(res.error){ toast(res.error,true); return; }
+    await refresh(); toast(DL("Stop added","התחנה נוספה"));
+  };
+  body.querySelectorAll('[data-stopdel]').forEach(b=>b.onclick=async()=>{
+    await api("stop/delete",{id:parseInt(b.dataset.stopdel)});
+    await refresh(); toast(DL("Stop removed","התחנה הוסרה"));
+  });
+  const pdfCb=body.querySelector('[data-rpdf]');
+  if(pdfCb) pdfCb.onchange=async()=>{
+    const v = pdfCb.checked?0:1;
+    try { await api("run/field",{id:r.id, field:"pdf_hide", value:v}); } catch(e){ pdfCb.checked = !pdfCb.checked; throw e; }
+    r.pdf_hide = v;
+    toast(pdfCb.checked?DL("Will show in the guest PDF","יוצג בלוח הזמנים"):DL("Hidden from the guest PDF","הוסתר מלוח הזמנים"));
+  };
+  const pr=body.querySelector('[data-runprint]');
+  if(pr) pr.onclick=()=>printDriverSheet(r);
+  const rd=body.querySelector('[data-rdel]');
+  if(rd) rd.onclick=async()=>{
+    if(!confirm(DL("Delete this run and its stops?","למחוק את ההסעה ואת התחנות שלה?"))) return;
+    await api("run/delete",{id:r.id});
+    if(ui.openRun) ui.openRun.delete(r.id);
+    await refresh(); toast(DL("Run deleted","ההסעה נמחקה"));
+  };
+}
+
+function printDriverSheet(r){
+  const stops=runStops(r.id);
+  const rows=stops.map(s=>{
+    const riders=stopRiders(s.hotel_match);
+    return `<tr><td>${esc(s.time||'')}</td><td>${esc(s.stop_label||'')}</td><td>${riders.length}</td>
+      <td style="font-size:11px;">${riders.map(g=>esc(g.first_name+' '+g.last_name)).join(', ')}</td></tr>`;
+  }).join('');
+  const w=window.open('','_blank');
+  if(!w){ toast(DL("Allow pop-ups to print","אפשרו חלונות קופצים להדפסה"),true); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.title)}</title>
+    <style>body{font-family:Georgia,serif;padding:28px;color:#22201B;}
+    h1{font-size:20px;margin:0 0 4px;} .m{font-size:12px;color:#4A463D;margin-bottom:16px;font-family:Arial,sans-serif;}
+    table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
+    th{background:#E8E1D4;text-align:left;padding:7px 9px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;}
+    td{border-top:1px solid #C9BFA8;padding:8px 9px;vertical-align:top;}</style></head><body>
+    <h1>${esc(r.title)}</h1>
+    <div class="m">Day ${r.day} · depart ${esc(r.depart_time||'')} · arrive ${esc(r.arrive_time||'')} · ${esc(r.destination||'')}<br>
+    ${esc(r.vehicles||'')} ${r.driver?('· driver '+esc(r.driver)):''} ${r.driver_phone?('· '+esc(r.driver_phone)):''} ${r.company?('· '+esc(r.company)):''}<br>
+    ${r.escort?('Escort: '+esc(r.escort)):''} ${r.notes?('<br>'+esc(r.notes)):''}</div>
+    <table><thead><tr><th>Time</th><th>Stop</th><th>Pax</th><th>Riders</th></tr></thead><tbody>${rows}
+    <tr><td><strong>${esc(r.arrive_time||'')}</strong></td><td colspan="2"><strong>Arrive — ${esc(r.destination||'')}</strong></td><td><strong>${runPax(r.id)} total</strong></td></tr>
+    </tbody></table></body></html>`);
+  w.document.close(); w.print();
+}
+
+// Export the whole transport plan as a workbook the producer can rework.
+// Four sheets: one row per run, one per stop, one per rider, plus a hotel summary.
+async function exportTransportXLSX(){
+  let XLSX;
+  try { XLSX = await loadSheetJS(); }
+  catch(e){ toast(DL("Could not load the spreadsheet writer","טעינת מנוע האקסל נכשלה"), true); return; }
+  const runs = data.transport_runs.slice().sort((a,b)=>(a.day-b.day)||(a.sort_order-b.sort_order));
+  const dayLabel = d => `Day ${d}`;
+
+  const runRows = runs.map(r=>{
+    const stops = runStops(r.id);
+    return {
+      Day: dayLabel(r.day),
+      Depart: r.depart_time||"",
+      Arrive: r.arrive_time||"",
+      Run: r.title||"",
+      "Run (HE)": r.title_he||"",
+      Destination: r.destination||"",
+      Pickups: stops.map(s=>s.stop_label).join(" · "),
+      Passengers: runPax(r.id),
+      Vehicles: r.vehicles||"",
+      Capacity: r.capacity||"",
+      Driver: r.driver||"",
+      "Driver mobile": r.driver_phone||"",
+      Company: r.company||"",
+      Escort: r.escort||"",
+      Status: (R_STATUS[r.status]||{label:r.status}).label,
+      "In guest PDF": r.pdf_hide ? "no" : "yes",
+      Notes: r.notes||""
+    };
+  });
+
+  const stopRows = [];
+  runs.forEach(r=>{
+    const stops = runStops(r.id);
+    if(!stops.length){
+      stopRows.push({Day:dayLabel(r.day), Run:r.title||"", "Stop time":"", Stop:"(no stops set)", Passengers:0});
+      return;
+    }
+    stops.forEach(s=>{
+      stopRows.push({
+        Day: dayLabel(r.day),
+        Run: r.title||"",
+        "Stop time": s.time||"",
+        Stop: s.stop_label||"",
+        Passengers: stopRiders(s.hotel_match).length
+      });
+    });
+  });
+
+  const manifestRows = [];
+  runs.forEach(r=>{
+    runStops(r.id).forEach(s=>{
+      stopRiders(s.hotel_match).forEach(g=>{
+        manifestRows.push({
+          Day: dayLabel(r.day),
+          Run: r.title||"",
+          Depart: s.time||r.depart_time||"",
+          "Pickup point": s.stop_label||"",
+          Guest: `${g.first_name} ${g.last_name}`.trim(),
+          Desk: g.desk||"",
+          Dietary: g.dietary||"",
+          Mobile: g.phone||""
+        });
+      });
+    });
+  });
+
+  const hotels = {};
+  data.guests.filter(g=>g.status==="active").forEach(g=>{
+    const h = g.hotel || "(no hotel recorded)";
+    hotels[h] = (hotels[h]||0) + 1;
+  });
+  const hotelRows = Object.keys(hotels).sort().map(h=>({
+    Hotel: h,
+    Guests: hotels[h],
+    "Runs collecting here": runs.filter(r=>runStops(r.id).some(s=>s.hotel_match===h)).length
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(runRows), "Runs");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stopRows), "Stops");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(manifestRows.length?manifestRows:[{Note:"No riders — no hotels recorded in the Guest Registry yet"}]), "Manifest");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hotelRows), "Hotels");
+
+  const d = new Date();
+  const stamp = `${d.getDate()}.${d.getMonth()+1}`;
+  XLSX.writeFile(wb, `JF60 Transport ${stamp}.xlsx`);
+  toast(DL("Excel exported","קובץ אקסל יוצא"));
+}
+
+function renderTransport(){
+  const el=document.getElementById("content");
+  const isAdmin=ROLE==="admin";
+  const all=data.transport_runs;
+  let list=all.slice();
+  if(ui.runDay && ui.runDay!=="all") list=list.filter(r=>r.day==ui.runDay);
+  const cnt=k=>all.filter(r=>r.status===k).length;
+  const noHotel=guestsWithoutHotel();
+  const inHotel=data.guests.filter(g=>g.status==="active" && g.hotel).length;
+
+  let html=`<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px;gap:30px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--serif);font-size:22px;font-weight:400;margin:0 0 4px;">${t("transport")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);max-width:540px;">${DL("Every minibus run — who is picked up where, when, and who is riding. Manifests are built live from the hotels in the Guest Registry.","כל הסעה — מי נאסף מאיפה, מתי, ומי נוסע. רשימות הנוסעים נבנות ישירות מהמלונות במרשם האורחים.")}</div>
+    </div>
+    <div style="display:flex;gap:18px;text-align:center;">
+      <div><div style="font-family:var(--serif);font-size:20px;">${all.length}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Runs","הסעות")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-confirmed);">${cnt('booked')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Booked","הוזמנו")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-open);">${cnt('no_driver')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("No driver","אין נהג")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--olive);">${inHotel}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("In JF hotels","במלונות הקרן")}</div></div>
+    </div>
+  </div>`;
+
+  if(noHotel.length){
+    html += `<div style="border:1px solid var(--terra);background:rgba(162,78,46,0.07);border-radius:4px;padding:13px 17px;margin-bottom:16px;font-size:13px;line-height:1.7;">
+      ${DL(`<strong>${noHotel.length} guests have no hotel recorded</strong>, so they appear on no manifest. Once the registry is updated they will be picked up automatically — nothing here needs re-entering.`,`<strong>ל-${noHotel.length} אורחים לא רשום מלון</strong>, ולכן הם לא מופיעים באף רשימת נוסעים. ברגע שהמרשם יתעדכן הם ייכנסו אוטומטית — אין צורך להזין כאן שוב.`)}
+    </div>`;
+  }
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div class="seg" style="width:fit-content;">
+      ${["all",1,2,3].map(d=>`<button data-rday="${d}" class="${(ui.runDay||'all')==d?'active':''}">${d==='all'?DL("All days","כל הימים"):(LANG==="he"?DAYS[d].num:('Day '+d))}</button>`).join('')}
+    </div>
+    <button class="btn-ghost" id="rXlsx">${DL("⭳ Export Excel","⭳ ייצוא אקסל")}</button>
+  </div>`;
+
+  let curDay=null;
+  html += `<div>`;
+  if(!list.length) html += `<div class="empty" style="padding:32px;">${stateLoaded?DL('No runs.','אין הסעות.'):DL('Loading…','טוען…')}</div>`;
+  list.forEach(r=>{
+    if(r.day!==curDay){
+      curDay=r.day; const d=DAYS[r.day];
+      html += `<div class="day-head" style="margin-top:18px;"><span class="daynum">${d.num}</span><span class="date">${d.date}</span></div>
+        <div class="g-table" style="border-top:none;border-radius:0 0 3px 3px;">
+        <div class="d-head" style="grid-template-columns:0.6fr 2fr 1.4fr 0.6fr 1.2fr 26px;">
+          <div>${DL("Depart","יציאה")}</div><div>${DL("Run","הסעה")}</div><div>${DL("Pickups","תחנות")}</div><div>${DL("Pax","נוסעים")}</div><div>${DL("Status","סטטוס")}</div><div></div>
+        </div>`;
+    }
+    html += runRowHtml(r);
+    const next = list[list.indexOf(r)+1];
+    if(!next || next.day!==curDay) html += `</div>`;
+  });
+  html += `</div>`;
+
+  if(isAdmin){
+    html += `<div class="add-row" style="flex-wrap:wrap;margin-top:18px;">
+      <select id="nrDay" class="search" style="max-width:110px;"><option value="1">${DL("Day 1","יום 1")}</option><option value="2">${DL("Day 2","יום 2")}</option><option value="3">${DL("Day 3","יום 3")}</option></select>
+      <input type="text" id="nrTime" placeholder="${DL('Depart','יציאה')}" style="max-width:90px;">
+      <input type="text" id="nrTitle" placeholder="${DL('Run name','שם ההסעה')}" style="flex:2;">
+      <input type="text" id="nrDest" placeholder="${DL('Destination','יעד')}" style="flex:1;">
+      <button id="nrAdd">${DL("Add run","הוספת הסעה")}</button>
+    </div>`;
+  }
+
+  el.innerHTML=html;
+  el.querySelectorAll("[data-rday]").forEach(b=>b.onclick=()=>{ ui.runDay=b.dataset.rday==='all'?'all':parseInt(b.dataset.rday); renderTransport(); });
+  const xb=document.getElementById("rXlsx"); if(xb) xb.onclick=exportTransportXLSX;
+  el.querySelectorAll('.d-row[data-rid]').forEach(d=>{
+    d.addEventListener('toggle',()=>{
+      const id=d.dataset.rid;
+      if(!ui.openRun) ui.openRun=new Set();
+      if(d.open) ui.openRun.add(id); else ui.openRun.delete(id);
+    });
+  });
+  list.forEach(r=>wireRunBody(r));
+  if(isAdmin){
+    const na=document.getElementById("nrAdd");
+    if(na) na.onclick=async()=>{
+      const t2=document.getElementById("nrTitle").value.trim();
+      if(!t2){ toast(DL("Run name required","נדרש שם להסעה"),true); return; }
+      const res=await api("run/add",{day:document.getElementById("nrDay").value, depart_time:document.getElementById("nrTime").value.trim(), title:t2, destination:document.getElementById("nrDest").value.trim()});
+      if(res.error){ toast(res.error,true); return; }
+      await refresh(); toast(DL("Run added","ההסעה נוספה"));
+    };
+  }
+}
+
+// ---- DESIGN & PRINT ----
+const D_STATUS = {
+  content_missing:{label:"Content missing", he:"חסר תוכן", color:"var(--st-open)"},
+  in_design:{label:"In design", he:"בעיצוב", color:"var(--st-progress)"},
+  awaiting_approval:{label:"Awaiting approval", he:"ממתין לאישור", color:"var(--sky)"},
+  approved:{label:"Approved", he:"מאושר", color:"var(--st-confirmed)"},
+  changes:{label:"Changes requested", he:"נדרשים תיקונים", color:"var(--terra)"},
+  at_printer:{label:"At printer", he:"בדפוס", color:"var(--olive)"},
+  delivered:{label:"Delivered", he:"נמסר", color:"var(--ink-soft)"},
+  no_design:{label:"No design line", he:"ללא שורת עיצוב", color:"var(--ink-soft)"},
+  unresolved:{label:"Unresolved", he:"לא הוכרע", color:"var(--st-progress)"}
+};
+// one place for every Design & Print label, so the tab flips with the עב/EN toggle
+function DL(en,he){ return LANG==="he" ? he : en; }
+function dDaysLeft(it){
+  if(!it.deadline) return null;
+  const d=new Date(it.deadline+"T00:00:00");
+  if(isNaN(d)) return null;
+  const today=new Date(); today.setHours(0,0,0,0);
+  return Math.round((d-today)/86400000);
+}
+function dOverdue(it){
+  const n=dDaysLeft(it);
+  return n!==null && n<0 && !["approved","at_printer","delivered"].includes(it.status);
+}
+function dStatus(s){
+  const r = D_STATUS[s];
+  if(!r) return {label:s||"—", color:"var(--ink-soft)"};
+  return {label: LANG==="he"?r.he:r.label, color:r.color};
+}
+function itemProofs(id){
+  return data.design_proofs.filter(p=>p.item_id===id).sort((a,b)=>b.version-a.version);
+}
+
+function designBodyHtml(it){
+  const canEdit = ROLE==="admin" || ROLE==="edit";
+  const proofs = itemProofs(it.id);
+  const latest = proofs[0];
+  let html = `<div class="d-grid">
+    <div>
+      <div class="g-lab">${DL("Brief","בריף")}</div>
+      ${canEdit?`<textarea class="notes-area" data-df="brief" data-did="${esc(it.id)}" style="min-height:92px;">${esc(it.brief||'')}</textarea>`
+        :`<div class="g-note">${esc(it.brief||DL('No brief yet.','טרם הוזן בריף.'))}</div>`}
+      <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Quantity","כמות")}</div>${canEdit?`<input class="g-in" data-df="qty" data-did="${esc(it.id)}" value="${esc(it.qty||'')}">`:`<div class="g-val">${esc(it.qty||'—')}</div>`}</div>
+        <div style="flex:1;min-width:130px;"><div class="g-lab">${DL("Size","גודל")}</div>${canEdit?`<input class="g-in" data-df="size" data-did="${esc(it.id)}" value="${esc(it.size||'')}">`:`<div class="g-val">${esc(it.size||'—')}</div>`}</div>
+        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Print spec","מפרט דפוס")}</div>${canEdit?`<input class="g-in" data-df="spec" data-did="${esc(it.id)}" value="${esc(it.spec||'')}">`:`<div class="g-val">${esc(it.spec||'—')}</div>`}</div>
+      </div>
+      <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Design cost","עלות עיצוב")}</div>${canEdit?`<input class="g-in" data-df="design_cost" data-did="${esc(it.id)}" value="${esc(it.design_cost||'')}" placeholder="₪">`:`<div class="g-val">${esc(it.design_cost||'—')}</div>`}</div>
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Print cost","עלות דפוס")}</div>${canEdit?`<input class="g-in" data-df="print_cost" data-did="${esc(it.id)}" value="${esc(it.print_cost||'')}" placeholder="${DL('not quoted yet','טרם תומחר')}">`:`<div class="g-val">${esc(it.print_cost||'—')}</div>`}</div>
+        <div style="flex:1.4;min-width:170px;"><div class="g-lab">${DL("Supplier","ספק")}</div>${canEdit?`<input class="g-in" data-df="supplier" data-did="${esc(it.id)}" value="${esc(it.supplier||'')}">`:`<div class="g-val">${esc(it.supplier||'—')}</div>`}</div>
+        <div style="flex:1;min-width:150px;"><div class="g-lab">${DL("Art deadline","דדליין לקבצים")}</div>${canEdit?`<input class="g-in" data-df="deadline" data-did="${esc(it.id)}" value="${esc(it.deadline||'')}" placeholder="YYYY-MM-DD">`:`<div class="g-val">${esc(it.deadline||'—')}</div>`}</div>
+      </div>
+      ${it.notes?`<div style="margin-top:12px;"><div class="g-lab">${DL('Notes','הערות')}</div><div class="g-note" style="border-color:var(--gold);background:rgba(181,137,46,0.07);">${esc(it.notes)}</div></div>`:''}
+      ${canEdit?`<div style="margin-top:12px;"><div class="g-lab">${DL('Status','סטטוס')}</div>
+        <select class="g-in" data-df="status" data-did="${esc(it.id)}" style="max-width:230px;">
+          ${Object.keys(D_STATUS).map(k=>`<option value="${k}" ${it.status===k?'selected':''}>${LANG==="he"?D_STATUS[k].he:D_STATUS[k].label}</option>`).join('')}
+        </select></div>`:''}
+    </div>
+
+    <div>
+      <div class="g-lab">${DL("Proof","הגהה")}${latest?` · v${latest.version}`:''}</div>`;
+
+  if(latest && latest.file_id){
+    const src=`/api/files/download?id=${esc(latest.file_id)}&inline=1`;
+    const isImg=(latest.file_type||'').startsWith('image/');
+    html += `<div class="d-proof">
+      ${isImg?`<img src="${src}" alt="Proof preview" style="width:100%;display:block;max-height:280px;object-fit:contain;background:var(--parchment);">`
+             :`<iframe src="${src}" title="Proof preview" style="width:100%;height:280px;border:none;display:block;"></iframe>`}
+      <div style="padding:8px 12px;font-size:11.5px;color:var(--ink-soft);border-top:1px solid var(--line);display:flex;justify-content:space-between;">
+        <span>${esc(latest.file_name||'proof')}</span>
+        <a href="/api/files/download?id=${esc(latest.file_id)}" target="_blank">open ↗</a>
+      </div>
+    </div>`;
+  } else {
+    html += `<div class="save-hint" style="padding:10px 0;">${DL('No proof uploaded yet.','טרם הועלתה הגהה.')}</div>`;
+  }
+
+  if(canEdit){
+    html += `<label class="d-drop" style="margin-top:10px;">
+      <input type="file" data-dupload="${esc(it.id)}" accept=".pdf,image/*">
+      ${latest?DL('Upload a new version','העלאת גרסה חדשה'):DL('Drop a PDF or image, or click to browse','גררו PDF או תמונה, או לחצו לבחירה')}
+      <div class="save-hint" id="dUpHint-${esc(it.id)}"></div>
+    </label>`;
+  }
+
+  if(latest && latest.decision==="pending"){
+    html += `<div class="d-signoff">
+      <div class="g-lab" style="color:var(--sky);">${DL("Foundation sign-off","אישור הקרן")}</div>
+      <textarea class="notes-area" id="dComment-${esc(it.id)}" placeholder="${DL('Comments for the designer (optional)…','הערות למעצב (לא חובה)…')}" style="min-height:52px;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn-ghost" data-dapprove="${esc(latest.id)}" data-did="${esc(it.id)}" style="flex:1;background:var(--st-confirmed);color:#fff;border-color:var(--st-confirmed);font-weight:700;">${DL("Approve for print","אישור להדפסה")}</button>
+        <button class="btn-ghost" data-dchanges="${esc(latest.id)}" data-did="${esc(it.id)}" style="flex:1;color:var(--terra);border-color:var(--terra);">${DL("Request changes","בקשת שינויים")}</button>
+      </div>
+    </div>`;
+  } else if(latest && latest.decision==="approved"){
+    html += `<div class="d-signoff" style="border-color:var(--st-confirmed);background:rgba(107,113,69,0.07);">
+      <strong style="font-size:12.5px;color:var(--st-confirmed);">${DL("Approved for print","אושר להדפסה")}</strong>
+      <div class="save-hint">v${latest.version}${latest.decided_by?` · by ${esc(latest.decided_by)}`:''}${latest.decided_at?` · ${esc(String(latest.decided_at).slice(0,10))}`:''}</div>
+      ${latest.comment?`<div style="font-size:12.5px;margin-top:6px;">${esc(latest.comment)}</div>`:''}
+    </div>`;
+  }
+
+  if(proofs.length){
+    html += `<div style="margin-top:12px;"><div class="g-lab">${DL('History','היסטוריה')}</div><div class="d-hist">
+      ${proofs.map(p=>{
+        const d = p.decision==="approved"?DL("approved","אושר"):p.decision==="changes"?DL("changes requested","התבקשו שינויים"):DL("awaiting approval","ממתין לאישור");
+        return `<div><strong style="color:var(--ink);">v${p.version}</strong> · ${esc(String(p.created_at||'').slice(0,10))} · ${d}${p.comment?`: <em>"${esc(p.comment)}"</em>`:''}</div>`;
+      }).join('')}
+    </div></div>`;
+  }
+
+  html += `</div></div>
+  ${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-ddel="${esc(it.id)}" style="color:var(--terra);border-color:var(--line);">${DL("Delete item","מחיקת פריט")}</button></div>`:''}
+  <div class="save-hint" id="dHint-${esc(it.id)}" style="margin-top:10px;"></div>`;
+  return html;
+}
+
+function designRowHtml(it){
+  const isOpen = ui.openDesign && ui.openDesign.has(it.id);
+  const st = dStatus(it.status);
+  const proofs = itemProofs(it.id);
+  return `<details class="d-row" data-did="${esc(it.id)}"${isOpen?' open':''}>
+    <summary>
+      <div><strong>${esc(LANG==="he"&&it.title_he?it.title_he:it.title)}</strong>
+        <div class="d-sub">${esc(LANG==="he"?it.title:(it.title_he||''))}${it.design_cost&&it.design_cost!=='—'?` · ${esc(it.design_cost)}${/^\d+$/.test(it.design_cost)?' ₪':''}`:''}</div></div>
+      <div>${esc(it.qty||'—')}</div>
+      <div>${esc(it.size||'—')}</div>
+      <div style="font-size:12px;${dOverdue(it)?'color:var(--terra);font-weight:700;':''}">${it.deadline?esc(fmtDay(it.deadline)):'—'}</div>
+      <div><span class="d-tag" style="background:${st.color};">${st.label.toUpperCase()}</span>${proofs.length?` <span class="save-hint">v${proofs[0].version}</span>`:''}</div>
+      <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
+    </summary>
+    <div class="d-body" id="dBody-${esc(it.id)}">${designBodyHtml(it)}</div>
+  </details>`;
+}
+
+let designTimers = {};
+function wireDesignBody(it){
+  const body=document.getElementById('dBody-'+it.id);
+  if(!body) return;
+  body.querySelectorAll('[data-df]').forEach(el=>{
+    const ev = el.tagName==='SELECT' ? 'change' : 'input';
+    el.addEventListener(ev, ()=>{
+      const f=el.dataset.df, k=it.id+'-'+f;
+      clearTimeout(designTimers[k]);
+      const hint=document.getElementById('dHint-'+it.id);
+      if(hint) hint.textContent='saving…';
+      const go=async()=>{
+        it[f]=el.value;
+        await api("design/field",{id:it.id, field:f, value:el.value});
+        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint) hint.textContent=''; },1400); }
+        if(f==='status') renderDesign();
+      };
+      if(ev==='change') go(); else designTimers[k]=setTimeout(go,600);
+    });
+  });
+  const fi=body.querySelector('[data-dupload]');
+  if(fi) fi.onchange=()=>doDesignUpload(it);
+  const dz=body.querySelector('.d-drop');
+  if(dz){
+    ["dragenter","dragover"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();dz.classList.add('dragover');}));
+    ["dragleave","dragend"].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();dz.classList.remove('dragover');}));
+    dz.addEventListener('drop',ev=>{ev.preventDefault();ev.stopPropagation();dz.classList.remove('dragover');
+      const f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0];
+      if(f) doDesignUpload(it,f);});
+  }
+  const dd=body.querySelector('[data-ddel]');
+  if(dd) dd.onclick=async()=>{
+    if(!confirm(DL("Delete this item and its proofs?","למחוק את הפריט ואת ההגהות שלו?"))) return;
+    await api("design/delete",{id:it.id});
+    await refresh(); toast(DL("Item deleted","הפריט נמחק"));
+  };
+  const ap=body.querySelector('[data-dapprove]');
+  if(ap) ap.onclick=()=>decideProof(it, parseInt(ap.dataset.dapprove), "approved");
+  const rc=body.querySelector('[data-dchanges]');
+  if(rc) rc.onclick=()=>decideProof(it, parseInt(rc.dataset.dchanges), "changes");
+}
+
+async function decideProof(it, proofId, decision){
+  const ta=document.getElementById('dComment-'+it.id);
+  const comment=ta?ta.value.trim():"";
+  if(decision==="changes" && !comment){ toast(DL("Say what needs changing","נא לפרט מה צריך לשנות"),true); return; }
+  const r=await api("design/decide",{proof_id:proofId, decision, comment, by:NAME||""});
+  if(r.error){ toast(r.error,true); return; }
+  await refresh();
+  if(r.latest===false){ toast(DL("Recorded on that older version. The item's status follows the latest proof, so it did not change.","נרשם על הגרסה הישנה. הסטטוס של הפריט נקבע לפי ההגהה האחרונה, ולכן לא השתנה."),true); return; }
+  toast(decision==="approved"?DL("Approved for print","אושר להדפסה"):DL("Changes requested","התבקשו שינויים"));
+}
+
+async function doDesignUpload(it, dropped){
+  let file=dropped;
+  if(!file){
+    const inp=document.querySelector('[data-dupload="'+it.id+'"]');
+    if(!inp||!inp.files||!inp.files[0]) return;
+    file=inp.files[0];
+  }
+  const hint=document.getElementById('dUpHint-'+it.id);
+  if(hint) hint.textContent="Uploading "+file.name+"…";
+  const fd=new FormData();
+  fd.append("file",file); fd.append("section","proof"); fd.append("segment_id",it.id); fd.append("by",NAME||"");
+  try{
+    const j=await api("files/upload",fd,{idem:newIdemKey()});
+    if(j.error){ if(hint) hint.textContent=""; toast(j.error,true); return; }
+    const p=await api("design/proof",{item_id:it.id, file_id:j.id, by:NAME||""});
+    if(p.error){ if(hint) hint.textContent=""; toast(p.error,true); return; }
+    if(hint) hint.textContent="";
+    await refresh();
+    toast(DL("Proof v"+p.version+" uploaded — awaiting approval","הגהה v"+p.version+" הועלתה — ממתינה לאישור"));
+  }catch(e){ if(hint) hint.textContent=""; toast("Upload failed: "+apiErrorText(e, LANG==="he"),true); }
+}
+
+function renderDesign(){
+  const el=document.getElementById("content");
+  const isAdmin=ROLE==="admin";
+  const all=data.design_items;
+  let list=all.slice();
+  if(ui.designCat && ui.designCat!=="all"){
+    if(ui.designCat==="_blocked") list=list.filter(i=>i.status==="content_missing");
+    else if(ui.designCat==="_approval") list=list.filter(i=>i.status==="awaiting_approval");
+    else list=list.filter(i=>i.category===ui.designCat);
+  }
+  const cnt=k=>all.filter(i=>i.status===k).length;
+  const cats={}; all.forEach(i=>{ cats[i.category]=(cats[i.category]||0)+1; });
+  const totalDesign = all.reduce((s,i)=>s + (/^\d+$/.test(i.design_cost||'')?parseInt(i.design_cost):0), 0);
+
+  let html=`<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:18px;gap:30px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--serif);font-size:22px;font-weight:400;margin:0 0 4px;">${t("design")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);max-width:540px;">${DL("Every printed and on-screen item — its brief, its proof, and the Foundation's sign-off before it goes to press.","כל פריט מודפס ומסכי — הבריף שלו, ההגהה, ואישור הקרן לפני שהוא יוצא לדפוס.")}</div>
+    </div>
+    <div style="display:flex;gap:18px;text-align:center;">
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-open);">${cnt('content_missing')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Content missing","חסר תוכן")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-progress);">${cnt('in_design')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("In design","בעיצוב")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--sky);">${cnt('awaiting_approval')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Awaiting approval","ממתין לאישור")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-confirmed);">${cnt('approved')}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Approved","מאושר")}</div></div>
+    </div>
+  </div>`;
+
+  if(cnt('content_missing')){
+    html += `<div style="border:1px solid var(--terra);background:rgba(162,78,46,0.07);border-radius:4px;padding:13px 17px;margin-bottom:12px;font-size:13px;line-height:1.7;">
+      ${DL(`<strong>${cnt("content_missing")} items are blocked on content, not design.</strong> Nothing reaches the designer until the text exists — and the badge, programme and map share one holder, so they move as a set.`,`<strong>${cnt("content_missing")} פריטים תקועים על תוכן, לא על עיצוב.</strong> שום דבר לא מגיע למעצב לפני שהטקסט קיים — והתג, התכניה והמפה חולקים נרתיק אחד, כך שהם נעים כמקשה אחת.`)}
+    </div>`;
+  }
+  const overdue = all.filter(dOverdue);
+  if(overdue.length){
+    html += `<div style="border:1px solid var(--terra);background:rgba(162,78,46,0.07);border-radius:4px;padding:13px 17px;margin-bottom:12px;font-size:13px;line-height:1.7;">
+      ${DL(`<strong>${overdue.length} items are past their art deadline.</strong> `,`<strong>${overdue.length} פריטים עברו את הדדליין לקבצים.</strong> `)}${overdue.map(i=>esc(LANG==="he"&&i.title_he?i.title_he:i.title)).join(' · ')}
+    </div>`;
+  }
+  if(cnt('unresolved')){
+    html += `<div style="border:1px solid var(--gold);background:rgba(181,137,46,0.09);border-radius:4px;padding:13px 17px;margin-bottom:18px;font-size:13px;line-height:1.7;">
+      ${DL(`<strong>Unresolved between the production sheet and the Brief. quote:</strong> the 28-page programme is quoted but not on the sheet; the screen graphics are 4K portrait on the sheet and 16:9 in the quote; lanyards, holders and the die-cut arrow have no design line.`,`<strong>פערים בין גיליון ההפקה להצעת המחיר של Brief.:</strong> התכניה בת 28 העמודים מתומחרת אך לא מופיעה בגיליון; גרפיקת המסכים היא 4K לאורך בגיליון ו-16:9 בהצעה; לרצועות, לנרתיקים ולחץ החיתוך אין שורת עיצוב.`)}
+    </div>`;
+  }
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div class="seg" style="width:fit-content;flex-wrap:wrap;">
+      <button data-dcat="all" class="${(ui.designCat||'all')==='all'?'active':''}">${DL("All","הכול")} ${all.length}</button>
+      ${Object.keys(cats).sort().map(c=>`<button data-dcat="${esc(c)}" class="${ui.designCat===c?'active':''}">${esc(c)} ${cats[c]}</button>`).join('')}
+    </div>
+    <div class="chips">
+      <span class="chip ${ui.designCat==='_blocked'?'active':''}" data-dcat="_blocked" style="border-color:var(--terra);color:${ui.designCat==='_blocked'?'':'var(--terra)'};">${DL("Content missing","חסר תוכן")} ${cnt('content_missing')}</span>
+      <span class="chip ${ui.designCat==='_approval'?'active':''}" data-dcat="_approval">${DL("Needs approval","ממתין לאישור")} ${cnt('awaiting_approval')}</span>
+    </div>
+  </div>`;
+
+  html += `<div class="g-table">
+    <div class="d-head"><div>${DL("Item","פריט")}</div><div>${DL("Qty","כמות")}</div><div>${DL("Size","גודל")}</div><div>${DL("Deadline","דדליין")}</div><div>${DL("Status","סטטוס")}</div><div></div></div>
+    ${list.length?list.map(designRowHtml).join(''):`<div class="empty" style="padding:32px;">${stateLoaded?DL('No items match.','אין פריטים תואמים.'):DL('Loading…','טוען…')}</div>`}
+  </div>
+  <div class="save-hint" style="margin:8px 0 22px;">${DL('Showing','מוצגים')} ${list.length} ${DL('of','מתוך')} ${all.length} · ${DL('design total','סה"כ עיצוב')} ${totalDesign.toLocaleString()} ₪ ${DL('before VAT','לפני מע"מ')} · ${DL('print not yet quoted','דפוס טרם תומחר')}</div>`;
+
+  if(isAdmin){
+    html += `<div class="add-row" style="flex-wrap:wrap;margin-bottom:28px;">
+      <input type="text" id="ndTitle" placeholder="${DL('Item name','שם הפריט')}" style="flex:2;">
+      <input type="text" id="ndTitleHe" placeholder="שם בעברית" dir="rtl" style="flex:2;">
+      <input type="text" id="ndQty" placeholder="Qty" style="max-width:90px;">
+      <input type="text" id="ndSize" placeholder="Size" style="max-width:100px;">
+      <select id="ndCat" class="search" style="max-width:120px;"><option value="print">print</option><option value="badge">badge</option><option value="signage">signage</option><option value="screen">screen</option></select>
+      <button id="ndAdd">${DL("Add item","הוספת פריט")}</button>
+    </div>`;
+  }
+
+  // Print deadlines, grouped by date — artwork has to reach the printer by these
+  const byDeadline={};
+  all.forEach(i=>{ if(i.deadline) (byDeadline[i.deadline]=byDeadline[i.deadline]||[]).push(i); });
+  const dlDates=Object.keys(byDeadline).sort();
+  if(dlDates.length){
+    html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Print deadlines","דדליינים לדפוס")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;">${DL("Artwork has to reach the printer by these dates.","הקבצים צריכים להגיע לדפוס עד התאריכים האלה.")}</div>
+      <div class="g-table" style="margin-bottom:26px;">
+        <div style="display:grid;grid-template-columns:1fr 2.6fr 1fr;gap:10px;background:var(--stone);padding:9px 16px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;">
+          <div>${DL("Deadline","דדליין")}</div><div>${DL("Items","פריטים")}</div><div>${DL("Days left","ימים נותרו")}</div>
+        </div>
+        ${dlDates.map(d=>{
+          const items=byDeadline[d];
+          const n=dDaysLeft(items[0]);
+          const late=n!==null&&n<0;
+          return `<div style="display:grid;grid-template-columns:1fr 2.6fr 1fr;gap:10px;padding:10px 16px;font-size:13px;border-top:1px solid var(--line);${late?'background:rgba(162,78,46,0.06);':''}">
+            <div><strong>${esc(fmtDay(d))}</strong></div>
+            <div>${items.map(i=>esc(LANG==="he"&&i.title_he?i.title_he:i.title)).join(' · ')}</div>
+            <div style="${late?'color:var(--terra);font-weight:700;':''}">${n===null?'—':(late?DL(Math.abs(n)+' days late',Math.abs(n)+' ימים באיחור'):n+' '+DL('days','ימים'))}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // ---- Welcome package: its own table, separate from the print items ----
+  const gifts = data.gift_items || [];
+  if(gifts.length){
+    const cats = [];
+    gifts.forEach(g=>{ const c=LANG==="he"&&g.category_he?g.category_he:g.category; if(!cats.includes(c)) cats.push(c); });
+    const chosenCount = gifts.filter(g=>g.chosen && g.category!=="Logistics").length;
+    const logs = gifts.filter(g=>g.category==="Logistics" && g.deadline).sort((a,b)=>a.deadline<b.deadline?-1:1);
+    const finalMs = logs[logs.length-1];
+    const nextMs = logs.find(g=>dDaysLeft(g)>=0) || finalMs;
+    const lateMs = logs.filter(g=>dDaysLeft(g)<0);
+    html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Welcome package","חבילת קבלת פנים")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;max-width:640px;">${DL("Waiting in the room when each guest checks in — the Foundation's first hello. Pick one or two from each category; tick what you are taking.","מחכה בחדר עם הצ׳ק-אין — ברכת השלום הראשונה של הקרן. בוחרים פריט או שניים מכל קטגוריה; סמנו את מה שנלקח.")}</div>`;
+
+    if(finalMs){
+      const dLeft = dDaysLeft(finalMs);
+      html += `<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;border:1px solid ${lateMs.length?'var(--terra)':'var(--line)'};background:${lateMs.length?'rgba(162,78,46,0.06)':'#fff'};border-radius:4px;padding:13px 18px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--gold-deep);font-weight:700;">${DL("In the rooms by","בחדרים עד")}</div>
+          <div style="font-family:var(--serif);font-size:21px;">${esc(fmtDay(finalMs.deadline))}</div>
+          <div class="save-hint">${dLeft>=0?`${dLeft} ${DL("days left","ימים נותרו")}`:`${Math.abs(dLeft)} ${DL("days late","ימים באיחור")}`}</div>
+        </div>
+        <div style="border-${LANG==="he"?'right':'left'}:1px solid var(--line);padding-${LANG==="he"?'right':'left'}:24px;">
+          <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--gold-deep);font-weight:700;">${DL("Next milestone","אבן הדרך הבאה")}</div>
+          <div style="font-size:14px;margin-top:3px;">${esc(LANG==="he"&&nextMs.title_he?nextMs.title_he:nextMs.title)}</div>
+          <div class="save-hint">${esc(fmtDay(nextMs.deadline))} · ${dDaysLeft(nextMs)>=0?`${dDaysLeft(nextMs)} ${DL("days","ימים")}`:`${Math.abs(dDaysLeft(nextMs))} ${DL("days late","ימים באיחור")}`}</div>
+        </div>
+        <div style="border-${LANG==="he"?'right':'left'}:1px solid var(--line);padding-${LANG==="he"?'right':'left'}:24px;">
+          <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--gold-deep);font-weight:700;">${DL("Chosen","נבחרו")}</div>
+          <div style="font-family:var(--serif);font-size:21px;">${chosenCount}</div>
+          <div class="save-hint">${DL("90 packages","90 חבילות")}</div>
+        </div>
+        ${lateMs.length?`<div style="flex:1;min-width:210px;font-size:12.5px;color:var(--terra);font-weight:700;">
+          ${DL(`${lateMs.length} milestone${lateMs.length===1?'':'s'} already past`,`${lateMs.length} אבני דרך כבר עברו`)}: ${lateMs.map(m=>esc(LANG==="he"&&m.title_he?m.title_he:m.title)).join(' · ')}
+        </div>`:''}
+      </div>`;
+    }
+
+    cats.forEach(c=>{
+      const rows = gifts.filter(g=>(LANG==="he"&&g.category_he?g.category_he:g.category)===c);
+      const isLog = rows[0] && rows[0].category==="Logistics";
+      html += `<div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--gold-deep);font-weight:700;margin:16px 0 6px;">${esc(c)}</div>
+      <div class="g-table">
+        ${rows.map(g=>{
+          const late = g.deadline && dDaysLeft({deadline:g.deadline,status:g.status})<0;
+          return `<div style="display:grid;grid-template-columns:24px 2.2fr 0.7fr 1.2fr 1fr;gap:10px;padding:10px 16px;font-size:13px;border-top:1px solid var(--line);align-items:center;${g.chosen&&!isLog?'background:rgba(107,113,69,0.07);':''}">
+            <div>${isLog?'':`<input type="checkbox" data-gchoose="${esc(g.id)}" ${g.chosen?'checked':''} ${(ROLE==="admin"||ROLE==="edit")?'':'disabled'}>`}</div>
+            <div>${esc(LANG==="he"&&g.title_he?g.title_he:g.title)}
+              ${g.notes?`<div class="save-hint" style="margin-top:2px;">${esc(g.notes)}</div>`:''}</div>
+            <div>${esc(g.qty||'')}</div>
+            <div style="${late?'color:var(--terra);font-weight:700;':''}">${g.deadline?esc(fmtDay(g.deadline)):'—'}</div>
+            <div>${(ROLE==="admin"||ROLE==="edit")?`<input class="g-in" data-gf="supplier" data-gid2="${esc(g.id)}" value="${esc(g.supplier||'')}" placeholder="${DL('supplier','ספק')}" style="padding:5px 8px;font-size:12px;">`:esc(g.supplier||'')}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+    html += `<div class="save-hint" id="giftHint" style="margin:10px 0 26px;"></div>`;
+  }
+
+  const waiting=all.filter(i=>i.status==="awaiting_approval");
+  if(waiting.length){
+    html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Waiting on the Foundation","ממתין לאישור הקרן")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;">${DL("Proofs uploaded and awaiting a decision.","הגהות שהועלו וממתינות להחלטה.")}</div>
+      <div class="g-table" style="border-color:var(--sky);">
+        ${waiting.map(i=>{ const p=itemProofs(i.id)[0];
+          return `<div style="padding:11px 17px;border-top:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;align-items:center;">
+            <span><strong>${esc(i.title)}</strong>${p?` · v${p.version}`:''}</span>
+            <a href="#" data-dgo="${esc(i.id)}" style="color:var(--sky);">${DL("review","לבדיקה")} ↗</a>
+          </div>`;}).join('')}
+      </div>`;
+  }
+
+  el.innerHTML=html;
+  el.querySelectorAll("[data-dcat]").forEach(b=>b.onclick=()=>{ ui.designCat=b.dataset.dcat; renderDesign(); });
+  el.querySelectorAll('.d-row').forEach(d=>{
+    d.addEventListener('toggle',()=>{
+      const id=d.dataset.did;
+      if(!ui.openDesign) ui.openDesign=new Set();
+      if(d.open) ui.openDesign.add(id); else ui.openDesign.delete(id);
+    });
+  });
+  el.querySelectorAll("[data-dgo]").forEach(a=>a.onclick=(e)=>{
+    e.preventDefault();
+    if(!ui.openDesign) ui.openDesign=new Set();
+    ui.openDesign.add(a.dataset.dgo); ui.designCat="all"; renderDesign();
+    const row=document.querySelector('.d-row[data-did="'+a.dataset.dgo+'"]');
+    if(row) row.scrollIntoView({behavior:"smooth",block:"center"});
+  });
+  list.forEach(it=>wireDesignBody(it));
+  // welcome package wiring
+  el.querySelectorAll("[data-gchoose]").forEach(cb=>cb.onchange=async()=>{
+    const g=(data.gift_items||[]).find(x=>x.id===cb.dataset.gchoose);
+    if(!g) return;
+    g.chosen = cb.checked?1:0;
+    await api("gift/chosen",{id:g.id, chosen:g.chosen});
+    renderDesign();
+  });
+  let giftT={};
+  el.querySelectorAll("[data-gid2]").forEach(inp=>inp.addEventListener("input",()=>{
+    const id=inp.dataset.gid2, f=inp.dataset.gf, k=id+"-"+f;
+    clearTimeout(giftT[k]);
+    const h2=document.getElementById("giftHint");
+    if(h2) h2.textContent="saving…";
+    giftT[k]=setTimeout(async()=>{
+      const g=(data.gift_items||[]).find(x=>x.id===id);
+      if(g) g[f]=inp.value;
+      await api("gift/field",{id, field:f, value:inp.value});
+      if(h2){ h2.textContent="saved"; setTimeout(()=>{ if(h2) h2.textContent=""; },1400); }
+    },600);
+  }));
+  if(isAdmin){
+    const na=document.getElementById("ndAdd");
+    if(na) na.onclick=async()=>{
+      const t=document.getElementById("ndTitle").value.trim();
+      if(!t){ toast("Item name required",true); return; }
+      const r=await api("design/add",{title:t, title_he:document.getElementById("ndTitleHe").value.trim(), qty:document.getElementById("ndQty").value.trim(), size:document.getElementById("ndSize").value.trim(), category:document.getElementById("ndCat").value});
+      if(r.error){ toast(r.error,true); return; }
+      await refresh(); toast("Item added");
+    };
+  }
+}
+
+// ---- GUEST REGISTRY ----
+const GUEST_SESSIONS = [
+  ["seg-ms6g3f67-uwl0","Day 1 · Bus tour"],
+  ["d1-opening","Day 1 · Opening night"],
+  ["d2-leadership","Day 2 · Leadership"],
+  ["d2-beithanina","Day 2 · Beit Hanina"],
+  ["d2-dinner","Day 2 · HaMiffal dinner"],
+  ["d3-morning","Day 3 · Activities market"],
+  ["d3-thinktank","Day 3 · Think tank"],
+  ["d3-gala","Day 3 · Closing gala"]
+];
+function guestAttending(gid, segId){
+  return data.guest_sessions.some(r=>r.guest_id===gid && r.segment_id===segId);
+}
+function guestNights(g){
+  if(!g.checkin || !g.checkout) return "";
+  const a=new Date(g.checkin), b=new Date(g.checkout);
+  if(isNaN(a)||isNaN(b)) return "";
+  const n=Math.round((b-a)/86400000);
+  return n>0 ? n+" night"+(n===1?"":"s") : "";
+}
+function fmtDay(d){
+  if(!d) return "";
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  if(!m) return esc(d);
+  return parseInt(m[3],10)+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m[2],10)-1];
+}
+function guestDeskCounts(){
+  const c={};
+  data.guests.forEach(g=>{ if(g.status!=="active") return; const d=g.desk||"—"; c[d]=(c[d]||0)+1; });
+  return c;
+}
+function guestHotelCounts(){
+  const h={};
+  data.guests.forEach(g=>{
+    if(g.status!=="active" || !g.hotel) return;
+    if(!h[g.hotel]) h[g.hotel]={guests:0, parties:new Set(), din:"", dout:""};
+    h[g.hotel].guests++;
+    if(g.party_id) h[g.hotel].parties.add(g.party_id); else h[g.hotel].parties.add("solo"+g.id);
+    if(g.checkin && (!h[g.hotel].din || g.checkin<h[g.hotel].din)) h[g.hotel].din=g.checkin;
+    if(g.checkout && (!h[g.hotel].dout || g.checkout>h[g.hotel].dout)) h[g.hotel].dout=g.checkout;
+  });
+  return h;
+}
+
+function guestBodyHtml(g){
+  const isAdmin = ROLE==="admin";
+  const canEdit = isAdmin || ROLE==="edit";
+  const nights = guestNights(g);
+  let html = `<div class="g-grid3">
+    <div>
+      <div class="g-lab">${DL("Contact","פרטי קשר")}</div>
+      ${!isAdmin?`<div class="save-hint">${DL("Admin only","למנהלים בלבד")}</div>`:canEdit?`
+        <input class="g-in" data-gf="email" data-gid="${esc(g.id)}" value="${esc(g.email||'')}" placeholder="${DL('Email','אימייל')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="phone" data-gid="${esc(g.id)}" value="${esc(g.phone||'')}" placeholder="${DL('Phone','טלפון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="city" data-gid="${esc(g.id)}" value="${esc(g.city||'')}" placeholder="${DL('City','עיר')}">`
+      :`<div class="g-val">${esc(g.email||'—')}<br>${esc(g.phone||'')}<br>${esc(g.city||'')}</div>`}
+    </div>
+    <div>
+      <div class="g-lab">${DL("Travel documents","מסמכי נסיעה")}</div>
+      ${!isAdmin?`<div class="save-hint">${DL("Admin only","למנהלים בלבד")}</div>`:canEdit?`
+        <input class="g-in" data-gf="passport_no" data-gid="${esc(g.id)}" value="${esc(g.passport_no||'')}" placeholder="${DL('Passport number','מספר דרכון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="passport_country" data-gid="${esc(g.id)}" value="${esc(g.passport_country||'')}" placeholder="${DL('Country of issue','מדינת הנפקה')}">`
+      :`<div class="g-val">${esc(g.passport_no||'—')}<br>${esc(g.passport_country||'')}</div>`}
+      ${isAdmin&&!g.passport_no?`<div class="save-hint" style="color:var(--terra);margin-top:5px;">${DL("Needed for VAT exemption","נדרש לפטור ממע\"מ")}</div>`:''}
+    </div>
+    <div>
+      <div class="g-lab">${DL("Accommodation","לינה")}</div>
+      ${canEdit?`
+        <input class="g-in" data-gf="hotel" data-gid="${esc(g.id)}" value="${esc(g.hotel||'')}" placeholder="${DL('Hotel','מלון')}" style="margin-bottom:6px;">
+        <input class="g-in" data-gf="room_type" data-gid="${esc(g.id)}" value="${esc(g.room_type||'')}" placeholder="${DL('Room type','סוג חדר')}" style="margin-bottom:6px;">
+        <div style="display:flex;gap:6px;">
+          <input class="g-in" data-gf="checkin" data-gid="${esc(g.id)}" value="${esc(g.checkin||'')}" placeholder="YYYY-MM-DD">
+          <input class="g-in" data-gf="checkout" data-gid="${esc(g.id)}" value="${esc(g.checkout||'')}" placeholder="YYYY-MM-DD">
+        </div>
+        <input class="g-in" data-gf="booking_conf" data-gid="${esc(g.id)}" value="${esc(g.booking_conf||'')}" placeholder="${DL('Booking confirmation','אישור הזמנה')}" style="margin-top:6px;">
+        <input class="g-in" data-gf="early_late" data-gid="${esc(g.id)}" value="${esc(g.early_late||'')}" placeholder="${DL('Early check-in / late check-out','צ׳ק-אין מוקדם / צ׳ק-אאוט מאוחר')}" style="margin-top:6px;">`
+      :`<div class="g-val">${esc(g.hotel||DL('Own arrangement','סידור עצמאי'))}<br>${esc(g.room_type||'')}<br>${fmtDay(g.checkin)} → ${fmtDay(g.checkout)}${g.booking_conf?'<br>'+DL('Confirmation','אישור')+': '+esc(g.booking_conf):''}${g.early_late?'<br>'+esc(g.early_late):''}</div>`}
+      ${nights?`<div class="save-hint" style="margin-top:5px;">${nights}</div>`:''}
+      ${g.accommodation_note?`<div class="save-hint" style="margin-top:5px;">Own: ${esc(g.accommodation_note)}</div>`:''}
+    </div>
+  </div>`;
+
+  html += `<div style="margin-top:16px;">
+    <div class="g-lab">${DL("Dietary","תזונה")}</div>
+    ${canEdit?`<input class="g-in" data-gf="dietary" data-gid="${esc(g.id)}" value="${esc(g.dietary||'')}" placeholder="${DL('None recorded','לא נרשם')}" style="max-width:480px;">`
+      :`<div class="g-val">${esc(g.dietary||'—')}</div>`}
+  </div>`;
+
+  html += `<div style="margin-top:16px;">
+    <div class="g-lab">${DL("Attending","משתתף/ת ב")}</div>
+    <div class="g-sess">
+      ${GUEST_SESSIONS.map(([sid,label])=>{
+        const on = guestAttending(g.id, sid);
+        return `<label class="${on?'on':''}"><input type="checkbox" data-gsess="${esc(sid)}" data-gid="${esc(g.id)}" ${on?'checked':''}> ${esc(label)}</label>`;
+      }).join('')}
+    </div>
+  </div>`;
+
+  if(g.guest_note){
+    html += `<div style="margin-top:16px;">
+      <div class="g-lab">${DL('Note from registration','הערה מטופס ההרשמה')} ${g.note_handled?'<span class="g-chip" style="background:rgba(107,113,69,0.16);color:var(--olive);">${DL("handled","טופל")}</span>':''}</div>
+      <div class="g-note">${esc(g.guest_note)}</div>
+      ${canEdit?`<button class="btn-ghost" data-gnote="${esc(g.id)}" data-val="${g.note_handled?0:1}" style="margin-top:8px;">${g.note_handled?DL('Mark unhandled','סימון כלא טופל'):DL('Mark note handled','סימון כטופל')}</button>`:''}
+    </div>`;
+  }
+
+  if(g.needs_review){
+    html += `<div style="margin-top:16px;">
+      <div class="g-lab">${DL("Needs review","דורש בדיקה")}</div>
+      <div class="g-note" style="border-color:var(--gold);background:rgba(181,137,46,0.08);">${esc(g.review_note||DL('Flagged during import','סומן בעת הייבוא'))}
+      ${canEdit?`<br><button class="btn-ghost" data-gclear="${esc(g.id)}" style="margin-top:8px;">${DL("Reviewed — clear flag","נבדק — הסרת הסימון")}</button>`:''}</div>
+    </div>`;
+  }
+
+  html += `${ROLE==="admin"?`<div style="margin-top:14px;"><button class="btn-ghost" data-gdel="${esc(g.id)}" style="color:var(--terra);border-color:var(--line);">${DL("Remove guest","הסרת אורח/ת")}</button></div>`:''}
+  <div class="save-hint" id="gHint-${esc(g.id)}" style="margin-top:10px;"></div>`;
+  return html;
+}
+
+function guestRowHtml(g){
+  const isOpen = ui.openGuest && ui.openGuest.has(String(g.id));
+  const partners = g.party_id ? data.guests.filter(x=>x.party_id===g.party_id && x.id!==g.id) : [];
+  const flags = [];
+  if(g.dietary) flags.push(`<span class="g-chip ${g.dietary_severe?'sev':''}">${esc(g.dietary.slice(0,28))}</span>`);
+  if(g.needs_review) flags.push(`<span class="g-chip rev">${DL("review","בדיקה")}</span>`);
+  if(g.guest_note && !g.note_handled) flags.push(`<span class="g-chip" style="background:rgba(62,107,122,0.14);color:var(--sky);">${DL("note","הערה")}</span>`);
+  return `<details class="g-row" data-gid="${esc(g.id)}"${isOpen?' open':''}>
+    <summary>
+      <div><strong>${esc(g.first_name)} ${esc(g.last_name)}</strong>${partners.length?`<div class="sub">+ ${partners.map(p=>esc(p.first_name+' '+p.last_name)).join(', ')}</div>`:''}</div>
+      <div>${esc(g.desk||'—')}</div>
+      <div>${g.hotel?esc(g.hotel):`<span style="color:var(--ink-soft);font-style:italic;">${DL('Own arrangement','סידור עצמאי')}</span>`}</div>
+      <div>${g.checkin?fmtDay(g.checkin)+'–'+fmtDay(g.checkout):'<span style="color:var(--ink-soft);">—</span>'}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">${flags.join('')}</div>
+      <div style="text-align:right;color:var(--ink-soft);">${isOpen?'▾':'▸'}</div>
+    </summary>
+    <div class="g-body" id="gBody-${esc(g.id)}">${guestBodyHtml(g)}</div>
+  </details>`;
+}
+
+let guestSaveTimers = {};
+function wireGuestBody(g){
+  const body = document.getElementById('gBody-'+g.id);
+  if(!body) return;
+  body.querySelectorAll('[data-gf]').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      const f=el.dataset.gf, k=g.id+'-'+f;
+      clearTimeout(guestSaveTimers[k]);
+      const hint=document.getElementById('gHint-'+g.id);
+      if(hint) hint.textContent='saving…';
+      guestSaveTimers[k]=setTimeout(async()=>{
+        g[f]=el.value;
+        await api("guest/field",{id:g.id, field:f, value:el.value});
+        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint) hint.textContent=''; },1400); }
+      },600);
+    });
+  });
+  body.querySelectorAll('[data-gsess]').forEach(cb=>{
+    cb.onchange = async ()=>{
+      const sid=cb.dataset.gsess;
+      await api("guest/session",{guest_id:g.id, segment_id:sid, attending:cb.checked?1:0});
+      if(cb.checked){
+        if(!guestAttending(g.id,sid)) data.guest_sessions.push({guest_id:g.id, segment_id:sid, attending:1});
+      } else {
+        data.guest_sessions = data.guest_sessions.filter(r=>!(r.guest_id===g.id && r.segment_id===sid));
+      }
+      cb.parentElement.classList.toggle('on', cb.checked);
+    };
+  });
+  const nb = body.querySelector('[data-gnote]');
+  if(nb) nb.onclick = async ()=>{
+    const v = nb.dataset.val==='1'?1:0;
+    await api("guest/flag",{id:g.id, field:"note_handled", value:v});
+    g.note_handled=v; refreshGuestRow(g.id); toast(v?"Marked handled":"Marked unhandled");
+  };
+  const gdel = body.querySelector('[data-gdel]');
+  if(gdel) gdel.onclick=async()=>{
+    if(!confirm(DL(`Remove ${g.first_name} ${g.last_name} from the registry? This also removes their session RSVPs.`,`להסיר את ${g.first_name} ${g.last_name} מהמרשם? הפעולה תסיר גם את ההשתתפות במפגשים.`))) return;
+    await api("guest/delete",{id:g.id});
+    if(ui.openGuest) ui.openGuest.delete(String(g.id));
+    await refresh(); toast(DL("Guest removed","האורח/ת הוסר/ה"));
+  };
+  const cb2 = body.querySelector('[data-gclear]');
+  if(cb2) cb2.onclick = async ()=>{
+    await api("guest/flag",{id:g.id, field:"needs_review", value:0});
+    g.needs_review=0; refreshGuestRow(g.id); toast("Flag cleared");
+  };
+}
+function refreshGuestRow(gid){
+  const g = data.guests.find(x=>x.id===gid);
+  if(!g) return;
+  const b = document.getElementById('gBody-'+gid);
+  if(b) b.innerHTML = guestBodyHtml(g);
+  wireGuestBody(g);
+}
+
+function renderGuests(){
+  const el = document.getElementById("content");
+  const isAdmin = ROLE==="admin";
+  const canEdit = isAdmin || ROLE==="edit";
+  const all = data.guests.filter(g=>g.status==="active");
+  const deskC = guestDeskCounts();
+  let list = all.slice();
+  if(ui.guestDesk && ui.guestDesk!=="all") list = list.filter(g=>(g.desk||"—")===ui.guestDesk);
+  if(ui.guestHotel && ui.guestHotel!=="all") list = list.filter(g=>(g.hotel||"(no hotel)")===ui.guestHotel);
+  const q = (ui.guestSearch||"").toLowerCase().trim();
+  if(q) list = list.filter(g=>[g.first_name,g.last_name,g.email,g.passport_no,g.hotel,g.dietary].join(" ").toLowerCase().includes(q));
+
+  const inHotel = all.filter(g=>g.hotel).length;
+  const diet = all.filter(g=>g.dietary).length;
+  const noPass = ROLE==="admin" ? all.filter(g=>!g.passport_no).length : "—";
+  const review = all.filter(g=>g.needs_review).length;
+  const openNotes = all.filter(g=>g.guest_note && !g.note_handled).length;
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:18px;gap:30px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--serif);font-size:22px;font-weight:400;margin:0 0 4px;">${t("guests")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);max-width:540px;">${DL("Every registered participant, their desk, hotel, travel dates and dietary needs — the source the other tabs read from.","כל משתתף רשום, הדסק, המלון, תאריכי הנסיעה והצרכים התזונתיים — המקור שממנו שאר הלשוניות קוראות.")}</div>
+    </div>
+    <div style="display:flex;gap:20px;text-align:center;">
+      <div><div style="font-family:var(--serif);font-size:20px;">${all.length}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Participants","משתתפים")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--st-confirmed);">${inHotel}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("In JF hotels","במלונות הקרן")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--terra);">${diet}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("Dietary","תזונה")}</div></div>
+      <div><div style="font-family:var(--serif);font-size:20px;color:var(--gold-deep);">${noPass}</div><div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);">${DL("No passport","ללא דרכון")}</div></div>
+    </div>
+  </div>`;
+
+  if(isAdmin){
+    html += `<div class="g-card" style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:320px;">
+        <div class="g-lab">${DL("Sync from registration sheet","סנכרון מגיליון ההרשמה")}</div>
+        <div style="font-size:12.5px;">${DL("Upload an updated .xlsx export — you\u2019ll see exactly what changed before anything is saved.","העלו קובץ xlsx. מעודכן — תראו בדיוק מה השתנה לפני שמשהו נשמר.")}</div>
+      </div>
+      <div style="display:flex;gap:9px;align-items:center;">
+        <input type="file" id="gImportFile" accept=".xlsx,.xls,.csv" style="font-size:12px;max-width:230px;">
+        <button class="btn-ghost" id="gImportBtn" style="background:var(--ink);color:var(--parchment);border-color:var(--ink);">${DL("Compare","השוואה")}</button>
+      </div>
+      <label style="width:100%;font-size:12.5px;display:flex;gap:7px;align-items:center;"><input type="checkbox" id="gImportFull"> ${DL("This sheet is the complete guest list: also list registered guests who are missing from it (offered as cancellations, unticked)","הגיליון הוא רשימת האורחים המלאה: להציג גם אורחים רשומים שחסרים בו (כהצעות לביטול, לא מסומנות)")}</label>
+      <div class="save-hint" id="gImportHint" style="width:100%;"></div>
+    </div>
+    <div id="gImportArea"></div>`;
+  }
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px;">
+    <div class="seg" style="width:fit-content;flex-wrap:wrap;">
+      <button data-gdesk="all" class="${(ui.guestDesk||'all')==='all'?'active':''}">${DL("All","הכול")} ${all.length}</button>
+      ${Object.keys(deskC).sort().map(d=>`<button data-gdesk="${esc(d)}" class="${ui.guestDesk===d?'active':''}">${esc(d)} ${deskC[d]}</button>`).join('')}
+    </div>
+    <input class="search" id="gSearch" placeholder="${DL('Search name, email, passport…','חיפוש שם, אימייל, דרכון…')}" value="${esc(ui.guestSearch||'')}">
+  </div>`;
+
+  // hotel filter + grouping
+  const hotelC = {};
+  all.forEach(g=>{ const h=g.hotel||"(no hotel)"; hotelC[h]=(hotelC[h]||0)+1; });
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div class="seg" style="width:fit-content;flex-wrap:wrap;">
+      <button data-ghotel="all" class="${(ui.guestHotel||'all')==='all'?'active':''}">${DL("All hotels","כל המלונות")}</button>
+      ${Object.keys(hotelC).sort().map(h=>`<button data-ghotel="${esc(h)}" class="${ui.guestHotel===h?'active':''}">${esc(h)} ${hotelC[h]}</button>`).join('')}
+    </div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;">
+      <input type="checkbox" id="gGroupHotel" ${ui.guestGroupHotel?'checked':''}> ${DL("Group by hotel","קיבוץ לפי מלון")}
+    </label>
+  </div>`;
+
+  if(review || openNotes){
+    html += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      ${review?`<span class="chip" style="background:rgba(181,137,46,0.16);color:var(--gold-deep);border-color:var(--gold);">${review} ${DL("need review","לבדיקה")}</span>`:''}
+      ${openNotes?`<span class="chip" style="background:rgba(62,107,122,0.12);color:var(--sky);">${openNotes} ${DL("guest notes unanswered","הערות אורחים ללא מענה")}</span>`:''}
+    </div>`;
+  }
+
+  let rowsHtml;
+  if(ui.guestGroupHotel && list.length){
+    const groups = {};
+    list.forEach(g=>{ const h=g.hotel||"(no hotel)"; (groups[h]=groups[h]||[]).push(g); });
+    rowsHtml = Object.keys(groups).sort().map(h=>
+      `<div style="background:var(--stone);padding:8px 16px;font-size:11px;font-weight:700;color:var(--ink);border-top:1px solid var(--line);">
+         ${esc(h)} <span style="color:var(--ink-soft);font-weight:400;">· ${groups[h].length}</span>
+       </div>` + groups[h].map(guestRowHtml).join('')
+    ).join('');
+  } else {
+    rowsHtml = list.length?list.map(guestRowHtml).join(''):`<div class="empty" style="padding:34px;">${stateLoaded?DL('No guests match.','אין אורחים תואמים.'):DL('Loading…','טוען…')}</div>`;
+  }
+  html += `<div class="g-table">
+    <div class="g-head"><div>${DL("Guest","אורח/ת")}</div><div>${DL("Desk","דסק")}</div><div>${DL("Hotel","מלון")}</div><div>${DL("Dates","תאריכים")}</div><div>${DL("Flags","סימונים")}</div><div></div></div>
+    ${rowsHtml}
+  </div>
+  <div class="save-hint" style="margin:8px 0 26px;">${DL("Showing","מוצגים")} ${list.length} ${DL("of","מתוך")} ${all.length}</div>`;
+
+  if(isAdmin){
+    html += `<div class="add-row" style="flex-wrap:wrap;margin-bottom:30px;">
+      <input type="text" id="ngFirst" placeholder="${DL('First name','שם פרטי')}" style="max-width:150px;">
+      <input type="text" id="ngLast" placeholder="${DL('Last name','שם משפחה')}" style="max-width:150px;">
+      <input type="text" id="ngDesk" placeholder="${DL('Desk','דסק')}" style="max-width:110px;">
+      <input type="text" id="ngEmail" placeholder="${DL('Email','אימייל')}">
+      <button id="ngAdd">${DL("Add guest","הוספת אורח/ת")}</button>
+    </div>`;
+  }
+
+  // hotel rooming
+  // ---- Dietary & allergy table, built from the registry itself ----
+  const dietGuests = all.filter(g=>g.dietary && g.dietary.trim());
+  const severe = dietGuests.filter(g=>g.dietary_severe);
+  html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Dietary &amp; Allergies","תזונה ואלרגיות")}</h2>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;max-width:640px;">${DL("Straight from each guest\u2019s registration — this is the list the caterers need. Editing a guest above updates this table.","ישירות מטופס ההרשמה של כל אורח — זו הרשימה שהקייטרינג צריך. עריכת אורח למעלה מעדכנת את הטבלה.")}</div>`;
+  if(severe.length){
+    html += `<div style="border:1px solid var(--terra);background:rgba(162,78,46,0.07);border-radius:4px;padding:12px 16px;margin-bottom:12px;font-size:13px;">
+      <strong>${severe.length} severe ${severe.length===1?'allergy':'allergies'}</strong> — ${severe.map(g=>esc(g.first_name+' '+g.last_name)+': '+esc(g.dietary)).join(' · ')}. ${DL("Every caterer and every gift package must be checked against this.","כל קייטרינג וכל חבילת מתנה חייבים להיבדק מול זה.")}
+    </div>`;
+  }
+  if(dietGuests.length){
+    html += `<div class="g-table" style="margin-bottom:10px;">
+      <div style="display:grid;grid-template-columns:1.4fr 2fr 1fr 1.2fr;gap:10px;background:var(--stone);padding:10px 16px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;">
+        <div>${DL("Guest","אורח/ת")}</div><div>${DL("Requirement","דרישה")}</div><div>${DL("Desk","דסק")}</div><div>${DL("Hotel","מלון")}</div>
+      </div>
+      ${dietGuests.map(g=>`<div style="display:grid;grid-template-columns:1.4fr 2fr 1fr 1.2fr;gap:10px;padding:10px 16px;font-size:13px;border-top:1px solid var(--line);align-items:center;${g.dietary_severe?'background:rgba(162,78,46,0.06);':''}">
+        <div>${esc(g.first_name)} ${esc(g.last_name)}</div>
+        <div>${g.dietary_severe?`<span class="g-chip sev">${esc(g.dietary)}</span>`:esc(g.dietary)}</div>
+        <div>${esc(g.desk||'')}</div>
+        <div>${esc(g.hotel||'—')}</div>
+      </div>`).join('')}
+    </div>
+    <div class="save-hint" style="margin-bottom:26px;">${dietGuests.length} of ${all.length} ${DL("guests have a recorded requirement","אורחים עם דרישה רשומה")} · <a href="#" id="dietCopy" style="color:var(--sky);">${DL("copy as a list for the caterer","העתקה כרשימה לקייטרינג")}</a></div>`;
+  } else {
+    html += `<div class="save-hint" style="margin-bottom:26px;">${DL("No dietary requirements recorded yet.","טרם נרשמו דרישות תזונה.")}</div>`;
+  }
+
+  const hot = guestHotelCounts();
+  html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Hotel Rooming","חלוקת חדרים")}</h2>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;">${DL("Guests and parties per hotel, with the overall date span.","אורחים וחדרים לפי מלון, עם טווח התאריכים הכולל.")}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-bottom:30px;">
+      ${Object.keys(hot).sort().map(h=>`<div class="g-card">
+        <div style="font-family:var(--serif);font-size:15px;margin-bottom:7px;">${esc(h)}</div>
+        <div style="font-size:24px;font-family:var(--serif);color:var(--olive);">${hot[h].parties.size} <span style="font-size:12px;color:var(--ink-soft);font-family:var(--sans);">${DL("rooms","חדרים")}</span></div>
+        <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${hot[h].guests} ${DL("guests","אורחים")}${hot[h].din?` · ${fmtDay(hot[h].din)} – ${fmtDay(hot[h].dout)}`:''}</div>
+      </div>`).join('') || `<div class="save-hint">${DL('No hotel assignments yet.','טרם שובצו מלונות.')}</div>`}
+    </div>`;
+
+  // session attendance
+  html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Session Attendance","השתתפות במפגשים")}</h2>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;">${DL("Headcounts per session — these are the numbers the caterers need.","מספרי משתתפים לכל מפגש — אלה המספרים שהקייטרינג צריך.")}</div>
+    <div class="g-table" style="margin-bottom:30px;">
+      <div style="display:grid;grid-template-columns:2fr 1fr;background:var(--stone);padding:9px 16px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;"><div>${DL("Session","מפגש")}</div><div>${DL("Attending","משתתפים")}</div></div>
+      ${GUEST_SESSIONS.map(([sid,label])=>{
+        const n = data.guest_sessions.filter(r=>r.segment_id===sid && all.some(g=>g.id===r.guest_id)).length;
+        return `<div style="display:grid;grid-template-columns:2fr 1fr;padding:10px 16px;font-size:13px;border-top:1px solid var(--line);"><div>${label}</div><div><strong>${n}</strong></div></div>`;
+      }).join('')}
+    </div>`;
+
+  // VAT (passport data is admin-only)
+  const missing = all.filter(g=>!g.passport_no);
+  if(ROLE==="admin") html += `<h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 5px;">${DL("Passports for VAT","דרכונים למע\"מ")}</h2>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;">${DL("Required for the hotel tax exemption.","נדרש לפטור ממע\"מ במלונות.")} ${missing.length?`<strong style="color:var(--terra);">${missing.length} ${DL('still missing.','עדיין חסרים.')}</strong>`:DL('All on file.','הכול קיים.')}</div>
+    ${missing.length?`<div class="g-card" style="margin-bottom:20px;"><div style="font-size:12.5px;line-height:1.9;">${missing.map(g=>esc(g.first_name+' '+g.last_name)+(g.desk?` <span style="color:var(--ink-soft);">· ${esc(g.desk)}</span>`:'')).join(' · ')}</div></div>`:''}`;
+
+  el.innerHTML = html;
+
+  // wire
+  el.querySelectorAll("[data-gdesk]").forEach(b=>b.onclick=()=>{ ui.guestDesk=b.dataset.gdesk; renderGuests(); });
+  el.querySelectorAll("[data-ghotel]").forEach(b=>b.onclick=()=>{ ui.guestHotel=b.dataset.ghotel; renderGuests(); });
+  const gh=document.getElementById("gGroupHotel");
+  if(gh) gh.onchange=()=>{ ui.guestGroupHotel=gh.checked; renderGuests(); };
+  const dc=document.getElementById("dietCopy");
+  if(dc) dc.onclick=(e)=>{
+    e.preventDefault();
+    const txt = all.filter(g=>g.dietary && g.dietary.trim())
+      .map(g=>`${g.first_name} ${g.last_name}${g.hotel?' ('+g.hotel+')':''} — ${g.dietary}${g.dietary_severe?' [SEVERE]':''}`).join("\n");
+    navigator.clipboard.writeText(txt).then(()=>toast("Copied for the caterer"), ()=>toast("Could not copy",true));
+  };
+  const se=document.getElementById("gSearch");
+  if(se) se.oninput=()=>{ ui.guestSearch=se.value; const p=se.selectionStart; renderGuests(); const s2=document.getElementById("gSearch"); if(s2){s2.focus(); s2.setSelectionRange(p,p);} };
+  el.querySelectorAll('.g-row').forEach(d=>{
+    d.addEventListener('toggle', ()=>{
+      const id=d.dataset.gid;
+      if(!ui.openGuest) ui.openGuest=new Set();
+      if(d.open) ui.openGuest.add(id); else ui.openGuest.delete(id);
+    });
+  });
+  list.forEach(g=>wireGuestBody(g));
+  if(isAdmin){
+    const ib=document.getElementById("gImportBtn"); if(ib) ib.onclick=doGuestImport;
+    const na=document.getElementById("ngAdd");
+    if(na) na.onclick=async()=>{
+      const f=document.getElementById("ngFirst").value.trim();
+      if(!f){ toast("First name required",true); return; }
+      const r=await api("guest/add",{first_name:f, last_name:document.getElementById("ngLast").value.trim(), desk:document.getElementById("ngDesk").value.trim(), email:document.getElementById("ngEmail").value.trim()});
+      if(r.error){ toast(r.error,true); return; }
+      await refresh(); toast("Guest added");
+    };
+    if(ui.importChanges) renderImportArea();
+  }
+}
+
+// --- spreadsheet import (parsed in the browser with SheetJS) ---
+function loadSheetJS(){
+  return new Promise((res,rej)=>{
+    if(window.XLSX) return res(window.XLSX);
+    const s=document.createElement('script');
+    s.src="/vendor/xlsx/xlsx.full.min.js";
+    s.onload=()=>res(window.XLSX); s.onerror=()=>rej(new Error("could not load the spreadsheet reader"));
+    document.head.appendChild(s);
+  });
+}
+const IMPORT_MAP = {
+  "name (first)":"first_name", "name (last)":"last_name", "email":"email",
+  "mobile phone":"phone", "address (city)":"city", "address (country)":"country",
+  "passport number":"passport_no", "country of issue":"passport_country",
+  "please provide your dietary specifications":"dietary",
+  "hotel accommodation - subject to availability":"hotel",
+  "accommodation":"accommodation",
+  "if you are taking care of your own accommodation, please let us know where you are staying":"accommodation_note",
+  "anything you would like to share with us?":"guest_note",
+  "first name":"first_name", "last name":"last_name", "desk":"desk", "type":"ptype",
+  "check-in":"checkin", "check in":"checkin", "check-in date":"checkin", "check in date":"checkin", "arrival date":"checkin", "arrival":"checkin",
+  "check-out":"checkout", "check out":"checkout", "check-out date":"checkout", "check out date":"checkout", "departure date":"checkout", "departure":"checkout",
+  "registration id":"reg_id", "registration number":"reg_id", "registration #":"reg_id", "reg id":"reg_id", "reg. id":"reg_id", "registration no.":"reg_id"
+};
+function xlDate(v){
+  if(v==null||v==="") return "";
+  // SheetJS builds dates at local midnight: read the local date parts (toISOString would shift a day in Israel)
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0");
+  if(typeof v==="number" && v>20000 && v<80000){
+    const d=new Date(Date.UTC(1899,11,30)+v*86400000);
+    return isNaN(d)?"":d.toISOString().slice(0,10);
+  }
+  const s=String(v).trim();
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m?m[0]:s;
+}
+async function doGuestImport(){
+  const inp=document.getElementById("gImportFile");
+  const hint=document.getElementById("gImportHint");
+  if(!inp.files||!inp.files[0]){ toast("Choose a file first",true); return; }
+  hint.textContent="Reading the spreadsheet…";
+  try{
+    const XLSX=await loadSheetJS();
+    const buf=await inp.files[0].arrayBuffer();
+    const wb=XLSX.read(buf,{cellDates:true});
+    // prefer the registration sheet, else the first sheet
+    let sheetName = wb.SheetNames.find(n=>/registration/i.test(n)) || wb.SheetNames[0];
+    let rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
+    // find the header row (the one containing a first-name column)
+    let hi=rows.findIndex(r=>r.some(c=>/name \(first\)|first name/i.test(String(c))));
+    if(hi<0){ hint.textContent=""; toast("Couldn't find a name column in that sheet",true); return; }
+    const hdr=rows[hi].map(c=>String(c).trim().toLowerCase());
+    const out=[];
+    for(let i=hi+1;i<rows.length;i++){
+      const r=rows[i]; if(!r||!r.length) continue;
+      const rec={};
+      hdr.forEach((h,ci)=>{ const f=IMPORT_MAP[h]; if(f && !rec[f]) rec[f]=(f==="checkin"||f==="checkout") ? xlDate(r[ci]) : String(r[ci]==null?"":r[ci]).trim(); });
+      if(!rec.first_name) continue;
+      out.push(rec);
+    }
+    if(!out.length){ hint.textContent=""; toast("No guest rows found in that sheet",true); return; }
+    hint.textContent="Comparing "+out.length+" rows…";
+    const full=!!(document.getElementById("gImportFull")||{}).checked;
+    const r=await api("guest/import",{rows:out, full_roster:full});
+    hint.textContent="";
+    ui.importChanges=r.changes||[]; ui.importKey=newIdemKey();
+    if(!ui.importChanges.length){ toast("No changes — the registry already matches"); renderImportArea(); return; }
+    renderImportArea();
+  }catch(e){ hint.textContent=""; toast(e && e.kind ? apiErrorText(e, LANG==="he") : "Couldn't read that file",true); }
+}
+function renderImportArea(){
+  const el=document.getElementById("gImportArea");
+  if(!el) return;
+  const ch=ui.importChanges;
+  if(!ch){ el.innerHTML=""; return; }
+  if(!ch.length){ el.innerHTML=`<div class="save-hint" style="margin-bottom:18px;">${DL('No differences found.','לא נמצאו הבדלים.')}</div>`; return; }
+  const tag=k=>k==="new"?'<span class="imp-tag" style="background:var(--st-confirmed);">NEW</span>'
+    :k==="edit"?'<span class="imp-tag" style="background:var(--st-progress);">EDIT</span>'
+    :k==="gone"?'<span class="imp-tag" style="background:var(--st-open);">NOT IN SHEET</span>'
+    :k==="ambiguous"?'<span class="imp-tag" style="background:var(--terra);">AMBIGUOUS</span>'
+    :'<span class="imp-tag" style="background:var(--ink-soft);">DUPLICATE ROW</span>';
+  const selectable=c=>c.kind==="new"||c.kind==="edit"||c.kind==="gone";
+  const checkedByDefault=c=>(c.kind==="new"||c.kind==="edit") && !(c.problems&&c.problems.length);
+  el.innerHTML=`<div style="border:1px solid var(--gold);border-radius:4px;overflow:hidden;margin-bottom:22px;">
+    <div style="background:rgba(181,137,46,0.12);padding:10px 18px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;">
+      <span>${DL(`${ch.length} difference${ch.length===1?'':'s'} found — review before applying`,`נמצאו ${ch.length} הבדלים — לבדיקה לפני החלה`)}</span>
+      <span style="font-weight:400;color:var(--ink-soft);">${DL("nothing is saved until you approve; cancellations and rows with problems start unticked","שום דבר לא נשמר עד לאישורכם; ביטולים ושורות עם בעיות לא מסומנים מראש")}</span>
+    </div>
+    <div style="background:#fff;max-height:340px;overflow:auto;">
+      ${ch.map((c,i)=>`<div class="imp-row">
+        ${selectable(c)?`<input type="checkbox" data-impsel="${i}" ${checkedByDefault(c)?'checked':''} aria-label="${esc(c.name)}">`:'<span style="width:13px;"></span>'}
+        ${tag(c.kind)}
+        <span><bdi>${esc(c.name)}</bdi>${c.kind==='edit'?' · '+(c.diffs||[]).map(d=>`${esc(d.field)}: <span style="text-decoration:line-through;color:var(--ink-soft);">${esc(d.from||'(empty)')}</span> → <strong>${esc(d.to)}</strong>`).join(', '):''}${c.kind==='gone'?DL(' · registered but not in this sheet — mark cancelled?',' · רשום אבל לא בגיליון — לסמן כבוטל?'):''}${c.note?' · '+esc(c.note):''}${c.problems&&c.problems.length?` · <span style="color:var(--terra);">${c.problems.map(esc).join('; ')}</span>`:''}</span>
+      </div>`).join('')}
+    </div>
+    <div style="background:var(--parchment);padding:11px 18px;display:flex;gap:9px;">
+      <button class="btn-ghost" id="impApply" style="background:var(--ink);color:var(--parchment);border-color:var(--ink);">${DL("Apply selected","החלת הנבחרים")}</button>
+      <button class="btn-ghost" id="impDiscard">${DL("Discard","ביטול")}</button>
+    </div>
+  </div>`;
+  document.getElementById("impDiscard").onclick=()=>{ ui.importChanges=null; renderGuests(); };
+  const applyBtn=document.getElementById("impApply");
+  applyBtn.onclick=async()=>{
+    if(applyBtn.disabled) return;
+    const picked=[];
+    el.querySelectorAll("[data-impsel]").forEach(cb=>{ if(cb.checked) picked.push(ch[parseInt(cb.dataset.impsel)]); });
+    if(!picked.length){ toast("Nothing selected",true); return; }
+    const gone=picked.filter(c=>c.kind==="gone").length;
+    if(gone && !confirm(DL(`Mark ${gone} guest(s) as cancelled?`,`לסמן ${gone} אורחים כמבוטלים?`))) return;
+    applyBtn.disabled=true; applyBtn.textContent=DL("Applying…","מחיל…");
+    try{
+      const r=await api("guest/import/apply",{changes:picked},{idem:ui.importKey});
+      ui.importChanges=null;
+      await refresh(true);
+      toast(DL(`Applied ${r.applied} change${r.applied===1?'':'s'}`,`הוחלו ${r.applied} שינויים`)+(r.skipped?DL(` · ${r.skipped} already up to date`,` · ${r.skipped} כבר מעודכנים`):''));
+    }catch(e){
+      applyBtn.disabled=false; applyBtn.textContent=DL("Apply selected","החלת הנבחרים");
+      toast(e.kind==="conflict"?DL("The guest list changed since the comparison. Nothing was applied; compare again.","רשימת האורחים השתנתה מאז ההשוואה. שום דבר לא הוחל; השוו שוב."):apiErrorText(e, LANG==="he"),true);
+    }
+  };
+}
+
+// ---- FOOD & DRINK ----
+function parseMenuJson(s){ try{ const a=JSON.parse(s||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+// which menu/beverage/dietary column the current language edits and displays
+function menuField(){ return LANG==="he" ? "menu_json_he" : "menu_json"; }
+function bevField(){ return LANG==="he" ? "beverages_he" : "beverages"; }
+function dietField(){ return LANG==="he" ? "dietary_note_he" : "dietary_note"; }
+function foodMenu(item){
+  const primary = parseMenuJson(item[menuField()]);
+  if(primary.length) return primary;
+  // fall back to the other language so a menu is never invisible
+  return parseMenuJson(LANG==="he" ? item.menu_json : item.menu_json_he);
+}
+function foodTypeLabel(mt){
+  const en = {lunch:'Lunch',dinner:'Dinner',drinks:'Drinks',snack:'Snack'};
+  const he = {lunch:'צהריים',dinner:'ערב',drinks:'שתייה',snack:'כיבוד'};
+  return (LANG==="he"?he:en)[mt]||mt||'';
+}
+
+function foodCourseHtml(item, menu){
+  return menu.map((c,ci)=>{
+    if(!c.choice){
+      return `<div class="food-course-sec">
+        <div class="food-course-hd">${esc(c.course)}</div>
+        ${c.items.map(it=>`<div class="food-item-line">${esc(it.name)}</div>`).join('')}
+      </div>`;
+    }
+    const locked = !!c.locked;
+    const he = LANG==="he";
+    return `<div class="food-course-sec">
+      <div class="food-choice-hd">
+        <div class="food-course-hd">${esc(c.course)} — ${locked?(he?'הבחירה נעולה':'choice locked'):(he?'נדרשת בחירה':'choice needed')}</div>
+        <span class="${locked?'badge-locked':'badge-pending'}">${locked?(he?'נעול ✓':'Locked ✓'):(he?'ממתין':'Pending')}</span>
+      </div>
+      ${c.items.map((it,ii)=>`
+        <label class="food-opt ${it.selected?'sel':''} ${locked?'locked':''}">
+          <input type="radio" name="food-${esc(item.id)}-c${ci}" data-food="${esc(item.id)}" data-course="${ci}" data-item="${ii}" ${it.selected?'checked':''} ${locked?'disabled':''}>
+          ${esc(it.name)}
+        </label>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function foodBodyHtml(item){
+  const menu = foodMenu(item);
+  const hasMenu = menu.length>0;
+  const hasChoice = menu.some(c=>c.choice);
+  const allLocked = hasChoice && menu.filter(c=>c.choice).every(c=>c.locked);
+  const canEdit = ROLE==="admin" || ROLE==="edit";
+  const he = LANG==="he";
+  const bevVal = item[bevField()]||'';
+  const dietVal = item[dietField()]||'';
+  let html = '';
+  if(item.file_id){
+    html += `<div class="food-source">📄 <a href="/api/files/download?id=${esc(item.file_id)}" target="_blank">${esc(item.file_name||(he?'קובץ תפריט':'menu file'))}</a> · <a href="#" data-toggle-preview="${esc(item.id)}">${he?'הצג תצוגה מקדימה':'show preview'}</a>
+      <div class="food-pdf-embed" id="foodPdf-${esc(item.id)}" data-loaded="0" data-fileid="${esc(item.file_id)}" data-ctype="${esc(item.file_type||'')}"></div>
+    </div>`;
+  }
+  if(hasMenu){
+    html += `<div class="food-course">${foodCourseHtml(item, menu)}</div>`;
+    if(hasChoice && canEdit){
+      html += `<button class="btn-ghost food-lock-btn" data-fid="${esc(item.id)}" data-lock="${allLocked?'0':'1'}" style="margin-top:10px;${allLocked?'':'background:var(--ink);color:#fff;'}">${allLocked?(he?'ביטול נעילה לשינוי':'Unlock to change'):(he?'נעילת הבחירות':'Lock in choices')}</button>`;
+    }
+  } else {
+    html += `<div class="save-hint">${he?'טרם הועלה תפריט.':'No menu uploaded yet.'}</div>`;
+  }
+  if(canEdit){
+    html += `<div class="field" style="margin-top:16px;">
+      <label>${item.file_id?(he?'החלפת קובץ תפריט':'Replace menu file'):(he?'העלאת תפריט':'Upload menu')}</label>
+      <label class="food-upload-drop">
+        <input type="file" data-upload-fid="${esc(item.id)}" accept=".pdf,.png,.jpg,.jpeg,.webp,image/*">
+        ${he?'גררו PDF, PNG או JPG — או לחצו לבחירה. מעובד אוטומטית':'Drop a PDF, PNG or JPG — or click to browse. Processed automatically'}
+      </label>
+      <div class="save-hint" id="foodUploadHint-${esc(item.id)}"></div>
+    </div>
+    <div class="field"><label>${he?'משקאות מוגשים':'Beverages served'}</label><textarea class="notes-area" data-ffield="${bevField()}" data-fid="${esc(item.id)}" style="min-height:44px;">${esc(bevVal)}</textarea></div>
+    <div style="display:flex;gap:20px;">
+      <div class="field" style="flex:1;"><label>${he?'קייטרינג / ספק':'Caterer / vendor'}</label><input type="text" data-ffield="caterer" data-fid="${esc(item.id)}" value="${esc(item.caterer||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
+      <div class="field" style="flex:1;"><label>${he?'מספר סועדים':'Headcount'}</label><input type="text" data-ffield="headcount" data-fid="${esc(item.id)}" value="${esc(item.headcount||'')}" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:2px;font-size:13px;font-family:var(--sans);background:#fff;"></div>
+    </div>
+    <div class="field"><label>${he?'הערות תזונה לפריט זה':'Dietary notes for this item'}</label><textarea class="notes-area" data-ffield="${dietField()}" data-fid="${esc(item.id)}" style="min-height:44px;">${esc(dietVal)}</textarea></div>`;
+  } else if(dietVal){
+    html += `<div class="field"><label>${he?'הערות תזונה':'Dietary notes'}</label><div class="val">${esc(dietVal)}</div></div>`;
+  }
+  html += `${ROLE==="admin"?`<div style="margin-top:12px;"><button class="btn-ghost" data-fdel="${esc(item.id)}" style="color:var(--terra);border-color:var(--line);">${he?'מחיקת פריט':'Delete item'}</button></div>`:''}
+  <div class="save-hint" id="foodHint-${esc(item.id)}"></div>`;
+  return html;
+}
+
+function foodRowHtml(item){
+  const isOpen = ui.openFood && ui.openFood.has(item.id);
+  return `<details class="food-row" data-fid="${esc(item.id)}"${isOpen?' open':''}>
+    <summary>
+      <div class="food-time">${esc(item.time||'')}${item.end_time?`<span class="end">– ${esc(item.end_time)}</span>`:''}</div>
+      <div class="food-main">
+        <div class="food-title">${esc(L(item,'title'))}</div>
+        ${item.venue?`<div class="food-venue">${esc(L(item,'venue'))}</div>`:''}
+      </div>
+      <span class="tag ${(item.meal_type==='drinks'||item.meal_type==='snack')?'people':'meal'}">${foodTypeLabel(item.meal_type)}</span>
+      <span class="dot ${item.status}"><i></i>${STATUS_LABEL[item.status]}</span>
+    </summary>
+    <div class="food-body" id="foodBody-${esc(item.id)}">${foodBodyHtml(item)}</div>
+  </details>`;
+}
+
+function refreshFoodRow(fid){
+  const item = data.food_items.find(f=>f.id===fid);
+  if(!item) return;
+  const body = document.getElementById('foodBody-'+fid);
+  if(body) body.innerHTML = foodBodyHtml(item);
+  const row = document.querySelector('.food-row[data-fid="'+fid+'"] .dot');
+  if(row){ row.className='dot '+item.status; row.innerHTML='<i></i>'+STATUS_LABEL[item.status]; }
+  wireFoodBody(item);
+}
+
+let foodSaveTimers = {};
+// A choice/lock is one real-world decision — mirror it into BOTH language menus
+// so switching language never shows a different selection.
+async function saveMenuBothLangs(item, mutate){
+  for(const fld of ["menu_json","menu_json_he"]){
+    const m = parseMenuJson(item[fld]);
+    if(!m.length) continue;
+    mutate(m);
+    item[fld] = JSON.stringify(m);
+    await api("food/field", {id:item.id, field:fld, value:item[fld]});
+  }
+}
+function wireFoodBody(item){
+  const body = document.getElementById('foodBody-'+item.id);
+  if(!body) return;
+  body.querySelectorAll('input[type=radio][data-food]').forEach(r=>{
+    r.onchange = async ()=>{
+      const ci = parseInt(r.dataset.course), ii = parseInt(r.dataset.item);
+      await saveMenuBothLangs(item, m=>{ if(m[ci]&&m[ci].items) m[ci].items.forEach((it,idx)=>{ it.selected = idx===ii; }); });
+      refreshFoodRow(item.id);
+    };
+  });
+  const lockBtn = body.querySelector('.food-lock-btn');
+  if(lockBtn) lockBtn.onclick = async ()=>{
+    const lock = lockBtn.dataset.lock==='1';
+    await saveMenuBothLangs(item, m=>{ m.forEach(c=>{ if(c.choice) c.locked=lock; }); });
+    toast(lock?(LANG==="he"?"הבחירות ננעלו":"Choices locked"):(LANG==="he"?"הנעילה בוטלה":"Unlocked"));
+    refreshFoodRow(item.id);
+  };
+  body.querySelectorAll('[data-ffield]').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      const f = el.dataset.ffield;
+      const tkey = item.id+'-'+f;
+      clearTimeout(foodSaveTimers[tkey]);
+      const hint = document.getElementById('foodHint-'+item.id);
+      if(hint) hint.textContent='saving…';
+      foodSaveTimers[tkey] = setTimeout(async ()=>{
+        item[f] = el.value;
+        await api("food/field", {id:item.id, field:f, value:el.value});
+        if(hint){ hint.textContent='saved'; setTimeout(()=>{ if(hint) hint.textContent=''; },1500); }
+      },600);
+    });
+  });
+  const fd2=body.querySelector('[data-fdel]');
+  if(fd2) fd2.onclick=async()=>{
+    if(!confirm(LANG==="he"?"למחוק את הפריט?":"Delete this food item?")) return;
+    await api("food/delete",{id:item.id});
+    if(ui.openFood) ui.openFood.delete(item.id);
+    await refresh(); toast(LANG==="he"?"הפריט נמחק":"Item deleted");
+  };
+  const fileInp = body.querySelector('[data-upload-fid]');
+  if(fileInp) fileInp.onchange = ()=> doFoodUpload(item);
+  const dropZone = body.querySelector('.food-upload-drop');
+  if(dropZone){
+    ["dragenter","dragover"].forEach(evt=>dropZone.addEventListener(evt, (e)=>{
+      e.preventDefault(); e.stopPropagation(); dropZone.classList.add('dragover');
+    }));
+    ["dragleave","dragend"].forEach(evt=>dropZone.addEventListener(evt, (e)=>{
+      e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover');
+    }));
+    dropZone.addEventListener('drop', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      dropZone.classList.remove('dragover');
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) doFoodUpload(item, f);
+    });
+  }
+  const previewLink = body.querySelector('[data-toggle-preview]');
+  if(previewLink) previewLink.onclick = (e)=>{
+    e.preventDefault();
+    const box = document.getElementById('foodPdf-'+item.id);
+    if(!box) return;
+    if(box.dataset.loaded==='0'){
+      loadFoodPdfPreview(item.id);
+      previewLink.textContent = 'hide preview';
+    } else {
+      const showing = box.style.display!=='none';
+      box.style.display = showing?'none':'';
+      previewLink.textContent = showing?'show preview':'hide preview';
+    }
+  };
+}
+
+function loadFoodPdfPreview(fid){
+  const box = document.getElementById('foodPdf-'+fid);
+  if(!box || box.dataset.loaded==='1') return;
+  const fileId = box.dataset.fileid;
+  if(!fileId) return;
+  box.dataset.loaded='1';
+  const ctype = box.dataset.ctype||'';
+  const src = `/api/files/download?id=${fileId}&inline=1`;
+  if(ctype.startsWith('image/')){
+    box.innerHTML = `<img src="${src}" alt="Menu preview" style="max-width:100%;border:1px solid var(--line);border-radius:4px;margin-top:10px;display:block;">`;
+  } else {
+    box.innerHTML = `<iframe src="${src}" title="Menu PDF preview" style="width:100%;height:540px;border:1px solid var(--line);border-radius:4px;margin-top:10px;display:block;"></iframe>`;
+  }
+}
+
+async function doFoodUpload(item, droppedFile){
+  let file = droppedFile;
+  if(!file){
+    const inp = document.querySelector('[data-upload-fid="'+item.id+'"]');
+    if(!inp || !inp.files || !inp.files[0]) return;
+    file = inp.files[0];
+  }
+  const hint = document.getElementById('foodUploadHint-'+item.id);
+  const he = LANG==="he";
+  const nm = (file.name||"").toLowerCase();
+  if(/\.(heic|heif|tiff?)$/.test(nm)){
+    toast(he?"פורמט לא נתמך — שמרו כ-JPG או PNG":"Unsupported format — save as JPG or PNG first", true);
+    return;
+  }
+  if(hint) hint.textContent = (he?"מעלה ":"Uploading ")+file.name+"…";
+  const fd = new FormData();
+  fd.append("file", file); fd.append("section","menu"); fd.append("segment_id", item.id); fd.append("by", NAME||"");
+  try{
+    const j = await api("files/upload", fd, { idem:newIdemKey() });
+    if(j.error){ if(hint) hint.textContent=""; toast(j.error, true); return; }
+    item.file_id = j.id; item.file_name = file.name; item.file_type = file.type||"";
+    if(hint) hint.textContent = he?"קורא את התפריט עם AI…":"Reading menu with AI…";
+    const p = await api("food/process-menu", { food_id:item.id, file_id:j.id, lang:LANG });
+    if(p.error){ if(hint) hint.textContent=""; toast(p.error, true); return; }
+    item[menuField()] = JSON.stringify(p.menu||[]);
+    if(hint) hint.textContent="";
+    toast(he?"התפריט עובד":"Menu processed");
+    refreshFoodRow(item.id);
+    loadFoodPdfPreview(item.id);
+    const pl = document.querySelector('#foodBody-'+item.id+' [data-toggle-preview]');
+    if(pl) pl.textContent = he?'הסתר תצוגה מקדימה':'hide preview';
+  }catch(e){ if(hint) hint.textContent=""; toast(he?"ההעלאה נכשלה":"Upload failed", true); }
+}
+
+function foodCounts(){
+  const c = {open:0, progress:0, confirmed:0};
+  data.food_items.forEach(f=>{ if(c[f.status]!=null) c[f.status]++; });
+  return c;
+}
+
+function renderFood(){
+  const el = document.getElementById("content");
+  const isAdmin = ROLE==="admin";
+  let items = data.food_items.slice().sort((a,b)=>(a.day-b.day)||(a.sort_order-b.sort_order));
+  if(ui.foodDay && ui.foodDay!=='all') items = items.filter(f=>f.day==ui.foodDay);
+  if(ui.foodType && ui.foodType!=='all'){
+    items = ui.foodType==='meals' ? items.filter(f=>f.meal_type==='lunch'||f.meal_type==='dinner')
+                                   : items.filter(f=>f.meal_type==='drinks'||f.meal_type==='snack');
+  }
+  const c = foodCounts();
+  const he = LANG==="he";
+  let html = `<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:20px;gap:32px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-family:var(--serif);font-size:22px;font-weight:400;margin:0 0 4px;">${t("food")}</h2>
+      <div style="font-size:12.5px;color:var(--ink-soft);max-width:520px;">${he?'כל ארוחה, כיבוד ורגע שתייה לאורך שלושת הימים, לצד רשימת הצרכים התזונתיים והאלרגיות שהקייטרינג צריך לראות.':'Every meal, snack and drink moment across the three days, plus the dietary and allergy list caterers need to see.'}</div>
+    </div>
+    <div style="display:flex;gap:22px;">
+      <div style="text-align:center;"><div style="font-family:var(--serif);font-size:20px;color:var(--st-confirmed);">${c.confirmed}</div><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);">${statusLabel('confirmed')}</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--serif);font-size:20px;color:var(--st-progress);">${c.progress}</div><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);">${statusLabel('progress')}</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--serif);font-size:20px;color:var(--st-open);">${c.open}</div><div style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);">${statusLabel('open')}</div></div>
+    </div>
+  </div>`;
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+    <div class="seg" style="width:fit-content;">
+      ${["all",1,2,3].map(d=>`<button data-fday="${d}" class="${(ui.foodDay||'all')==d?'active':''}">${d==='all'?t("allDays"):(he?DAYS[d].num:('Day '+d))}</button>`).join('')}
+    </div>
+    <div class="chips">
+      ${[["all",he?'הכול':'All types'],["meals",he?'ארוחות':'Meals'],["drinks",he?'שתייה וכיבוד':'Drinks & snacks']].map(([k,l])=>`<span class="chip ${(ui.foodType||'all')===k?'active':''}" data-ftype="${k}">${l}</span>`).join('')}
+    </div>
+  </div>`;
+
+  html += `<div id="foodRows">`;
+  let curDay=null;
+  if(!items.length){
+    html += (!stateLoaded && !data.food_items.length)
+      ? `<div class="empty"><div class="big">${he?'טוען…':'Loading…'}</div></div>`
+      : `<div class="empty"><div class="big">${he?'אין כאן פריטים':'Nothing here'}</div>${he?'שנו את הסינון.':'Adjust filters.'}</div>`;
+  }
+  items.forEach(item=>{
+    if(item.day!==curDay){ curDay=item.day; const d=DAYS[item.day];
+      html += `<div class="day-head"><span class="daynum">${d.num}</span><span class="date">${d.date}</span></div>`; }
+    html += foodRowHtml(item);
+  });
+  if(isAdmin) html += `<div style="padding:16px 0;" id="addFoodWrap"><button class="btn-ghost" id="addFoodBtn" style="border-color:var(--olive);color:var(--olive);font-weight:600;">${he?'+ הוספת פריט אוכל/שתייה':'+ Add food/drink item'}</button></div>`;
+  html += `</div>`;
+
+  html += `<div style="margin-top:44px;">
+    <h2 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 6px;">${he?'צרכים תזונתיים ואלרגיות':'Dietary &amp; Allergy Registry'}</h2>
+    <div style="font-size:12.5px;color:var(--ink-soft);max-width:600px;margin-bottom:14px;">${he?'מרוכז עבור כלל האורחים, גלוי לכל ספק קייטרינג ומקום אירוח.':'Consolidated across all guests, visible to every caterer and venue.'}</div>
+  </div>
+  <div id="dietaryArea"></div>`;
+
+  el.innerHTML = html;
+  el.querySelectorAll("[data-fday]").forEach(b=>b.onclick=()=>{ ui.foodDay = b.dataset.fday==='all'?'all':parseInt(b.dataset.fday); renderFood(); });
+  el.querySelectorAll("[data-ftype]").forEach(b=>b.onclick=()=>{ ui.foodType = b.dataset.ftype; renderFood(); });
+  el.querySelectorAll('.food-row').forEach(d=>{
+    d.addEventListener('toggle', ()=>{
+      const fid = d.dataset.fid;
+      if(!ui.openFood) ui.openFood = new Set();
+      if(d.open) ui.openFood.add(fid); else ui.openFood.delete(fid);
+    });
+  });
+  items.forEach(item=>wireFoodBody(item));
+  if(isAdmin){ const ab=document.getElementById("addFoodBtn"); if(ab) ab.onclick=openAddFood; }
+  renderDietaryArea();
+}
+
+function openAddFood(){
+  const wrap = document.getElementById("addFoodWrap");
+  if(!wrap) return;
+  wrap.innerHTML = `<div class="add-row" style="flex-wrap:wrap;">
+    <select id="newFoodDay" class="search" style="max-width:100px;"><option value="1">Day I</option><option value="2">Day II</option><option value="3">Day III</option></select>
+    <input type="text" id="newFoodTime" placeholder="Time (HH:MM)" style="max-width:110px;">
+    <input type="text" id="newFoodTitle" placeholder="Title" style="flex:2;">
+    <input type="text" id="newFoodVenue" placeholder="Venue">
+    <select id="newFoodType" class="search" style="max-width:120px;"><option value="drinks">Drinks</option><option value="snack">Snack</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select>
+    <button id="newFoodSave">Add</button>
+  </div>`;
+  document.getElementById("newFoodSave").onclick = async ()=>{
+    const day = parseInt(document.getElementById("newFoodDay").value);
+    const time = document.getElementById("newFoodTime").value.trim();
+    const title = document.getElementById("newFoodTitle").value.trim();
+    const venue = document.getElementById("newFoodVenue").value.trim();
+    const meal_type = document.getElementById("newFoodType").value;
+    if(!title){ toast("Title required", true); return; }
+    const r = await api("food/add", {day, time, title, venue, meal_type});
+    if(r.error){ toast(r.error, true); return; }
+    await refresh();
+    toast("Added");
+  };
+}
+
+function renderDietaryArea(){
+  const el = document.getElementById("dietaryArea");
+  if(!el) return;
+  const he = LANG==="he";
+  // Single source of truth: the Guest Registry. Editing a guest there updates this.
+  const gs = (data.guests||[]).filter(g=>g.status==="active" && g.dietary && g.dietary.trim());
+  if(!gs.length){
+    el.innerHTML = `<div class="save-hint">${he?'לא נרשמו צרכים תזונתיים במרשם האורחים.':'No dietary requirements recorded in the Guest Registry.'}</div>`;
+    return;
+  }
+  // group identical requirements so the caterer sees counts, not 15 one-offs
+  const byNeed = {};
+  gs.forEach(g=>{
+    const k = g.dietary.trim();
+    (byNeed[k] = byNeed[k] || []).push(g);
+  });
+  const severe = gs.filter(g=>g.dietary_severe);
+
+  let html = "";
+  if(severe.length){
+    html += `<div style="border:1px solid var(--terra);background:rgba(162,78,46,0.07);border-radius:4px;padding:12px 16px;margin-bottom:14px;font-size:13px;">
+      <strong>${severe.length} ${he?'אלרגיות חמורות':'severe '+(severe.length===1?'allergy':'allergies')}</strong> — ${severe.map(g=>esc(g.first_name+' '+g.last_name)+': '+esc(g.dietary)).join(' · ')}
+    </div>`;
+  }
+  html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">`;
+  Object.keys(byNeed).sort().forEach(k=>{
+    const sev = byNeed[k].some(g=>g.dietary_severe);
+    html += `<span class="dietary-chip ${sev?'severe':''}">${esc(k)} · <strong>${byNeed[k].length}</strong></span>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="dietary-table">
+    <div class="dietary-row dietary-hd" style="grid-template-columns:1.3fr 1.9fr 1fr 1.2fr;">
+      <div>${he?'אורח/ת':'Guest'}</div><div>${he?'דרישה':'Requirement'}</div><div>${he?'דסק':'Desk'}</div><div>${he?'מלון':'Hotel'}</div>
+    </div>
+    ${gs.map(g=>`<div class="dietary-row" style="grid-template-columns:1.3fr 1.9fr 1fr 1.2fr;${g.dietary_severe?'background:rgba(162,78,46,0.06);':''}">
+      <div>${esc(g.first_name)} ${esc(g.last_name)}</div>
+      <div>${g.dietary_severe?`<span class="badge-locked" style="background:var(--terra);">${esc(g.dietary)}</span>`:esc(g.dietary)}</div>
+      <div>${esc(g.desk||'')}</div>
+      <div>${esc(g.hotel||'—')}</div>
+    </div>`).join('')}
+  </div>
+  <div class="save-hint" style="margin-top:9px;">
+    ${gs.length} ${he?'אורחים עם דרישה תזונתית · נערך במרשם האורחים':'guests with a requirement · edited in the Guest Registry'}
+    · <a href="#" id="foodDietCopy" style="color:var(--sky);">${he?'העתקה לקייטרינג':'copy for the caterer'}</a>
+  </div>`;
+
+  el.innerHTML = html;
+  const cp = document.getElementById("foodDietCopy");
+  if(cp) cp.onclick = (e)=>{
+    e.preventDefault();
+    const txt = gs.map(g=>`${g.first_name} ${g.last_name}${g.hotel?' ('+g.hotel+')':''} — ${g.dietary}${g.dietary_severe?' [SEVERE]':''}`).join("\n");
+    navigator.clipboard.writeText(txt).then(
+      ()=>toast(he?"הועתק לקייטרינג":"Copied for the caterer"),
+      ()=>toast(he?"ההעתקה נכשלה":"Could not copy", true));
+  };
+}
+
+// ---- ADMIN GRID (multi-tab) ----
+let gridActiveTab = 0;
+async function renderGrid(){
+  const area=document.getElementById("gridArea");
+  if(!area) return;
+  try { const g = await api("grid"); gridCache = g.tabs || []; gridRev = g.rev || 0; gridBase = JSON.parse(JSON.stringify(gridCache)); }
+  catch(e){ area.innerHTML=`<div class="empty">${esc(DL("The budget sheet could not be loaded: ","לא ניתן לטעון את גיליון התקציב: ") + apiErrorText(e, LANG==="he"))}</div>`; return; }
+  if(!gridCache.length) gridCache=[{name:"Sheet 1",columns:["Item","Owner","Status","Notes"],rows:[]}];
+  if(gridActiveTab>=gridCache.length) gridActiveTab=0;
+  drawGrid();
+}
+function drawGrid(){
+  const area=document.getElementById("gridArea");
+  if(!area||!gridCache) return;
+  const tab=gridCache[gridActiveTab];
+  const {columns, rows}=tab;
+  // tab strip
+  let html=`<div class="gridtabs">`;
+  gridCache.forEach((t,i)=>{
+    html+=`<button class="gridtab ${i===gridActiveTab?'active':''}" data-tab="${i}">${esc(t.name)}</button>`;
+  });
+  html+=`<button class="gridtab addtab" id="gAddTab" title="Add sheet">+</button></div>`;
+  // toolbar for current tab
+  html+=`<div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center;">
+      <button class="btn-ghost" id="gRenameTab">Rename sheet</button>
+      <button class="btn-ghost" id="gDelTab">Delete sheet</button>
+      <span style="flex:1;"></span>
+      <button class="btn-ghost" id="gAddRow">+ Row</button>
+      <button class="btn-ghost" id="gAddCol">+ Column</button>
+      <button class="btn-ghost" id="gExport">Export sheet CSV</button>
+      <span class="save-hint" id="gHint" style="align-self:center;"></span>
+    </div>`;
+  // table
+  html+=`<div style="overflow-x:auto;max-height:60vh;overflow-y:auto;"><table class="gridtbl"><thead><tr><th style="width:30px;"></th>`;
+  columns.forEach((c,ci)=>{ html+=`<th><input class="gcell ghead" data-col="${ci}" value="${esc(c)}"></th>`; });
+  html+=`<th style="width:30px;"></th></tr></thead><tbody>`;
+  rows.forEach((r,ri)=>{
+    html+=`<tr><td class="rownum">${ri+1}</td>`;
+    columns.forEach((_,ci)=>{ html+=`<td><input class="gcell" data-r="${ri}" data-c="${ci}" value="${esc(r[ci]!=null?r[ci]:'')}"></td>`; });
+    html+=`<td><button class="del-btn" data-delrow="${ri}">×</button></td></tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  area.innerHTML=html;
+
+  // tab switching
+  area.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{ gridActiveTab=parseInt(b.dataset.tab); drawGrid(); });
+  document.getElementById("gAddTab").onclick=()=>{ const n=prompt("New sheet name:","Sheet "+(gridCache.length+1)); if(!n)return; gridCache.push({name:n,columns:["Column 1","Column 2"],rows:[]}); gridActiveTab=gridCache.length-1; drawGrid(); queueGridSave(); };
+  document.getElementById("gRenameTab").onclick=()=>{ const n=prompt("Rename sheet:",tab.name); if(!n)return; tab.name=n; drawGrid(); queueGridSave(); };
+  document.getElementById("gDelTab").onclick=()=>{ if(gridCache.length<=1){toast("Can't delete the last sheet",true);return;} if(!confirm(`Delete sheet "${tab.name}"?`))return; gridCache.splice(gridActiveTab,1); gridActiveTab=0; drawGrid(); queueGridSave(); };
+
+  // cell editing
+  area.querySelectorAll(".gcell").forEach(inp=>{
+    inp.addEventListener("input",()=>{
+      if(inp.classList.contains("ghead")){ tab.columns[parseInt(inp.dataset.col)]=inp.value; }
+      else { const ri=parseInt(inp.dataset.r), ci=parseInt(inp.dataset.c); tab.rows[ri][ci]=inp.value; }
+      queueGridSave();
+    });
+  });
+  document.getElementById("gAddRow").onclick=()=>{ tab.rows.push(new Array(tab.columns.length).fill("")); drawGrid(); queueGridSave(); };
+  document.getElementById("gAddCol").onclick=()=>{ const n=prompt("Column name:","New column"); if(n===null)return; tab.columns.push(n); tab.rows.forEach(r=>r.push("")); drawGrid(); queueGridSave(); };
+  document.getElementById("gExport").onclick=()=>exportTabCSV(tab);
+  area.querySelectorAll("[data-delrow]").forEach(b=>b.onclick=()=>{ tab.rows.splice(parseInt(b.dataset.delrow),1); drawGrid(); queueGridSave(); });
+}
+// Budget saves: if only cell values changed, send them as cell edits (each applies only if the cell still holds
+// the value this screen started from, so two people editing different cells both keep their work). Adding or
+// removing rows, columns or sheets saves the whole sheet with its revision number; if someone else saved
+// since, the server refuses (409) and the sheet is reloaded with a message, instead of overwriting.
+let gridT, gridRev = 0, gridBase = null, gridSaving = false;
+function sameShape(a, b){ return a && b && a.length === b.length && a.every((t, i) => t.name === b[i].name && t.columns.length === b[i].columns.length && t.columns.every((c, j) => c === b[i].columns[j]) && t.rows.length === b[i].rows.length); }
+function gridEdits(){
+  const edits = [];
+  gridCache.forEach((t, ti) => t.rows.forEach((r, ri) => t.columns.forEach((_, ci) => {
+    const now = r[ci] == null ? "" : String(r[ci]), was = gridBase[ti].rows[ri][ci] == null ? "" : String(gridBase[ti].rows[ri][ci]);
+    if (now !== was) edits.push({ tab:ti, r:ri, c:ci, from:was, to:now });
+  })));
+  return edits;
+}
+function queueGridSave(){
+  const h=document.getElementById("gHint"); if(h)h.textContent="saving…";
+  clearTimeout(gridT);
+  gridT=setTimeout(saveGrid, 700);
+}
+async function saveGrid(){
+  const h=document.getElementById("gHint");
+  if (gridSaving) { gridT = setTimeout(saveGrid, 400); return; }
+  gridSaving = true;
+  const snapshot = JSON.parse(JSON.stringify(gridCache));
+  try {
+    if (sameShape(gridCache, gridBase)) {
+      const edits = gridEdits();
+      if (edits.length) { const r = await api("grid/cells", { edits, by:NAME }); gridRev = r.rev; }
+    } else {
+      const r = await api("grid", { tabs:gridCache, rev:gridRev, by:NAME }); gridRev = r.rev;
+    }
+    gridBase = snapshot;
+    if(h){ h.textContent="saved"; setTimeout(()=>{ if(h && h.textContent==="saved") h.textContent=""; },1500); }
+  } catch(e) {
+    if (e.kind === "conflict") {
+      const d = e.data || {};
+      if (d.tabs) { gridCache = d.tabs; gridRev = d.rev; gridBase = JSON.parse(JSON.stringify(gridCache)); drawGrid(); }
+      const cells = (d.conflicts || []).map(c => (gridCache[c.tab] ? gridCache[c.tab].name + " " : "") + "R" + (c.r + 1) + "C" + (c.c + 1)).join(", ");
+      const hh = document.getElementById("gHint");
+      if (hh) hh.textContent = DL("Not saved: someone else changed ", "לא נשמר: מישהו אחר שינה ") + (cells || DL("the sheet", "את הגיליון")) + DL(". The latest version is shown; enter your change again.", ". מוצגת הגרסה העדכנית; הזינו שוב את השינוי.");
+    } else if (h) h.textContent = (LANG==="he"?"לא נשמר: ":"not saved: ") + apiErrorText(e, LANG==="he");
+  } finally { gridSaving = false; }
+}
+function exportTabCSV(tab){
+  const esc2=v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  let csv=tab.columns.map(esc2).join(",")+"\n"+tab.rows.map(r=>tab.columns.map((_,ci)=>esc2(r[ci])).join(",")).join("\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`jf60-${tab.name}.csv`; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---- CONTACTS (phone list) ----
+function contactsForVenue(venue){ return data.contacts.filter(c=>c.venue && (c.venue===venue || (venue||"").includes(c.venue))); }
+
+let contactEditId = null;
+function renderContacts(){
+  const el=document.getElementById("content");
+  const q=ui.search.toLowerCase();
+  let list=data.contacts.filter(c=> !q || [c.name,c.phone,c.role,c.email,c.venue,c.notes].join(" ").toLowerCase().includes(q));
+  // group: venue-linked first (by venue), then general/suppliers
+  const linked=list.filter(c=>c.venue);
+  const general=list.filter(c=>!c.venue);
+  const venueGroups={};
+  linked.forEach(c=>{ (venueGroups[c.venue]=venueGroups[c.venue]||[]).push(c); });
+
+  function card(c){
+    return `<div class="loose-item" style="grid-template-columns:1fr auto;">
+      <div class="litext" style="cursor:pointer;" data-edit="${esc(c.id)}">
+        <b>${esc(c.name)}</b>${c.role?` <span style="color:var(--ink-soft);font-weight:400;">· ${esc(c.role)}</span>`:''}
+        <span class="ctx">${c.phone?`📞 ${esc(c.phone)}`:''}${c.email?`  ✉ ${esc(c.email)}`:''}${c.venue?`  ◈ ${esc(c.venue)}`:''}${c.notes?`<br>${esc(c.notes)}`:''}</span>
+      </div>
+      <div class="lmeta"><button class="del-btn" data-cdel="${esc(c.id)}" title="Delete">×</button></div>
+    </div>`;
+  }
+
+  let html=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--serif);font-size:20px;">Phone list · ${data.contacts.length} contact${data.contacts.length!==1?'s':''}</div>
+      <button class="btn-ghost" id="addContactBtn" style="border-color:var(--olive);color:var(--olive);font-weight:600;">+ Add contact</button>
+    </div>
+    <div id="contactForm"></div>`;
+
+  Object.keys(venueGroups).sort().forEach(v=>{
+    html+=`<div class="loose-group"><h3>◈ ${esc(v)}</h3>${venueGroups[v].map(card).join('')}</div>`;
+  });
+  if(general.length){
+    html+=`<div class="loose-group"><h3>${DL("Suppliers & general","ספקים וכללי")}</h3>${general.map(card).join('')}</div>`;
+  }
+  if(!list.length) html+=`<div class="empty" style="padding:40px;"><div class="big">${DL('No contacts yet','אין עדיין אנשי קשר')}</div>${DL('Add site contacts and suppliers here.','הוסיפו כאן אנשי קשר באתרים וספקים.')}</div>`;
+
+  el.innerHTML=html;
+  document.getElementById("addContactBtn").onclick=()=>showContactForm(null);
+  el.querySelectorAll("[data-edit]").forEach(x=>x.onclick=()=>showContactForm(parseInt(x.dataset.edit)));
+  el.querySelectorAll("[data-cdel]").forEach(x=>x.onclick=async()=>{
+    if(!confirm("Delete this contact?")) return;
+    try{ await api("contact/delete",{id:parseInt(x.dataset.cdel)}); await refresh(); toast("Deleted"); }catch(e){toast("Couldn't delete",true);}
+  });
+}
+
+function showContactForm(id){
+  contactEditId=id;
+  const c = id ? data.contacts.find(x=>x.id===id) : {name:"",phone:"",role:"",email:"",notes:"",venue:""};
+  if(!c) return;
+  // unique venue list from segments
+  const venues=[...new Set(data.segments.map(s=>s.venue))].sort();
+  const box=document.getElementById("contactForm");
+  box.innerHTML=`
+    <div style="border:1px solid var(--gold);border-radius:4px;padding:16px;margin-bottom:16px;background:rgba(181,137,46,0.05);">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <input id="cf_name" class="search" style="flex:2;min-width:160px;" placeholder="Name *" value="${esc(c.name)}">
+        <input id="cf_phone" class="search" style="flex:1;min-width:120px;" placeholder="Phone" value="${esc(c.phone)}">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <input id="cf_role" class="search" style="flex:1;min-width:140px;" placeholder="Role / company" value="${esc(c.role)}">
+        <input id="cf_email" class="search" style="flex:1;min-width:140px;" placeholder="Email" value="${esc(c.email)}">
+      </div>
+      <select id="cf_venue" class="search" style="width:100%;margin-bottom:8px;">
+        <option value="">— No site (supplier / general) —</option>
+        ${venues.map(v=>`<option value="${esc(v)}" ${v===c.venue?'selected':''}>${esc(v)}</option>`).join('')}
+      </select>
+      <textarea id="cf_notes" class="notes-area" style="min-height:52px;margin-bottom:8px;" placeholder="Notes">${esc(c.notes)}</textarea>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" id="cf_save" style="background:var(--olive);color:#fff;border-color:var(--olive);">${id?'Save':'Add contact'}</button>
+        <button class="btn-ghost" id="cf_cancel">Cancel</button>
+      </div>
+    </div>`;
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+  document.getElementById("cf_cancel").onclick=()=>{ box.innerHTML=""; };
+  document.getElementById("cf_save").onclick=async()=>{
+    const payload={ name:document.getElementById("cf_name").value, phone:document.getElementById("cf_phone").value,
+      role:document.getElementById("cf_role").value, email:document.getElementById("cf_email").value,
+      notes:document.getElementById("cf_notes").value, venue:document.getElementById("cf_venue").value, by:NAME||"" };
+    if(!payload.name.trim()){ toast("Name is required",true); return; }
+    try{
+      if(id){ payload.id=id; await api("contact/edit",payload); } else { await api("contact/add",payload); }
+      await refresh(); toast(id?"Saved":"Contact added");
+    }catch(e){ toast("Couldn't save",true); }
+  };
+}
+
+// ---- GENERAL NOTES (rich text) ----
+let notesSaveT=null;
+function cmd(c,val){ document.execCommand(c,false,val||null); const ed=document.getElementById("notesEditor"); if(ed){ed.focus(); scheduleNotesSave();} }
+async function renderNotes(){
+  const el=document.getElementById("content");
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--serif);font-size:20px;">${DL("General notes & open questions","הערות כלליות ושאלות פתוחות")}</div>
+      <span class="save-hint" id="notesHint"></span>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Shared scratchpad — open questions for the Foundation, things to raise at meetings, anything worth writing down. Everyone with edit access can edit; saves automatically.</div>
+    <div class="rt-toolbar" id="notesToolbar">
+      <select id="rt_block" title="Text style"><option value="P">Normal</option><option value="H1">Heading 1</option><option value="H2">Heading 2</option><option value="H3">Heading 3</option></select>
+      <select id="rt_size" title="Font size"><option value="">Size</option><option value="1">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">X-Large</option></select>
+      <span class="rt-sep"></span>
+      <button data-cmd="bold" title="Bold" style="font-weight:800;">B</button>
+      <button data-cmd="italic" title="Italic" style="font-style:italic;">I</button>
+      <button data-cmd="underline" title="Underline" style="text-decoration:underline;">U</button>
+      <button data-cmd="strikeThrough" title="Strikethrough" style="text-decoration:line-through;">S</button>
+      <span class="rt-sep"></span>
+      <label class="rt-color" title="Text color"><span style="border-bottom:3px solid var(--ink);">A</span><input type="color" id="rt_fore" value="#22201b"></label>
+      <label class="rt-color" title="Highlight"><span style="background:#ffe58a;padding:0 3px;">A</span><input type="color" id="rt_back" value="#ffe58a"></label>
+      <span class="rt-sep"></span>
+      <button data-cmd="insertUnorderedList" title="Bullet list">•≡</button>
+      <button data-cmd="insertOrderedList" title="Numbered list">1.≡</button>
+      <button data-cmd="outdent" title="Decrease indent">⇤</button>
+      <button data-cmd="indent" title="Increase indent">⇥</button>
+      <span class="rt-sep"></span>
+      <button data-cmd="justifyLeft" title="Align left">⇤≡</button>
+      <button data-cmd="justifyCenter" title="Align center">≡</button>
+      <button data-cmd="justifyRight" title="Align right">≡⇥</button>
+      <span class="rt-sep"></span>
+      <button data-cmd="removeFormat" title="Clear formatting">⌫</button>
+    </div>
+    <div id="notesEditor" contenteditable="true" class="rt-editor">Loading…</div>`;
+  const ed=document.getElementById("notesEditor");
+  ed.setAttribute("contenteditable","false");
+  try{
+    const r=await api("notes");
+    notesRev = r.rev || 0;
+    ed.innerHTML = cleanNotesHtml(r.body) || "<p></p>";
+    ed.setAttribute("contenteditable","true");
+    document.getElementById("notesHint").textContent = r.updated_by ? `last edited by ${r.updated_by}` : "";
+  }catch(e){ ed.innerHTML=""; document.getElementById("notesHint").textContent=DL("The notes could not be loaded: ","לא ניתן לטעון את ההערות: ")+apiErrorText(e, LANG==="he"); return; }
+
+  // toolbar buttons
+  document.querySelectorAll("#notesToolbar [data-cmd]").forEach(b=>{
+    b.onmousedown=(e)=>{ e.preventDefault(); }; // keep selection
+    b.onclick=()=>cmd(b.dataset.cmd);
+  });
+  document.getElementById("rt_block").onchange=(e)=>{ cmd("formatBlock", e.target.value); e.target.selectedIndex=0; };
+  document.getElementById("rt_size").onchange=(e)=>{ if(e.target.value)cmd("fontSize", e.target.value); e.target.selectedIndex=0; };
+  document.getElementById("rt_fore").oninput=(e)=>cmd("foreColor", e.target.value);
+  document.getElementById("rt_back").oninput=(e)=>cmd("hiliteColor", e.target.value);
+
+  ed.addEventListener("input", scheduleNotesSave);
+}
+// Notes HTML is cleaned with an allowlist before it is shown and before it is sent (the server cleans it
+// again). Only formatting survives: no scripts, event handlers, images, frames or non-http(s) links.
+const NOTE_TAGS = new Set(["P","DIV","BR","B","STRONG","I","EM","U","S","STRIKE","UL","OL","LI","H1","H2","H3","H4","H5","H6","BLOCKQUOTE","SPAN","FONT","A","HR","SUB","SUP","PRE","CODE","TABLE","THEAD","TBODY","TR","TH","TD"]);
+const NOTE_STYLE = /^(color|background-color|font-size|font-weight|font-style|text-decoration|text-align)$/;
+function cleanNotesHtml(html){
+  const doc = new DOMParser().parseFromString("<body>" + String(html || "") + "</body>", "text/html");
+  const walk = node => {
+    [...node.childNodes].forEach(n => {
+      if (n.nodeType === 8) { n.remove(); return; }
+      if (n.nodeType !== 1) return;
+      if (!NOTE_TAGS.has(n.tagName)) {
+        if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|SVG|MATH|TEMPLATE|NOSCRIPT|IMG|VIDEO|AUDIO|FORM|INPUT|BUTTON|TEXTAREA|SELECT|LINK|META|BASE|TITLE|CANVAS)$/.test(n.tagName)) { n.remove(); return; }
+        walk(n); n.replaceWith(...n.childNodes); return;
+      }
+      [...n.attributes].forEach(a => {
+        const k = a.name.toLowerCase(), v = a.value;
+        let keep = false;
+        if (k === "href" && n.tagName === "A") { try { const u = new URL(v, location.href); keep = /^(https?|mailto|tel):$/.test(u.protocol); } catch(e){} }
+        else if (k === "style") { const st = v.split(";").map(d => d.split(":").map(x => x.trim())).filter(([p, val]) => p && val && NOTE_STYLE.test(p.toLowerCase()) && !/url\(|expression|javascript:/i.test(val)).map(([p, val]) => p + ": " + val).join("; "); if (st) { n.setAttribute("style", st); } else n.removeAttribute("style"); return; }
+        else if ((k === "color" || k === "size") && n.tagName === "FONT") keep = /^[#\w(), .%-]{1,40}$/.test(v);
+        else if (k === "dir") keep = /^(rtl|ltr|auto)$/i.test(v);
+        else if ((k === "colspan" || k === "rowspan") && /^\d{1,2}$/.test(v)) keep = true;
+        if (!keep) n.removeAttribute(a.name);
+      });
+      if (n.tagName === "A") { n.setAttribute("rel", "noopener noreferrer"); n.setAttribute("target", "_blank"); }
+      walk(n);
+    });
+  };
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+let notesRev = 0, notesSaving = false;
+function scheduleNotesSave(){
+  const h=document.getElementById("notesHint"); if(h)h.textContent="saving…";
+  clearTimeout(notesSaveT);
+  notesSaveT=setTimeout(saveNotes,700);
+}
+async function saveNotes(overwrite){
+  const h=document.getElementById("notesHint");
+  const ed=document.getElementById("notesEditor"); if(!ed) return;
+  if (notesSaving) { notesSaveT = setTimeout(saveNotes, 400); return; }
+  notesSaving = true;
+  try{
+    const r = await api("notes",{body:cleanNotesHtml(ed.innerHTML), rev:notesRev, by:NAME});
+    notesRev = r.rev;
+    if(h){ h.textContent="saved"; setTimeout(()=>{const x=document.getElementById("notesHint"); if(x&&x.textContent==="saved")x.textContent="";},1500); }
+  }catch(e){
+    if (e.kind === "conflict" && e.data) {
+      // someone else saved meanwhile: keep what this person typed on screen, and let them choose
+      const d = e.data;
+      if (h) {
+        h.innerHTML = `${esc(DL("Not saved: ","לא נשמר: ") + (d.updated_by ? d.updated_by + DL(" changed the notes meanwhile.", " שינה/תה את ההערות בינתיים.") : DL("someone else changed the notes meanwhile.", "מישהו אחר שינה את ההערות בינתיים.")))} <button class="btn-ghost" id="nTheirs">${DL("Show their version","להציג את הגרסה שלהם")}</button> <button class="btn-ghost" id="nMine">${DL("Keep mine (overwrite)","לשמור את שלי (לדרוס)")}</button>`;
+        document.getElementById("nTheirs").onclick = () => { if (!confirm(DL("Replace what is on screen with the saved version? Your unsaved text will be lost.","להחליף את מה שעל המסך בגרסה השמורה? הטקסט שלא נשמר יאבד."))) return; ed.innerHTML = cleanNotesHtml(d.body) || "<p></p>"; notesRev = d.rev; h.textContent = ""; };
+        document.getElementById("nMine").onclick = () => { notesRev = d.rev; saveNotes(true); };
+      }
+    } else if(h) h.textContent=(LANG==="he"?"לא נשמר: ":"not saved: ")+apiErrorText(e, LANG==="he");
+  } finally { notesSaving = false; }
+}
+
+// ---- PRODUCTION TIMELINE ----
+const TL_CATS=["Content","Speakers","Venues","Catering","Logistics","Invitations","Budget","Tech","General"];
+const TL_COLORS={Content:"#6B7145",Speakers:"#3E6B7A",Venues:"#A24E2E",Catering:"#8A6820",Logistics:"#7a5a3e",Invitations:"#8a4a7a",Budget:"#4a6b45",Tech:"#4a5a7a",General:"#6a6a6a"};
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const d=new Date(dateStr+"T00:00:00"); const now=new Date(); now.setHours(0,0,0,0);
+  return Math.round((d-now)/86400000);
+}
+function fmtDate(dateStr){
+  if(!dateStr) return "—";
+  const d=new Date(dateStr+"T00:00:00");
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+}
+function renderTimeline(){
+  const el=document.getElementById("content");
+  const q=ui.search.toLowerCase();
+  let items=data.timeline.filter(t=>!q || [t.title,t.category,t.owner].join(" ").toLowerCase().includes(q));
+  const open=items.filter(t=>!t.done);
+  const done=items.filter(t=>t.done);
+  const overdue=open.filter(t=>{const d=daysUntil(t.due_date); return d!==null && d<0;});
+  const soon=open.filter(t=>{const d=daysUntil(t.due_date); return d!==null && d>=0 && d<=7;});
+  const later=open.filter(t=>{const d=daysUntil(t.due_date); return d===null || d>7;});
+
+  function row(t){
+    const d=daysUntil(t.due_date);
+    let when="", wcolor="var(--ink-soft)";
+    if(d===null){ when=""; }
+    else if(d<0){ when=`${-d}d overdue`; wcolor="var(--terra)"; }
+    else if(d===0){ when="today"; wcolor="var(--terra)"; }
+    else if(d<=7){ when=`in ${d}d`; wcolor="var(--gold-deep)"; }
+    else { when=`in ${d}d`; }
+    const col=TL_COLORS[t.category]||TL_COLORS.General;
+    return `<div class="loose-item ${t.done?'done':''}" style="grid-template-columns:22px 1fr auto;">
+      <div class="lcheck" data-tltoggle="${esc(t.id)}">${t.done?'\u2713':''}</div>
+      <div class="litext" style="cursor:pointer;" data-tledit="${esc(t.id)}">
+        <span style="display:inline-block;font-size:9px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:#fff;background:${col};padding:1px 6px;border-radius:3px;margin-right:6px;">${esc(t.category)}</span>${esc(t.title)}
+        <span class="ctx">${fmtDate(t.due_date)}${when?` · <b style="color:${wcolor};">${when}</b>`:''}${t.owner?` · ${esc(t.owner)}`:''}${t.notes?`<br>${esc(t.notes)}`:''}</span>
+      </div>
+      <div class="lmeta"><button class="edit-btn" data-tlassign="${esc(t.id)}" title="Assign">👤</button><button class="del-btn" data-tldel="${esc(t.id)}" title="Delete">×</button></div>
+    </div>`;
+  }
+  function group(title,list,color){
+    if(!list.length) return "";
+    return `<div class="loose-group"><h3 style="${color?`color:${color};`:''}">${title} <span style="font-size:12px;color:var(--ink-soft);font-weight:400;">(${list.length})</span></h3>${list.map(row).join('')}</div>`;
+  }
+
+  const eventDate=new Date("2026-10-20T00:00:00"); const now=new Date(); now.setHours(0,0,0,0);
+  const weeksOut=Math.max(0,Math.round((eventDate-now)/604800000));
+
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:var(--serif);font-size:20px;">${DL("Production timeline","ציר זמן הפקה")}</div>
+      <div style="font-size:13px;color:var(--ink-soft);">${weeksOut} week${weeksOut!==1?'s':''} to the conference · ${open.length} open</div>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Back-office milestones from now to 20 Oct. Click a milestone to edit its date, owner, or category. Check off when done.</div>
+    <div class="add-row" style="margin-bottom:16px;flex-wrap:wrap;">
+      <input type="date" id="tlDate" class="search" style="width:150px;">
+      <input id="tlTitle" class="search" style="flex:1;min-width:180px;" placeholder="New milestone…">
+      <select id="tlCat" class="search">${TL_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      <button id="tlAdd">Add</button>
+    </div>
+    ${group("Overdue",overdue,"var(--terra)")}
+    ${group("This week",soon,"var(--gold-deep)")}
+    ${group("Upcoming",later)}
+    ${done.length?`<div style="opacity:.6;">${group("Done",done,"var(--olive)")}</div>`:''}
+    ${!items.length?`<div class="empty" style="padding:40px;"><div class="big">${DL('No milestones yet','אין עדיין אבני דרך')}</div>${DL('Add your first above.','הוסיפו את הראשונה למעלה.')}</div>`:''}
+  `;
+  document.getElementById("tlAdd").onclick=addTimeline;
+  document.getElementById("tlTitle").addEventListener("keydown",e=>{if(e.key==="Enter")addTimeline();});
+  el.querySelectorAll("[data-tltoggle]").forEach(x=>x.onclick=async()=>{ const t=data.timeline.find(i=>i.id==x.dataset.tltoggle); if(t)t.done=t.done?0:1; render(); try{await api("timeline/toggle",{id:parseInt(x.dataset.tltoggle)});}catch(e){toast("Save failed",true);} });
+  el.querySelectorAll("[data-tledit]").forEach(x=>x.onclick=()=>editTimeline(parseInt(x.dataset.tledit)));
+  el.querySelectorAll("[data-tlassign]").forEach(x=>x.onclick=()=>{ const t=data.timeline.find(i=>i.id==x.dataset.tlassign); assignTask("timeline", x.dataset.tlassign, t?t.owner:""); });
+  el.querySelectorAll("[data-tldel]").forEach(x=>x.onclick=async()=>{ if(!confirm("Delete this milestone?"))return; try{await api("timeline/delete",{id:parseInt(x.dataset.tldel)}); await refresh(); toast("Deleted");}catch(e){toast("Couldn't delete",true);} });
+}
+async function addTimeline(){
+  const title=document.getElementById("tlTitle").value.trim();
+  if(!title){ toast("Add a title",true); return; }
+  const payload={ due_date:document.getElementById("tlDate").value, title, category:document.getElementById("tlCat").value };
+  try{ await api("timeline/add",payload); await refresh(); toast("Milestone added"); }
+  catch(e){ toast("Couldn't add",true); }
+}
+async function editTimeline(id){
+  const t=data.timeline.find(x=>x.id===id); if(!t) return;
+  const el=document.getElementById("content");
+  // simple inline edit via prompts kept minimal; use a small form at top
+  const title=prompt("Milestone:", t.title); if(title===null) return;
+  const due=prompt("Due date (YYYY-MM-DD):", t.due_date||""); if(due===null) return;
+  const cat=prompt("Category ("+TL_CATS.join("/")+"):", t.category)||t.category;
+  const owner=prompt("Owner:", t.owner||"");
+  try{ await api("timeline/edit",{id, title:title.trim()||t.title, due_date:due.trim(), category:cat.trim(), owner:(owner||"").trim(), notes:t.notes||""}); await refresh(); toast("Saved"); }
+  catch(e){ toast("Couldn't save",true); }
+}
+
+// ---- PDF EXPORT (print current language) ----
+// Hotel pickup lines for the guest-facing PDF.
+// Minibuses collect from every hotel at the same time, so this prints ONE time
+// and lists the hotels — only per-hotel times if they genuinely differ.
+// Runs with no hotel stop (venue-to-venue transfers) print nothing: a donor
+// only needs to know when to be in their own lobby.
+function pickupLineFor(segId){
+  if(!segId || !data.transport_runs || !data.transport_runs.length) return "";
+  const runs = data.transport_runs.filter(r=>r.linked_segment===segId && !r.pdf_hide);
+  if(!runs.length) return "";
+  const out = [];
+  runs.forEach(r=>{
+    const stops = runStops(r.id).filter(s=>s.hotel_match && s.stop_label);
+    if(!stops.length) return;
+    const times = [...new Set(stops.map(s=>(s.time||"").trim()).filter(Boolean))];
+    const hotels = stops.map(s=>esc(s.stop_label)).join(" · ");
+    if(times.length === 1){
+      out.push(`<strong>${DL("Bus pickup","איסוף אוטובוס")} ${esc(times[0])}</strong> — ${hotels}`);
+    } else if(times.length === 0){
+      out.push(`<strong>${DL("Bus pickup","איסוף אוטובוס")}</strong> — ${hotels}`);
+    } else {
+      const parts = stops.map(s=>`${esc(s.stop_label)} ${esc(s.time||'')}`.trim());
+      out.push(`<strong>${DL("Bus pickup","איסוף אוטובוס")}</strong> — ${parts.join(" · ")}`);
+    }
+  });
+  return out.join("<br>");
+}
+
+function exportSchedulePDF(){
+  const rtl = LANG==="he";
+  const dir = rtl?"rtl":"ltr";
+  const align = rtl?"right":"left";
+  // build day-grouped HTML
+  let body = "";
+  let curDay = null;
+  data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0)).forEach(s=>{
+    if(s.day!==curDay){
+      const first = curDay===null;
+      curDay=s.day; const d=DAYS[s.day];
+      body += `<div class="dh${first?'':' newpage'}"><span class="dn">${esc(d.num)}</span> <span class="dd">${esc(d.date)}</span><div class="dt">${esc(d.theme)}</div></div>`;
+    }
+    const pickup = ui.pdfBuses===false ? "" : pickupLineFor(s.id);
+    body += `<div class="ev">
+      <div class="tm">${esc(s.time)}–${esc(s.end_time)}</div>
+      <div class="bd">
+        <div class="ti">${esc(L(s,'title'))}</div>
+        <div class="vn">${esc(L(s,'venue'))}</div>
+        ${L(s,'descr')?`<div class="de">${esc(L(s,'descr')).replace(/\n/g,'<br>')}</div>`:''}
+        ${pickup?`<div class="pp">${pickup}</div>`:''}
+      </div>
+    </div>`;
+  });
+
+  const today = new Date().toLocaleDateString(rtl?"he-IL":"en-GB",{day:"numeric",month:"long",year:"numeric"});
+  const html = `<!DOCTYPE html><html dir="${dir}" lang="${rtl?'he':'en'}"><head><meta charset="utf-8"><title>${t("schedTitle")}</title>
+  <style>
+    /* margin:0 suppresses the browser's own date / title / page-number
+       headers; the real margins are rebuilt on the body and on each
+       new-page day heading so pages 2 and 3 keep their top margin. */
+    @page { margin: 0; }
+    * { box-sizing:border-box; }
+    body { font-family:${rtl?"'Frank Ruhl Libre', 'David', ":""}Georgia, serif; color:#22201B; margin:0; padding:16mm 16mm 14mm; direction:${dir}; text-align:${align}; }
+    .head { border-bottom:2px solid #22201B; padding-bottom:12px; margin-bottom:18px; }
+    .eye { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#8A6820; font-weight:700; }
+    h1 { font-size:26px; margin:6px 0 2px; font-weight:400; }
+    h1 .num { color:#A24E2E; font-style:italic; }
+    .sub { font-size:12px; color:#4A463D; }
+    .dh { margin:26px 0 12px; padding-bottom:9px; border-bottom:1px solid #C9BFA8; page-break-after:avoid; }
+    .dh.newpage { page-break-before:always; margin-top:0; padding-top:16mm; }
+    .dn { font-style:italic; color:#A24E2E; font-size:16px; }
+    .dd { font-size:22px; font-weight:700; }
+    .dt { font-size:12.5px; color:#4A463D; margin-top:6px; }
+    .ev { display:flex; gap:14px; padding:9px 0; border-bottom:1px solid #E8E1D4; page-break-inside:avoid; }
+    .tm { font-size:12px; color:#22201B; white-space:nowrap; min-width:88px; direction:ltr; text-align:${rtl?'right':'left'}; font-weight:700; }
+    .ti { font-size:14px; font-weight:700; margin-bottom:2px; }
+    .vn { font-size:11px; color:#3E6B7A; font-weight:600; }
+    .de { font-size:11px; color:#4A463D; margin-top:4px; line-height:1.5; }
+    .pp { font-size:10.5px; color:#4A463D; margin-top:5px; padding:4px 7px; background:#F1EEE4; border-${rtl?'right':'left'}:2px solid #6B7145; border-radius:2px; }
+    .foot { margin-top:20px; font-size:9px; color:#8a8272; text-align:center; }
+  </style></head>
+  <body>
+    <div class="head">
+      <div class="eye">Jerusalem Foundation</div>
+      <h1><span class="num">60</span>${rtl?' — לוח זמנים לכנס':'th Anniversary — Conference Schedule'}</h1>
+      <div class="sub">${t("theme")} · ${t("subtitle")}</div>
+    </div>
+    ${body}
+  </body></html>`;
+
+  const w = window.open("", "_blank");
+  if(!w){ toast("Allow pop-ups to export PDF", true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 350);
+}
+
+// ---- TASK ASSIGNMENT ----
+function ownerBadge(owner){
+  if(!owner) return `<span class="own-badge unassigned">unassigned</span>`;
+  return `<span class="own-badge">${esc(owner)}</span>`;
+}
+async function assignTask(kind, id, current){
+  // build a simple picker: team members + free text
+  const names = data.team.filter(m=>(m.org||"Production")==="Production").map(m=>m.name);
+  let msg = "Assign to:\n";
+  names.forEach((n,i)=>{ msg += `${i+1}. ${n}\n`; });
+  msg += `\nType a number, or type any name, or leave blank to unassign.`;
+  const ans = prompt(msg, current||"");
+  if(ans===null) return;
+  let owner = ans.trim();
+  const num = parseInt(owner);
+  if(!isNaN(num) && num>=1 && num<=names.length) owner = names[num-1];
+  try{
+    await api(kind==="check"?"check/assign":"timeline/assign", {id:parseInt(id), owner});
+    await refresh(); toast(owner?("Assigned to "+owner):"Unassigned");
+  }catch(e){ toast("Couldn't assign",true); }
+}
+async function manageTeam(){
+  const list = data.team.filter(m=>(m.org||"Production")==="Production").map(m=>`• ${m.name}${m.role?" ("+m.role+")":""}`).join("\n") || "(nobody yet)";
+  const ans = prompt(`Team members:\n${list}\n\nType a name to ADD, or type "del NAME" to remove.`, "");
+  if(ans===null || !ans.trim()) return;
+  const v = ans.trim();
+  try{
+    if(v.toLowerCase().startsWith("del ")){
+      const target = v.slice(4).trim();
+      const m = data.team.find(x=>x.name.toLowerCase()===target.toLowerCase());
+      if(!m){ toast("No such member",true); return; }
+      await api("team/delete",{id:m.id});
+    } else {
+      await api("team/add",{name:v});
+    }
+    await refresh(); toast("Team updated");
+  }catch(e){ toast("Couldn't update team",true); }
+}
+
+// ---- RUN OF SHOW PDF ----
+function exportRunOfShowPDF(){
+  const rtl = LANG==="he";
+  const dir = rtl?"rtl":"ltr";
+  const align = rtl?"right":"left";
+  let body="", curDay=null;
+  const segs = data.segments.slice().sort((a,b)=> a.day-b.day || (a.time<b.time?-1:a.time>b.time?1:0));
+  segs.forEach(sg=>{
+    if(sg.day!==curDay){
+      curDay=sg.day; const d=DAYS[sg.day];
+      if(body) body += `<div class="pb"></div>`;
+      body += `<section class="day">
+        <div class="dh">
+          <div class="dnum">${esc(d.num)}</div>
+          <div class="ddate">${esc(d.date)}</div>
+          <div class="dtheme">${esc(d.theme)}</div>
+        </div>`;
+    }
+    const desc = (L(sg,'descr')||"").trim();
+    const runsheet = (sg.brief_runsheet||"").trim();
+    body += `<article class="ev">
+      <div class="evtop">
+        <div class="tm">${esc(sg.time)}<span class="tmend">${esc(sg.end_time)}</span></div>
+        <div class="evmain">
+          <h3>${esc(L(sg,'title'))}</h3>
+          <div class="vn">${esc(L(sg,'venue'))}</div>
+          ${desc?`<div class="de">${esc(desc).replace(/\n/g,'<br>')}</div>`:''}
+          ${runsheet?`<div class="rs"><div class="rslab">${t("rosLabel")}</div><div class="rstext">${esc(runsheet).replace(/\n/g,'<br>')}</div></div>`:''}
+        </div>
+      </div>
+    </article>`;
+  });
+  body += `</section>`;
+
+  const today=new Date().toLocaleDateString(rtl?"he-IL":"en-GB",{day:"numeric",month:"long",year:"numeric"});
+  const html = `<!DOCTYPE html><html dir="${dir}" lang="${rtl?'he':'en'}"><head><meta charset="utf-8"><title>${t("rosTitle")}</title>
+  <style>
+    @page { margin: 20mm 18mm 16mm; }
+    *{box-sizing:border-box;}
+    body { font-family:${rtl?"'Frank Ruhl Libre','David',":""}Georgia,'Times New Roman',serif;
+      color:#22201B; margin:0; direction:${dir}; text-align:${align};
+      -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+    /* cover header */
+    .cover { padding-bottom:16px; margin-bottom:6px; border-bottom:2.5px solid #22201B; }
+    .eyebrow { font-size:9.5px; letter-spacing:.26em; text-transform:uppercase; color:#8A6820; font-weight:700; margin-bottom:8px; }
+    .title { font-size:34px; line-height:1.05; font-weight:400; letter-spacing:-.01em; margin:0 0 6px; }
+    .title .num { color:#A24E2E; font-style:italic; }
+    .subtitle { font-size:12px; color:#4A463D; letter-spacing:.01em; }
+
+    /* day section */
+    .pb { page-break-before:always; }
+    .dh { margin:26px 0 14px; page-break-after:avoid; }
+    .dnum { font-style:italic; color:#A24E2E; font-size:13px; letter-spacing:.04em; }
+    .ddate { font-size:23px; font-weight:400; line-height:1.15; margin:1px 0 3px; }
+    .dtheme { font-size:11px; color:#6B7145; font-style:italic; }
+
+    /* event */
+    .ev { padding:13px 0; border-bottom:1px solid #E4DCCB; page-break-inside:avoid; }
+    .ev:last-child { border-bottom:none; }
+    .evtop { display:flex; gap:16px; }
+    .tm { min-width:64px; font-size:13.5px; font-weight:700; direction:ltr;
+      text-align:${rtl?'right':'left'}; letter-spacing:.01em; padding-top:1px; }
+    .tmend { display:block; font-size:11px; font-weight:400; color:#8a8272; margin-top:1px; }
+    .evmain { flex:1; }
+    h3 { font-size:15.5px; font-weight:700; margin:0 0 2px; line-height:1.25; }
+    .vn { font-size:10.5px; color:#3E6B7A; font-weight:600; letter-spacing:.02em; margin-bottom:6px; }
+    .de { font-size:11.5px; line-height:1.6; color:#3f3b33; }
+    .rs { margin-top:9px; background:#FBF8F1; border-${rtl?'right':'left'}:2.5px solid #B5892E; padding:8px 11px; }
+    .rslab { font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:#8A6820; font-weight:700; margin-bottom:4px; }
+    .rstext { font-size:11px; line-height:1.7; }
+
+    .foot { margin-top:22px; padding-top:8px; border-top:1px solid #E4DCCB;
+      font-size:8.5px; color:#9a927f; text-align:center; letter-spacing:.04em; }
+  </style></head><body>
+    <div class="cover">
+      <div class="eyebrow">Jerusalem Foundation</div>
+      <div class="title"><span class="num">60</span>${rtl?' — לו״ז מפורט של הכנס':'th Anniversary — Detailed Schedule'}</div>
+      <div class="subtitle">${t("theme")} · ${t("subtitle")}</div>
+    </div>
+    ${body}
+    <div class="foot">${t("printed")} ${today}</div>
+  </body></html>`;
+  const w=window.open("","_blank");
+  if(!w){ toast("Allow pop-ups to export PDF", true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 400);
+}
+
+// ---- util ----
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+window.addEventListener("unhandledrejection", e => { const err = e.reason; if (err && err.kind) { e.preventDefault(); toast((LANG==="he" ? "לא נשמר: " : "Not saved: ") + apiErrorText(err, LANG==="he"), true); } });
+window.addEventListener("beforeunload", e => { if (SAVE.inflight) { e.preventDefault(); e.returnValue = ""; } });
+let toastT;
+function toast(msg,bad){ const t=document.getElementById("toast"); t.textContent=msg; t.className="toast on"+(bad?" offline":""); clearTimeout(toastT); toastT=setTimeout(()=>t.className="toast",2200); }
+
+// live-ish sync: refresh every 20s while visible.
+// Skipped while a drawer or a Food & Drink row is open, so the poll can't
+// collapse what you're reading or editing.
+setInterval(()=>{
+  if(!ROLE || document.visibilityState!=="visible") return;
+  if(ui.openId || ui.view==="notes") return;
+  if(ui.view==="food" && ui.openFood && ui.openFood.size) return;
+  if(ui.view==="guests" && ((ui.openGuest && ui.openGuest.size) || ui.importChanges)) return;
+  if(ui.view==="design" && ui.openDesign && ui.openDesign.size) return;
+  if(ui.view==="transport" && ui.openRun && ui.openRun.size) return;
+  refresh();
+}, 20000);

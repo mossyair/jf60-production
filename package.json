@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "seed": "wrangler d1 execute jf60-db --remote --file=./schema.sql && wrangler d1 execute jf60-db --remote --file=./seed.sql",
-    "seed-local": "wrangler d1 execute jf60-db --local --file=./schema.sql && wrangler d1 execute jf60-db --local --file=./seed.sql"
+    "migrate:local": "wrangler d1 migrations apply jf60-db --local",
+    "migrate:remote": "wrangler d1 migrations apply jf60-db --remote",
+    "seed-local": "wrangler d1 migrations apply jf60-db --local && wrangler d1 execute jf60-db --local --file=./tests/fixtures/synthetic.sql",
+    "credential": "node scripts/issue-field-credential.mjs",
+    "test": "node tests/run.mjs"
   },
   "devDependencies": {
     "wrangler": "^3.114.17"

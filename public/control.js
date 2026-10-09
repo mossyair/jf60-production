@@ -1116,8 +1116,10 @@ function answer(q){
     a = H(`${ap} of ${D.design.length} design items approved, ${aw} waiting for sign-off, ${cm} missing content. ${lt} past deadline.`, `${ap} מתוך ${D.design.length} פריטי עיצוב מאושרים, ${aw} ממתינים לאישור, ל-${cm} חסר תוכן. ${lt} עברו את הדדליין.`); }
   else if (/overdue|late|milestone|behind|איחור|באיחור|אבני/.test(q)) { const o = D.miles.filter(m=>!m.done&&daysTo(m.due)<0); const list = o.slice(0,4).map(m=>tk(m.title)).join('; ') + (o.length>4?'…':'.');
     a = H(`${o.length} milestones are overdue: ${list}`, `${o.length} אבני דרך באיחור: ${list}`); }
-  else if (/who|crew|lead|manager|צוות|אחראי|מנהל/.test(q)) { const g = D.ops.filter(o=>o.crew.some(c=>c.n==='?')), list = g.map(o=>o.day+'.10 '+tk(o.site)).join(', '), hg = D.ops.filter(o=>o.crew.some(c=>c.n==='Hagai')).length, ur = D.ops.filter(o=>o.crew.some(c=>c.n==='Uri')).length;
-    a = H(`${g.length} crew items have no lead: ${list}. Hagai has ${hg} shifts, Uri ${ur}.`, `ל-${g.length} משמרות צוות אין אחראי: ${list}. לחגי ${hg} משמרות, לאורי ${ur}.`); }
+  else if (/who|crew|lead|manager|צוות|אחראי|מנהל/.test(q)) { const g = D.ops.filter(o=>o.crew.some(c=>c.n==='?')), list = g.map(o=>o.day+'.10 '+tk(o.site)).join(', ');
+    const per = {}; D.ops.forEach(o => o.crew.forEach(c => { if (c.n !== '?' && !/^\d/.test(c.n)) per[c.n] = (per[c.n] || 0) + 1; }));
+    const top = Object.entries(per).sort((a,b) => b[1] - a[1]).slice(0, 3).map(([n, k]) => n + ' ' + k).join(', ');
+    a = H(`${g.length} crew items have no lead: ${list}.${top ? ' Most shifts: ' + top + '.' : ''}`, `ל-${g.length} משמרות צוות אין אחראי: ${list}.${top ? ' הכי הרבה משמרות: ' + top + '.' : ''}`); }
   else a = H('In the app this question goes to Claude with the event’s data. Try “what’s missing for day 1?”, “which runs have no driver?” or “what’s overdue?”.', 'באפליקציה השאלה נשלחת ל-Claude עם נתוני האירוע. נסו “מה חסר ביום 1?”, “לאילו הסעות אין נהג?” או “מה באיחור?”.');
   drawPal(`<span data-notr>${esc(a)}</span>`);
 }
@@ -1323,7 +1325,7 @@ const HE = {
  'Attending all main sessions. RSVPs per session feed the headcount for catering and transport.':'משתתף בכל המפגשים המרכזיים. אישורי ההגעה לכל מפגש מזינים את ספירת הכיבוד וההסעות.','Flagged in the last import':'סומן בייבוא האחרון','Details changed in the registration sheet.':'הפרטים השתנו בגיליון הרישום.','Reviewed':'נבדק','clear flag':'הסרת הסימון',
  'Production crew':'צוות הפקה','Hotel group leaders':'ראשי קבוצות במלונות',
  'Sound':'סאונד','site manager':'מנהל אתר','Transport':'הסעות','Tower of David':'מגדל דוד','Furniture':'ריהוט','Food':'אוכל','producer':'מפיק','Design & print':'עיצוב ודפוס','Ein Yael':'עין יעל','Cinematheque':'סינמטק','unconfirmed':'לא מאושר',
- 'Hagai':'חגי','Uri':'אורי','Natali':'נטלי','Carmi':'כרמי','Moss':'מוס','Yair':'יאיר','Kosta':'קוסטה','Yarden':'ירדן','Elnatan':'אלנתן','Yaara':'יערה','Maichuk':'מאיצ׳וק','Tali Sasson':'טלי ששון','Si Agai':'סי אגאי','Schuster':'שוסטר','Designer':'מעצבת','Design':'עיצוב','AV':'הגברה',
+ 'Schuster':'שוסטר','Designer':'מעצבת','Design':'עיצוב','AV':'הגברה',
  'Contacted':'נוצר קשר','Quote in':'התקבלה הצעה','Signed':'נחתם','Invoiced':'חשבונית','Total fees incl. VAT':'סך שכר כולל מע״מ','Move back':'החזרה',
  'Drop a quote, signed contract or invoice in the Inbox and the card moves by itself.':'גררו הצעת מחיר, חוזה חתום או חשבונית לתיבה והכרטיס יתקדם לבד.',
  'Panel host':'הנחיית פאנל','Train Theater':'תיאטרון הקרון','Performance + workshop':'מופע + סדנה','Jerusalem Theater':'תיאטרון ירושלים','Keynote speaker':'דובר מרכזי','Yoga':'יוגה','day 2':'יום 2','day 3':'יום 3','Run tour':'סיור ריצה','Round-table keynote':'דובר מרכזי לשולחנות עגולים','Arabic lesson for donors':'שיעור ערבית לתורמים','British Trail run':'ריצה במסלול הבריטי','TED-style build':'בניית טד','Science Museum':'מוזיאון המדע','Main performance':'הופעה מרכזית','gala':'גאלה','Additional booking':'הזמנה נוספת',
@@ -1332,7 +1334,7 @@ const HE = {
  'JF60 design moodboard':'מודבורד עיצוב JF60','Look and feel per venue and day':'שפה עיצובית לכל אתר ויום','23 pages':'23 עמודים','the reference for every design & print item':'הרפרנס לכל פריטי העיצוב והדפוס','Open PDF ↗':'פתיחת PDF ↗',
  'Totals match the “יריד דוכנים” tab (42 · 40 · 37). Organization names are placeholders here.':'המספרים תואמים ללשונית “יריד דוכנים” (42 · 40 · 37). שמות הארגונים כאן הם דוגמה.',
  'Venue':'אתר','Supplier':'ספק','Crew':'צוות','Filter contacts':'סינון אנשי קשר','Sound, AV & lighting':'סאונד, הגברה ותאורה','Coffee & pastries':'קפה ומאפה','Catering':'קייטרינג','Days 1–3 base':'בסיס ימים 1–3','Day 1 plenary':'מליאה יום 1','Opening evening':'ערב פתיחה','Art fair & dinner':'יריד אמנות וארוחת ערב','Day 3 morning':'בוקר יום 3','Think tank':'חשיבה משותפת','Closing gala':'גאלת סיום',
- 'Peacock':'פיקוק','Talbiye':'טלבייה','Nir Bavli':'ניר בבלי','HaMiffal':'המפעל','Cinematheque Jerusalem':'סינמטק ירושלים','Bloomfield Science Museum':'מוזיאון המדע בלומפילד','No contacts':'אין אנשי קשר','New contact':'איש קשר חדש',
+ 'Peacock':'פיקוק','Talbiye':'טלבייה','HaMiffal':'המפעל','Cinematheque Jerusalem':'סינמטק ירושלים','Bloomfield Science Museum':'מוזיאון המדע בלומפילד','No contacts':'אין אנשי קשר','New contact':'איש קשר חדש',
  'Suppliers and venues from the production sheet; phone numbers are left out of the prototype.':'ספקים ואתרים מגיליון ההפקה; מספרי הטלפון הושמטו מאב־הטיפוס.',
  // logistics
  'Click a status to cycle it; click a run to see pickups per hotel.':'לחצו על סטטוס כדי לשנות אותו; לחצו על הסעה כדי לראות איסוף לפי מלון.','Change status':'שינוי סטטוס','Driver':'נהג','[driver · phone]':'[נהג · טלפון]','Not assigned':'לא שובץ','Pickups by hotel':'איסוף לפי מלון','Passengers':'נוסעים','Everyone attending the previous session.':'כל המשתתפים במפגש הקודם.','Driver sheet in the Print center':'דף נהג במרכז ההדפסה',

@@ -1,0 +1,46 @@
+// AV (Shuster): per event, the AV brief, Shuster's equipment list to tick off, files to project, screens and venue contacts.
+window.FIELD = { level:'av', render };
+const needRow = n => `<label class="chk ${n.done ? 'done' : ''}"><input type="checkbox" data-need="${esc(n.id)}" ${n.done ? 'checked' : ''}>
+  <span class="m"><b>${esc(n.item)}</b>${n.qty ? ` <span class="tag">${esc(n.qty)}</span>` : ''}<div class="s">${[n.area, n.notes].filter(Boolean).map(esc).join(' · ')}</div></span></label>`;
+const fileBtn = f => `<button class="btn" type="button" data-file="${esc(f.id)}" data-name="${esc(f.filename)}">⬇ <bdi>${esc(f.filename)}</bdi></button>`;
+function segCard(s){
+  const needs = DATA.needs.filter(n => segDays(n.segment_ids).includes(s.id));
+  const files = DATA.files.filter(f => f.segment_id === s.id);
+  const screens = DATA.screens.filter(x => x.linked_segment === s.id);
+  const venue = DATA.venues.filter(v => sameVenue(v.venue, s.venue));
+  if (!s.brief_av && !needs.length && !files.length && !screens.length) return '';
+  return `<div class="card"><div class="time">${esc(s.time)}${s.end_time ? ` <small>– ${esc(s.end_time)}</small>` : ''}</div>
+    <div class="title">${esc(segName(s))}</div><div class="s muted">${esc(s.venue_he || s.venue || '')}</div>
+    <div class="btns">${String(s.venue || '').split(/\s*[·\/]\s*/).filter(Boolean).map(v => navBtn(v, v)).join('')}</div>
+    ${needs.length ? `<div class="sec">ציוד ומשימות לשוסטר</div>${needs.map(needRow).join('')}` : ''}
+    ${s.brief_av ? `<div class="sec">בריף טכני</div><div class="pre">${esc(s.brief_av)}</div>` : ''}
+    ${files.length ? `<div class="sec">קבצים להקרנה</div><div class="btns">${files.map(fileBtn).join('')}</div>` : ''}
+    ${screens.length ? `<div class="sec">מסכים</div>${screens.map(x => `<div><b>${esc(x.title_he || x.title)}</b> <span class="s muted">${esc(x.size || '')}</span></div>`).join('')}` : ''}
+    ${s.brief_runsheet ? `<details><summary>לו״ז האירוע</summary><div class="pre">${esc(s.brief_runsheet)}</div></details>` : ''}
+    ${s.brief_staging || s.brief_location ? `<details><summary>במה ומיקום</summary><div class="pre">${esc([s.brief_location, s.brief_staging].filter(Boolean).join('\n\n'))}</div></details>` : ''}
+    ${venue.length ? `<div class="sec">אנשי קשר במקום</div>${venue.map(personRow).join('')}` : ''}</div>`;
+}
+function dayView(day){
+  const shifts = DATA.shifts.filter(s => shiftDay(s.day) === day);
+  const cards = DATA.segments.filter(s => s.day === day).sort((a, b) => mins(a.time) - mins(b.time)).map(segCard).join('');
+  return (shifts.length ? `<div class="card"><div class="title">הקמות ובדיקות סאונד</div>${shifts.map(s => `<div class="row"><span class="t">${hhmm(s.start_min)}</span><span class="m"><b>${esc(s.title)}</b><div class="s">${esc(s.site || '')}${s.note ? ' · ' + esc(s.note) : ''}</div></span></div>`).join('')}</div>` : '')
+    + (cards || '<div class="empty">אין דרישות AV ביום הזה</div>');
+}
+function screensView(){
+  const general = DATA.needs.filter(n => !segDays(n.segment_ids).length);
+  const segById = Object.fromEntries(DATA.segments.map(s => [s.id, s]));
+  return `<div class="card"><div class="title">מסכים וקבצים דיגיטליים</div>${DATA.screens.map(x => `<details><summary>${esc(x.title_he || x.title)}${x.status ? ` <span class="tag">${esc(x.status)}</span>` : ''}</summary>
+      <div class="pre">${esc([x.size, x.spec, x.brief].filter(Boolean).join('\n\n'))}</div></details>`).join('') || '<div class="muted">—</div>'}</div>
+    <div class="card"><div class="title">כל הקבצים להקרנה</div>${DATA.files.map(f => `<div class="row"><span class="m"><bdi>${esc(f.filename)}</bdi><div class="s">${esc(segName(segById[f.segment_id]))}</div></span>${fileBtn(f).replace('⬇ <bdi>' + esc(f.filename) + '</bdi>', '⬇')}</div>`).join('') || '<div class="muted">—</div>'}</div>
+    ${general.length ? `<div class="card"><div class="title">כללי, לא משויך לאירוע</div>${general.map(needRow).join('')}</div>` : ''}`;
+}
+function render(){
+  $('who').textContent = 'שוסטר · הגברה, תאורה ומסכים';
+  const days = [1, 2, 3].concat(DATA.shifts.some(s => shiftDay(s.day) === 0) ? [0] : []).sort();
+  const left = DATA.needs.filter(n => !n.done).length;
+  tabs(days.map(d => [d, DAYS[d].name]).concat([['scr', 'מסכים וקבצים']]));
+  $('main').innerHTML = `<div class="s muted" style="margin-bottom:10px">${left} פריטים פתוחים מתוך ${DATA.needs.length}</div>` + (DAY === 'scr' ? screensView() : dayView(DAY))
+    + `<div class="card"><div class="title">אנשי קשר בהפקה</div>${DATA.contacts.map(personRow).join('')}</div>`;
+  $('main').querySelectorAll('[data-need]').forEach(el => el.onchange = async () => { if (!await toggle(el, 'field/done', { kind:'need', id:el.dataset.need, done:el.checked })) return; const n = DATA.needs.find(x => x.id === el.dataset.need); if (n) n.done = el.checked ? 1 : 0; });
+  $('main').querySelectorAll('[data-file]').forEach(b => b.onclick = () => download(b.dataset.file, b.dataset.name));
+}

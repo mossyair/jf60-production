@@ -11,10 +11,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&
 let KEY = '', NAME = '', DATA = null, DAY = 1;
 try { KEY = sessionStorage.getItem('jf60k') || ''; NAME = sessionStorage.getItem('jf60n') || ''; } catch(e){}
 
-// minutes from midnight; anything before 05:00 belongs to the evening before
-const mins = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return null; const v = +m[1] * 60 + +m[2]; return v < 300 ? v + 1440 : v; };
-const hhmm = m => m == null ? '' : String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
-const nowIL = () => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Jerusalem', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(new Date()).map(x => [x.type, x.value])); return { date:`${p.year}-${p.month}-${p.day}`, min:+p.hour * 60 + +p.minute }; };
+// times on the event-day scale (shared clock: Asia/Jerusalem, a day runs until 05:00 the next morning)
+const mins = t => EventClock.mins(t);
+const hhmm = m => EventClock.hhmm(m);
 const waze = q => 'https://waze.com/ul?q=' + encodeURIComponent(q) + '&navigate=yes';
 const tel = p => 'tel:' + String(p).replace(/[^\d+]/g, '');
 const norm = s => String(s || '').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
@@ -33,33 +32,53 @@ const personRow = c => `<div class="row"><span class="m"><div><b><bdi>${esc(c.na
 const segName = s => s ? (s.title_he || s.title) : '';
 const segDays = ids => String(ids || '').split(',').map(x => x.trim()).filter(Boolean);
 
+// identity comes from the key alone; the name typed at sign-in is only shown in the usage log
 function api(path, body){
-  return fetch('/api/' + path, { method: body ? 'POST' : 'GET', headers: Object.assign({ 'x-token':KEY, 'x-name':encodeURIComponent(NAME) }, body ? { 'content-type':'application/json' } : {}), body: body ? JSON.stringify(body) : undefined })
-    .then(async r => { let j = {}; try { j = await r.json(); } catch(e){} if (!r.ok || j.error) { const e = new Error(j.error || 'HTTP ' + r.status); e.status = r.status; throw e; } return j; });
+  return apiRequest(path, { key:KEY, body, timeout:20000 });
 }
-async function load(){ DATA = await api(FIELD.level + '/state'); }
+// connection line under the header: when the data was last loaded and whether the last attempt worked
+let LAST_OK = 0, LAST_FAIL = false;
+function connLine(){
+  let el = $('conn');
+  if (!el) { el = document.createElement('div'); el.id = 'conn'; el.className = 'conn'; el.setAttribute('role', 'status'); const h = document.querySelector('#app header'); if (h) h.appendChild(el); }
+  const age = LAST_OK ? EventClock.ago(LAST_OK, true) : '';
+  el.classList.toggle('bad', LAST_FAIL);
+  el.textContent = LAST_FAIL ? `אין חיבור לשרת · הנתונים מ${age ? age : 'הטעינה הקודמת'}` : `מעודכן · ${age}`;
+}
+async function load(){
+  try { DATA = await api(FIELD.level + '/state'); LAST_OK = Date.now(); LAST_FAIL = false; }
+  catch(e){ LAST_FAIL = true; if (DATA) connLine(); throw e; }
+  if (DATA) connLine();
+}
 // files come through the API (they need the key), then save as a normal download
 async function download(id, name){
-  const r = await fetch('/api/files/download?id=' + encodeURIComponent(id), { headers:{ 'x-token':KEY, 'x-name':encodeURIComponent(NAME) } });
-  if (!r.ok) { alert('ההורדה נכשלה'); return; }
+  let r;
+  try { r = await fetch('/api/files/download?id=' + encodeURIComponent(id), { headers:{ 'x-token':KEY }, cache:'no-store' }); } catch(e){ alert('אין חיבור, ההורדה נכשלה'); return; }
+  if (!r.ok) { alert(r.status === 404 ? 'הקובץ לא זמין לקוד הזה' : 'ההורדה נכשלה'); return; }
   const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-// tick boxes: change the screen right away, undo if the server says no
+// tick boxes: the box shows "saving" until the server confirms; on failure it goes back and says why.
+// Returns true only when the server saved it.
 async function toggle(el, path, body){
-  el.disabled = true;
-  try { await api(path, body); } catch(e){ el.checked = !el.checked; alert('לא נשמר: ' + e.message); }
-  el.disabled = false; el.closest('.chk')?.classList.toggle('done', el.checked);
+  const row = el.closest('.chk');
+  el.disabled = true; row?.classList.add('saving'); row?.setAttribute('aria-busy', 'true');
+  let ok = false;
+  try { await api(path, body); ok = true; }
+  catch(e){ el.checked = !el.checked; alert('לא נשמר: ' + apiErrorText(e, true)); }
+  el.disabled = false; row?.classList.remove('saving'); row?.removeAttribute('aria-busy');
+  row?.classList.toggle('done', el.checked);
+  return ok;
 }
 function tabs(list){
-  $('tabs').innerHTML = list.map(([k, label]) => `<button type="button" role="tab" data-k="${k}" aria-selected="${String(k) === String(DAY)}">${label}</button>`).join('');
+  $('tabs').innerHTML = list.map(([k, label]) => `<button type="button" role="tab" data-k="${esc(k)}" aria-selected="${String(k) === String(DAY)}">${esc(label)}</button>`).join('');
   $('tabs').querySelectorAll('[data-k]').forEach(b => b.onclick = () => { DAY = isNaN(+b.dataset.k) ? b.dataset.k : +b.dataset.k; FIELD.render(); window.scrollTo(0, 0); });
 }
-function pickDay(){ const d = nowIL().date; const hit = Object.entries(DAYS).find(([, x]) => x.date === d); DAY = hit && +hit[0] > 0 ? +hit[0] : 1; }
+function pickDay(){ const d = EventClock.now().day; DAY = d != null && d > 0 ? d : 1; }
 async function start(){
   try { await load(); }
-  catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = !KEY ? '' : e.message === 'name not found' ? 'השם לא נמצא ברשימת הצוות. כתבו שם מלא באנגלית, כמו ברשימה.' : 'הקוד לא התקבל.'; return; }
-  $('gate').hidden = true; $('app').hidden = false; pickDay(); FIELD.render(); hello();
+  catch(e){ $('app').hidden = true; $('gate').hidden = false; $('gName').value = NAME; $('gErr').textContent = !KEY ? '' : e.kind === 'auth' || e.kind === 'forbidden' ? 'הקוד לא התקבל.' : apiErrorText(e, true); return; }
+  $('gate').hidden = true; $('app').hidden = false; pickDay(); FIELD.render(); connLine(); hello();
 }
 function hello(){
   try { if (sessionStorage.getItem('jf60dv')) return; } catch(e){}
@@ -67,8 +86,11 @@ function hello(){
 }
 // a key for another mode goes to that mode's page
 $('gateForm').onsubmit = async e => { e.preventDefault(); KEY = $('gKey').value.trim(); NAME = $('gName').value.trim(); try { sessionStorage.setItem('jf60k', KEY); sessionStorage.setItem('jf60n', NAME); sessionStorage.removeItem('jf60dv'); } catch(e){}
-  try { const s = await api('state'); if (s.redirect !== location.pathname) { location.href = s.redirect || '/'; return; } } catch(err){}
+  try { const s = await api('state'); if (s.redirect && s.redirect !== location.pathname) { location.href = s.redirect; return; } if (!s.redirect) { location.href = '/'; return; } } catch(err){}
   start(); };
 // log out to the main sign-in screen, so any key (another mode included) can be used next
 $('logout').onclick = () => { try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; location.href = '/'; };
-setInterval(() => { if (DATA && document.visibilityState === 'visible' && !document.querySelector('input:focus')) load().then(FIELD.render).catch(() => {}); }, 120000);
+// refresh every 2 minutes (not while a box is being saved); the connection line ages every 30 seconds
+setInterval(() => { if (DATA && document.visibilityState === 'visible' && !document.querySelector('input:focus, .chk.saving')) load().then(FIELD.render).catch(() => {}); }, 120000);
+setInterval(() => { if (DATA) connLine(); }, 30000);
+start();

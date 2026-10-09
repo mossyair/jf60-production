@@ -1,14 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { HttpError, json as jsonResp, readJson, ENUMS, oneOf, ident, timeHM, dateISO, dayNum, str, safeHttpUrl, sanitizeHtml, aiAcquire, idempotent, sha256Hex, utf8Bytes } from "./lib.js";
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 // src/index.js
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
-var json = /* @__PURE__ */ __name2((data, status = 200) => new Response(JSON.stringify(data), {
-  status,
-  headers: { "content-type": "application/json", "cache-control": "no-store" }
-}), "json");
+var json = jsonResp;
 var GUEST_PII_FIELDS = ["email", "phone", "city", "country", "passport_no", "passport_country", "is_israeli"];
 var GUEST_OPS_COLUMNS = ["id", "party_id", "first_name", "last_name", "desk", "ptype", "dietary", "dietary_severe", "hotel", "room_type", "checkin", "checkout", "accommodation", "accommodation_note", "booking_conf", "early_late", "guest_note", "note_handled", "is_lead", "needs_review", "review_note", "status", "updated_at"];
 var UPLOAD_SECTIONS = ["content", "general", "proof", "menu"];
@@ -46,21 +44,45 @@ async function hmacHex(secret, msg) {
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(msg)));
   return [...sig].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
-async function tokenLevel(token, env) {
-  if (!token)
+// ---- authentication ----
+// Dashboard keys (chief/admin/edit/view) are Worker secrets. Field access needs either an individual
+// credential (field_credentials: hashed token -> role, person and authorized scope) or, for drivers and
+// the AV supplier only, an optional shared secret. Nothing has a built-in default: a role whose secret
+// or credentials are missing is simply disabled. Tokens are exact and case-sensitive.
+var SHARED_FIELD_MIN = 16;
+async function authenticate(request, env, url) {
+  const token = request.headers.get("x-token") || "";
+  if (token) {
+    for (const [level, name] of LEVELS)
+      if (env[name] && await safeEqual(token, env[name]))
+        return { level, cred: null };
+    for (const [level, name] of [["driver", "DRIVER_TOKEN"], ["av", "AV_TOKEN"]])
+      if (env[name] && env[name].length >= SHARED_FIELD_MIN && await safeEqual(token, env[name]))
+        return { level, cred: null };
+    if (/^[A-Za-z0-9_-]{20,128}$/.test(token)) {
+      let c = null;
+      try {
+        c = await env.DB.prepare("SELECT * FROM field_credentials WHERE token_hash=? AND active=1").bind(await sha256Hex(token)).first();
+      } catch (e) {
+        c = null;
+      }
+      if (c) {
+        const arr = (v) => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
+        let person = null;
+        if (c.person_id != null)
+          person = await env.DB.prepare("SELECT id, name, role, phone FROM team WHERE id=?").bind(c.person_id).first();
+        // leaders and crew are always a named person; without one the credential does nothing
+        if ((c.role === "leader" || c.role === "crew") && !person)
+          return null;
+        return { level: c.role, cred: { id: c.id, role: c.role, label: c.label || "", person, hotel_ids: arr(c.hotel_ids), run_ids: arr(c.run_ids), segment_ids: arr(c.segment_ids), all_scope: !!c.all_scope } };
+      }
+    }
     return null;
-  for (const [level, name] of LEVELS) {
-    if (env[name] && await safeEqual(token, env[name]))
-      return level;
   }
-  const t = token.trim().toLowerCase().replace(/\s+/g, " ");
-  if (await safeEqual(t, (env.DRIVER_TOKEN || "driver").toLowerCase()))
-    return "driver";
-  // field apps: one shared key per role; group leaders and crew also give their name, which picks what they see
-  for (const [level, keys] of [["leader", [env.LEADER_TOKEN || "group leader"]], ["av", [env.AV_TOKEN || "shuster"]], ["crew", env.CREW_TOKEN ? [env.CREW_TOKEN] : ["site manager", "assistant producer"]]])
-    for (const k of keys)
-      if (await safeEqual(t, k.toLowerCase()))
-        return level;
+  if (url.pathname === "/api/files/download" && request.method === "GET") {
+    const level = await cookieLevel(request, env);
+    return level ? { level, cred: null } : null;
+  }
   return null;
 }
 async function makeSessionCookie(level, env) {
@@ -69,6 +91,7 @@ async function makeSessionCookie(level, env) {
   const sig = await hmacHex(secret, `${level}.${exp}`);
   return `${SESSION_COOKIE}=${level}.${exp}.${sig}; Path=/api/files/download; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL}`;
 }
+var CLEAR_COOKIE = `${SESSION_COOKIE}=; Path=/api/files/download; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 async function cookieLevel(request, env) {
   const m = (request.headers.get("cookie") || "").match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([a-z]+)\\.(\\d+)\\.([0-9a-f]{64})`));
   if (!m)
@@ -79,22 +102,8 @@ async function cookieLevel(request, env) {
     return null;
   return await safeEqual(sig, await hmacHex(env[entry[1]], `${level}.${exp}`)) ? level : null;
 }
-async function authLevel(request, env, url) {
-  const level = await tokenLevel(request.headers.get("x-token") || "", env);
-  if (level)
-    return level;
-  if (url.pathname === "/api/files/download" && request.method === "GET")
-    return await cookieLevel(request, env);
-  return null;
-}
-__name(authLevel, "authLevel");
-__name2(authLevel, "authLevel");
 async function readBody(request) {
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+  return await readJson(request);
 }
 __name(readBody, "readBody");
 __name2(readBody, "readBody");
@@ -436,26 +445,11 @@ async function handleInboxApply(request, env, admin) {
   return json({ ok: true, filed_to: filedTo });
 }
 __name(handleInboxApply, "handleInboxApply");
-// ---- Driver app: bus runs, stops, passenger counts per hotel and production contacts. No guest names. ----
+// ---- Field apps (driver, group leader, AV, crew). Each sees only what its credential's scope allows. ----
 var DRIVER_DAYS = { 1: "2026-10-20", 2: "2026-10-21", 3: "2026-10-22" };
-async function driverState(env) {
-  const q = async (sql) => {
-    try {
-      return (await env.DB.prepare(sql).all()).results;
-    } catch (e) {
-      return [];
-    }
-  };
-  const runs = (await q("SELECT * FROM transport_runs ORDER BY day, depart_time")).map((r) => ({
-    id: r.id, day: r.day, depart_time: r.depart_time, arrive_time: r.arrive_time, title: r.title, title_he: r.title_he,
-    destination: r.destination, destination_he: r.destination_he, linked_segment: r.linked_segment, vehicles: r.vehicles,
-    capacity: r.capacity, driver: r.driver, driver_phone: r.driver_phone, company: r.company, escort: r.escort,
-    driver_note: r.driver_note || "", dropoff: r.dropoff || "", dropoff_url: r.dropoff_url || ""
-  }));
-  const stops = await q("SELECT run_id, time, stop_label, hotel_match, sort_order FROM run_stops ORDER BY run_id, sort_order");
-  const segments = await q("SELECT id, day, time, end_time, title, title_he, venue, venue_he FROM segments ORDER BY day, time");
-  const contacts = await q("SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' AND (role LIKE 'Lead producer%' OR role LIKE '%site manager%' OR role LIKE 'Hotel group leader%') ORDER BY id");
-  const stays = await q("SELECT hotel, checkin, checkout FROM guests WHERE status='active' AND hotel<>''");
+// "Registered at the hotel on this date": active guests with check-in <= date <= check-out. These are
+// the people a pickup may carry that day; it is not an RSVP or a boarded count.
+function stayCounts(stays) {
   const counts = {};
   for (const [day, date] of Object.entries(DRIVER_DAYS)) {
     counts[day] = {};
@@ -463,176 +457,285 @@ async function driverState(env) {
       if (g.checkin && g.checkout && g.checkin <= date && g.checkout >= date)
         counts[day][g.hotel] = (counts[day][g.hotel] || 0) + 1;
   }
-  return { level: "driver", runs, stops, segments, contacts, counts };
+  return counts;
+}
+async function q(env, sql, ...binds) {
+  return (await env.DB.prepare(sql).bind(...binds).all()).results;
+}
+async function driverState(env, cred) {
+  const runs = (await q(env, "SELECT * FROM transport_runs ORDER BY day, depart_time")).map((r) => ({
+    id: r.id, day: r.day, depart_time: r.depart_time, arrive_time: r.arrive_time, title: r.title, title_he: r.title_he,
+    destination: r.destination, destination_he: r.destination_he, linked_segment: r.linked_segment, vehicles: r.vehicles,
+    capacity: r.capacity, driver: r.driver, driver_phone: r.driver_phone, company: r.company, escort: r.escort,
+    driver_note: r.driver_note || "", dropoff: r.dropoff || "", dropoff_url: r.dropoff_url || ""
+  }));
+  const stops = await q(env, "SELECT run_id, time, stop_label, hotel_match, sort_order FROM run_stops ORDER BY run_id, sort_order");
+  const segments = await q(env, "SELECT id, day, time, end_time, title, title_he, venue, venue_he FROM segments ORDER BY day, time");
+  const contacts = await q(env, "SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' AND (role LIKE 'Lead producer%' OR role LIKE '%site manager%' OR role LIKE 'Hotel group leader%') ORDER BY id");
+  const counts = stayCounts(await q(env, "SELECT hotel, checkin, checkout FROM guests WHERE status='active' AND hotel<>''"));
+  // the runs this driver is assigned to (from the credential); none means "unassigned"
+  const assigned = cred ? cred.run_ids : [];
+  return { level: "driver", runs, stops, segments, contacts, counts, assigned_runs: assigned, counts_meaning: "registered at the hotel on that date (check-in to check-out)" };
 }
 var FIELD_PAGES = { leader: "/leader", av: "/av", crew: "/crew" };
 var normName = (x) => String(x || "").toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
-// who is asking: the name typed at login must match a production team member (full name, or a first name only one person has)
-async function fieldPerson(env, request, roleLike) {
-  const want = normName(decodeURIComponent(request.headers.get("x-name") || ""));
-  if (!want)
-    return null;
-  const rows = (await env.DB.prepare("SELECT id, name, role, phone FROM team WHERE org='Production'").all()).results.filter((r) => roleLike(r.role || ""));
-  const full = rows.filter((r) => normName(r.name) === want);
-  if (full.length === 1)
-    return full[0];
-  const first = rows.filter((r) => normName(r.name).split(" ")[0] === want);
-  return first.length === 1 ? first[0] : null;
-}
 async function fieldCommon(env) {
-  const q = async (sql) => {
-    try {
-      return (await env.DB.prepare(sql).all()).results;
-    } catch (e) {
-      return [];
-    }
-  };
-  const d = await driverState(env);
-  const team = await q("SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' ORDER BY id");
-  return { q, runs: d.runs, stops: d.stops, segments: d.segments, counts: d.counts, team };
+  const d = await driverState(env, null);
+  const team = await q(env, "SELECT name, role, phone FROM team WHERE org='Production' AND phone<>'' ORDER BY id");
+  return { runs: d.runs, stops: d.stops, segments: d.segments, counts: d.counts, team };
 }
-var isLeaderRole = (r) => /^Hotel group leader/i.test(r);
-var isCrewRole = (r) => /site manager|assistant producer|lead producer|setup|strike|design/i.test(r);
-async function leaderState(env, me) {
+async function hotelNames(env, ids) {
+  if (!ids.length)
+    return [];
+  const rows = await q(env, `SELECT id, name FROM hotels WHERE id IN (${ids.map(() => "?").join(",")})`, ...ids);
+  return rows.map((r) => r.name);
+}
+async function leaderGuests(env, cred) {
+  const hotels = await hotelNames(env, cred.hotel_ids);
+  if (!hotels.length)
+    return { hotels, guests: [] };
+  const guests = await q(env, `SELECT id, party_id, first_name, last_name, ptype, country, phone, dietary, dietary_severe, hotel, room_type, checkin, checkout, early_late, guest_note FROM guests WHERE status='active' AND hotel IN (${hotels.map(() => "?").join(",")}) ORDER BY last_name, first_name`, ...hotels);
+  return { hotels, guests };
+}
+async function leaderState(env, cred) {
+  const me = cred.person;
   const c = await fieldCommon(env);
-  const hotelKey = normName((me.role.split("·")[1] || "").replace(/hotel/i, ""));
-  const guests = (await c.q("SELECT id, party_id, first_name, last_name, ptype, country, phone, dietary, dietary_severe, hotel, room_type, checkin, checkout, early_late, guest_note FROM guests WHERE status='active' AND hotel<>'' ORDER BY last_name, first_name"))
-    .filter((g) => hotelKey && normName(g.hotel).includes(hotelKey));
+  const { hotels, guests } = await leaderGuests(env, cred);
   const ids = new Set(guests.map((g) => g.id));
-  const sessions = (await c.q("SELECT guest_id, segment_id FROM guest_sessions WHERE attending=1")).filter((x) => ids.has(x.guest_id));
-  const hotels = [...new Set(guests.map((g) => g.hotel))];
+  const sessions = (await q(env, "SELECT guest_id, segment_id FROM guest_sessions WHERE attending=1")).filter((x) => ids.has(x.guest_id));
   const runIds = new Set(c.stops.filter((s) => hotels.includes(s.hotel_match)).map((s) => s.run_id));
-  const first = normName(me.name).split(" ")[0];
-  const runs = c.runs.filter((r) => runIds.has(r.id) || normName(r.escort).includes(first));
-  const boarded = (await c.q("SELECT guest_id, day FROM boarding")).filter((x) => ids.has(x.guest_id));
-  const shifts = (await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => normName(x.crew_json).includes(normName(me.name)));
-  return { level: "leader", me: { name: me.name, role: me.role }, hotels, guests, sessions, boarded, runs, stops: c.stops.filter((s) => runs.some((r) => r.id === s.run_id)), segments: c.segments, shifts, contacts: c.team.filter((t) => /Lead producer|site manager|Hotel group leader/i.test(t.role) && t.name !== me.name) };
+  const runs = c.runs.filter((r) => runIds.has(r.id));
+  const boarded = (await q(env, "SELECT guest_id, day FROM boarding")).filter((x) => ids.has(x.guest_id));
+  const shifts = (await q(env, "SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => normName(x.crew_json).includes(normName(me.name)));
+  return { level: "leader", me: { name: me.name, role: me.role }, hotels, guests, sessions, boarded, runs, stops: c.stops.filter((s) => runIds.has(s.run_id)), segments: c.segments, shifts, contacts: c.team.filter((t) => /Lead producer|site manager|Hotel group leader/i.test(t.role) && t.name !== me.name) };
 }
 var AV_SUPPLIER = /שוסטר|shuster|schuster/i;
+var isAvNeed = (n) => AV_SUPPLIER.test(n.supplier || "") || n.kind === "podium";
 async function avState(env) {
   const c = await fieldCommon(env);
-  const segments = await c.q("SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_av, brief_staging, brief_location FROM segments ORDER BY day, time, sort_order");
-  const needs = (await c.q("SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id")).filter((n) => AV_SUPPLIER.test(n.supplier || "") || n.kind === "podium");
-  const screens = await c.q("SELECT id, title, title_he, size, spec, brief, status, linked_segment FROM design_items WHERE id LIKE 'd-screen%' OR category LIKE '%screen%' OR category LIKE '%מסך%' ORDER BY sort_order, id");
-  const files = await c.q("SELECT id, filename, size, segment_id FROM files WHERE section='content' AND segment_id IS NOT NULL ORDER BY uploaded_at");
-  const shifts = (await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => /sound|av\b|tech|טכני|סאונד|הגברה|מסך|screen|stage|במה/i.test(x.title + " " + (x.note || "")));
-  const venues = await c.q("SELECT name, role, phone, venue FROM contacts WHERE phone<>'' AND (role LIKE '%אתר%' OR role LIKE '%טכני%') ORDER BY venue");
+  const segments = await q(env, "SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_av, brief_staging, brief_location FROM segments ORDER BY day, time, sort_order");
+  const needs = (await q(env, "SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id")).filter(isAvNeed);
+  const screens = await q(env, "SELECT id, title, title_he, size, spec, brief, status, linked_segment FROM design_items WHERE id LIKE 'd-screen%' OR category LIKE '%screen%' OR category LIKE '%מסך%' ORDER BY sort_order, id");
+  const files = await q(env, "SELECT id, filename, size, segment_id FROM files WHERE section='content' AND access='ops' AND segment_id IS NOT NULL ORDER BY uploaded_at");
+  const shifts = (await q(env, "SELECT id, day, start_min, end_min, title, site, kind, crew_json, note FROM crew_shifts ORDER BY day, start_min, sort_order")).filter((x) => /sound|av\b|tech|טכני|סאונד|הגברה|מסך|screen|stage|במה/i.test(x.title + " " + (x.note || "")));
+  const venues = await q(env, "SELECT name, role, phone, venue FROM contacts WHERE phone<>'' AND (role LIKE '%אתר%' OR role LIKE '%טכני%') ORDER BY venue");
   return { level: "av", segments, needs, screens, files, shifts, venues, contacts: c.team.filter((t) => /Lead producer|site manager/i.test(t.role)) };
 }
-async function crewState(env, me) {
+// crew scope: all events (all_scope) or the credential's segment_ids; shifts they are named on
+var crewSeg = (cred, segIds) => cred.all_scope || String(segIds || "").split(",").map((x) => x.trim()).some((id) => cred.segment_ids.includes(id));
+var onShift = (cred, shift) => cred.all_scope || (() => { try { return JSON.parse(shift.crew_json || "[]").some((m) => normName(m.n) === normName(cred.person.name)); } catch { return false; } })();
+async function crewState(env, cred) {
+  const me = cred.person;
   const c = await fieldCommon(env);
-  const segments = await c.q("SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_location, brief_staging, brief_materials, notes_logistics FROM segments ORDER BY day, time, sort_order");
-  const needs = await c.q("SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id");
-  const shifts = await c.q("SELECT id, day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min, sort_order");
-  const food = await c.q("SELECT id, segment_id, day, time, title, venue, meal_type, caterer, headcount, dietary_note FROM food_items ORDER BY day, time");
-  const att = await c.q("SELECT segment_id, count(*) n FROM guest_sessions WHERE attending=1 GROUP BY segment_id");
-  const venues = await c.q("SELECT name, role, phone, venue FROM contacts WHERE phone<>'' ORDER BY venue, name");
-  return { level: "crew", me: { name: me.name, role: me.role }, segments, needs, shifts, food, attendance: att, runs: c.runs, stops: c.stops, counts: c.counts, venues, contacts: c.team.filter((t) => t.name !== me.name) };
+  const segments = await q(env, "SELECT id, day, time, end_time, title, title_he, venue, venue_he, brief_runsheet, brief_location, brief_staging, brief_materials, notes_logistics FROM segments ORDER BY day, time, sort_order");
+  const needs = (await q(env, "SELECT id, venue, area, item, qty, supplier, notes, segment_ids, kind, done FROM site_needs ORDER BY sort_order, id")).map((n) => ({ ...n, can_tick: crewSeg(cred, n.segment_ids) }));
+  const shifts = (await q(env, "SELECT id, day, start_min, end_min, title, site, kind, crew_json, flag, note, done FROM crew_shifts ORDER BY day, start_min, sort_order")).map((x) => ({ ...x, can_tick: onShift(cred, x) }));
+  const food = await q(env, "SELECT id, segment_id, day, time, title, venue, meal_type, caterer, headcount, dietary_note FROM food_items ORDER BY day, time");
+  const att = await q(env, "SELECT gs.segment_id, count(*) n FROM guest_sessions gs JOIN guests g ON g.id = gs.guest_id AND g.status='active' WHERE gs.attending=1 GROUP BY gs.segment_id");
+  const venues = await q(env, "SELECT name, role, phone, venue FROM contacts WHERE phone<>'' ORDER BY venue, name");
+  const files = (await q(env, "SELECT id, filename, size, segment_id FROM files WHERE section='content' AND access='ops' AND segment_id IS NOT NULL ORDER BY uploaded_at")).filter((f) => crewSeg(cred, f.segment_id));
+  return { level: "crew", me: { name: me.name, role: me.role }, scope: { all: cred.all_scope, segment_ids: cred.segment_ids }, segments, needs, shifts, food, attendance: att, files, runs: c.runs, stops: c.stops, counts: c.counts, venues, contacts: c.team.filter((t) => t.name !== me.name) };
+}
+// The public projection: exactly what a view key sees, used by view /api/state and by view Ask.
+async function publicProjection(env) {
+  const segments = await q(env, "SELECT id, day, time, end_time, title, venue, descr, title_he, venue_he, descr_he FROM segments ORDER BY day, time, sort_order");
+  const runs = await q(env, "SELECT id, day, depart_time, arrive_time, title, title_he, destination, destination_he, linked_segment FROM transport_runs WHERE pdf_hide=0 ORDER BY day, sort_order");
+  const visible = new Set(runs.map((r) => r.id));
+  const stops = (await q(env, "SELECT id, run_id, time, stop_label, hotel_match, sort_order FROM run_stops ORDER BY run_id, sort_order")).filter((x) => visible.has(x.run_id));
+  return { segments, transport_runs: runs, run_stops: stops };
+}
+// Files: who may read a file, by its explicit access class (never by section, name or AI type).
+function fileReadable(auth, row) {
+  if (!row)
+    return false;
+  const a = row.access || "admin";
+  if (auth.level === "chief")
+    return true;
+  if (auth.level === "admin")
+    return a === "ops" || a === "admin";
+  if (auth.level === "edit")
+    return a === "ops";
+  if (auth.level === "av")
+    return a === "ops" && row.section === "content" && !!row.segment_id;
+  if (auth.level === "crew")
+    return a === "ops" && row.section === "content" && !!row.segment_id && crewSeg(auth.cred, row.segment_id);
+  return false;
+}
+function readableAccess(auth) {
+  return auth.level === "chief" ? ["ops", "admin", "chief"] : auth.level === "admin" ? ["ops", "admin"] : auth.level === "edit" ? ["ops"] : [];
+}
+function downloadResponse(obj, row, inline) {
+  const ctype = (row.content_type || "").toLowerCase();
+  const safeInline = inline && INLINE_TYPES.includes(ctype);
+  const headers = new Headers();
+  headers.set("content-type", safeInline ? ctype : "application/octet-stream");
+  headers.set("content-disposition", `${safeInline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(row.filename)}`);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("content-security-policy", "default-src 'none'; sandbox");
+  headers.set("cache-control", "private, no-store");
+  return new Response(obj.body, { headers });
+}
+async function handleField(request, env, url, path, auth) {
+  const level = auth.level, cred = auth.cred;
+  if (path.startsWith("/api/access/")) {
+    const res = await handleAccess(path, request, env, level);
+    if (res)
+      return res;
+  }
+  if (path === "/api/state" && request.method === "GET")
+    return json({ level, redirect: level === "driver" ? "/driver" : FIELD_PAGES[level] });
+  if (level === "driver") {
+    if (path === "/api/driver/state" && request.method === "GET")
+      return json(await driverState(env, cred));
+    if (path === "/api/driver/position" && request.method === "POST")
+      return await driverPosition(request, env, cred);
+    throw new HttpError(403, "drivers only see the driver page");
+  }
+  if (path === `/api/${level}/state` && request.method === "GET")
+    return json(level === "leader" ? await leaderState(env, cred) : level === "crew" ? await crewState(env, cred) : await avState(env));
+  // group leader: mark one of her own hotel's guests, staying that day, as on board for the day
+  if (level === "leader" && path === "/api/leader/board" && request.method === "POST") {
+    const b = await readBody(request);
+    const day = dayNum(b.day), gid = Number(b.guest_id), date = DRIVER_DAYS[day];
+    const { guests } = await leaderGuests(env, cred);
+    const g = guests.find((x) => x.id === gid);
+    if (!g)
+      throw new HttpError(403, "not your guest");
+    if (!(g.checkin && g.checkout && g.checkin <= date && g.checkout >= date))
+      throw new HttpError(400, "this guest is not at the hotel on that day");
+    if (b.on)
+      await env.DB.prepare("INSERT OR REPLACE INTO boarding (guest_id, day, by, at) VALUES (?,?,?,datetime('now'))").bind(gid, day, cred.person.name).run();
+    else
+      await env.DB.prepare("DELETE FROM boarding WHERE guest_id=? AND day=?").bind(gid, day).run();
+    return json({ ok: true });
+  }
+  // AV ticks off Shuster/podium needs; crew ticks needs of events in their scope and shifts they are on
+  if ((level === "av" || level === "crew") && path === "/api/field/done" && request.method === "POST") {
+    const b = await readBody(request);
+    const on = b.done ? 1 : 0;
+    if (b.kind === "need") {
+      const n = await env.DB.prepare("SELECT supplier, kind, segment_ids FROM site_needs WHERE id=?").bind(String(b.id || "")).first();
+      if (!n)
+        throw new HttpError(404, "not found");
+      if (level === "av" ? !isAvNeed(n) : !crewSeg(cred, n.segment_ids))
+        throw new HttpError(403, "not in your scope");
+      await env.DB.prepare("UPDATE site_needs SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, String(b.id)).run();
+      return json({ ok: true });
+    }
+    if (b.kind === "shift" && level === "crew") {
+      const sh = await env.DB.prepare("SELECT id, crew_json FROM crew_shifts WHERE id=?").bind(String(b.id || "")).first();
+      if (!sh)
+        throw new HttpError(404, "not found");
+      if (!onShift(cred, sh))
+        throw new HttpError(403, "not your shift");
+      await env.DB.prepare("UPDATE crew_shifts SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, sh.id).run();
+      return json({ ok: true });
+    }
+    throw new HttpError(400, "bad kind");
+  }
+  // presentations and run-sheet files linked to an event, only when the file's own policy allows it
+  if ((level === "av" || level === "crew") && path === "/api/files/download" && request.method === "GET") {
+    const row = await env.DB.prepare("SELECT r2_key, filename, content_type, section, segment_id, access FROM files WHERE id=?").bind(url.searchParams.get("id")).first();
+    if (!fileReadable(auth, row) || !env.BUCKET)
+      throw new HttpError(404, "not found");
+    const obj = await env.BUCKET.get(row.r2_key);
+    if (!obj)
+      throw new HttpError(404, "not found");
+    return downloadResponse(obj, row, false);
+  }
+  throw new HttpError(403, "this key only opens its own page");
+}
+// Driver location. fix_at is when the phone measured the position; the server's own receipt time is `at`.
+// Re-sending an old fix keeps its old fix_at, and anything older than what is stored is ignored.
+async function driverPosition(request, env, cred) {
+  const b = await readBody(request);
+  const raw = (b.device || "").toString().replace(/[^\w-]/g, "").slice(0, 40);
+  if (!raw)
+    throw new HttpError(400, "device required");
+  const device = cred ? `c${cred.id}-${raw}` : `s-${raw}`;
+  if (b.stop) {
+    await env.DB.prepare("UPDATE driver_positions SET sharing=0, at=datetime('now') WHERE device=?").bind(device).run();
+    return json({ ok: true });
+  }
+  const lat = Number(b.lat), lng = Number(b.lng), num = (v) => v !== null && v !== "" && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : null;
+  if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180) || lat === 0 && lng === 0)
+    throw new HttpError(400, "position out of range");
+  const fixMs = Number(b.fix_at);
+  if (!Number.isFinite(fixMs) || fixMs > Date.now() + 120000 || fixMs < Date.now() - 6 * 3600e3)
+    throw new HttpError(400, "fix time missing or out of range");
+  const fixAt = new Date(fixMs).toISOString();
+  const runId = cred && cred.run_ids.length === 1 ? cred.run_ids[0] : "";
+  const name = cred ? cred.label || (cred.person && cred.person.name) || "" : (b.name || "").toString().trim().slice(0, 80);
+  const r = await env.DB.prepare(
+    `INSERT INTO driver_positions (device, name, run_id, lat, lng, accuracy, speed, heading, sharing, at, fix_at, cred_id) VALUES (?,?,?,?,?,?,?,?,1,datetime('now'),?,?)
+     ON CONFLICT(device) DO UPDATE SET name=excluded.name, run_id=excluded.run_id, lat=excluded.lat, lng=excluded.lng, accuracy=excluded.accuracy, speed=excluded.speed, heading=excluded.heading, sharing=1, at=excluded.at, fix_at=excluded.fix_at, cred_id=excluded.cred_id
+     WHERE excluded.fix_at >= driver_positions.fix_at`
+  ).bind(device, name, runId, lat, lng, num(b.accuracy), num(b.speed), num(b.heading), fixAt, cred ? cred.id : null).run();
+  await env.DB.prepare("DELETE FROM driver_positions WHERE at < datetime('now','-2 days')").run();
+  return json({ ok: true, accepted: !!r.meta.changes });
+}
+// ---- pages: security headers on every HTML/asset response ----
+var CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "connect-src 'self'",
+  "frame-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'"
+].join("; ");
+function withPageHeaders(res) {
+  const out = new Response(res.body, res);
+  const h = out.headers;
+  h.set("x-content-type-options", "nosniff");
+  h.set("referrer-policy", "same-origin");
+  h.set("x-frame-options", "DENY");
+  h.set("permissions-policy", "camera=(), microphone=(), geolocation=(self)");
+  if ((h.get("content-type") || "").includes("text/html")) {
+    h.set("content-security-policy", CSP);
+    h.set("cache-control", "no-cache");
+  }
+  return out;
 }
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    if (path.startsWith("/api/")) {
+    if (!path.startsWith("/api/"))
+      return withPageHeaders(await env.ASSETS.fetch(request));
+    try {
+      return await handleApi(request, env, url, path);
+    } catch (e) {
+      if (e instanceof HttpError)
+        return json({ error: e.message, ...e.extra || {} }, e.status);
+      // log the failing route and error type only, never the request body
+      console.error("api error", path, e && e.name, e && e.message);
+      return json({ error: "server error" }, 500);
+    }
+  }
+};
+async function handleApi(request, env, url, path) {
       // sign out: drop the file-download cookie (the key itself lives in the browser tab)
       if (path === "/api/logout" && request.method === "POST")
-        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json", "set-cookie": `${SESSION_COOKIE}=; Path=/api/files/download; HttpOnly; Secure; SameSite=Strict; Max-Age=0` } });
-      let level = await authLevel(request, env, url);
-      // the chief key is an admin key that also opens the budget sheet
-      const chief = level === "chief";
-      if (chief)
-        level = "admin";
-      if (!level)
-        return json({ error: "unauthorized" }, 401);
-      if (level === "driver") {
-        if (path.startsWith("/api/access/")) {
-          const res = await handleAccess(path, request, env, level);
-          if (res)
-            return res;
-        }
-        if (path === "/api/state" && request.method === "GET")
-          return json({ level, redirect: "/driver" });
-        if (path === "/api/driver/state" && request.method === "GET")
-          return json(await driverState(env));
-        if (path === "/api/driver/position" && request.method === "POST") {
-          const b = await readBody(request);
-          const device = (b.device || "").toString().replace(/[^\w-]/g, "").slice(0, 40);
-          if (!device)
-            return json({ error: "device required" }, 400);
-          if (b.stop) {
-            await env.DB.prepare("UPDATE driver_positions SET sharing=0, at=datetime('now') WHERE device=?").bind(device).run();
-            return json({ ok: true });
-          }
-          const lat = Number(b.lat), lng = Number(b.lng), num = (v) => Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : null;
-          // any real coordinate (0,0 is a failed reading)
-          if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180) || (lat === 0 && lng === 0))
-            return json({ error: "position out of range" }, 400);
-          await env.DB.prepare("INSERT OR REPLACE INTO driver_positions (device, name, run_id, lat, lng, accuracy, speed, heading, sharing, at) VALUES (?,?,?,?,?,?,?,?,1,datetime('now'))").bind(device, (b.name || "").toString().trim().slice(0, 80), (b.run_id || "").toString().slice(0, 40), lat, lng, num(b.accuracy), num(b.speed), num(b.heading)).run();
-          await env.DB.prepare("DELETE FROM driver_positions WHERE at < datetime('now','-2 days')").run();
-          return json({ ok: true });
-        }
-        return json({ error: "drivers only see the driver page" }, 403);
-      }
-      if (FIELD_PAGES[level]) {
-        if (path.startsWith("/api/access/")) {
-          const res = await handleAccess(path, request, env, level);
-          if (res)
-            return res;
-        }
-        if (path === "/api/state" && request.method === "GET")
-          return json({ level, redirect: FIELD_PAGES[level] });
-        const me = level === "leader" ? await fieldPerson(env, request, isLeaderRole) : level === "crew" ? await fieldPerson(env, request, isCrewRole) : null;
-        if (level !== "av" && !me)
-          return json({ error: "name not found" }, 403);
-        if (path === `/api/${level}/state` && request.method === "GET")
-          return json(level === "leader" ? await leaderState(env, me) : level === "crew" ? await crewState(env, me) : await avState(env));
-        // group leader: mark a guest of her hotel as on board for the day
-        if (level === "leader" && path === "/api/leader/board" && request.method === "POST") {
-          const b = await readBody(request);
-          const st = await leaderState(env, me);
-          const gid = Number(b.guest_id), day = Number(b.day);
-          if (!st.guests.some((g) => g.id === gid) || ![1, 2, 3].includes(day))
-            return json({ error: "not your guest" }, 403);
-          if (b.on)
-            await env.DB.prepare("INSERT OR REPLACE INTO boarding (guest_id, day, by, at) VALUES (?,?,?,datetime('now'))").bind(gid, day, me.name).run();
-          else
-            await env.DB.prepare("DELETE FROM boarding WHERE guest_id=? AND day=?").bind(gid, day).run();
-          return json({ ok: true });
-        }
-        // AV and crew tick off site needs (AV: only Shuster's); crew also tick off shifts
-        if ((level === "av" || level === "crew") && path === "/api/field/done" && request.method === "POST") {
-          const b = await readBody(request);
-          const on = b.done ? 1 : 0;
-          if (b.kind === "need") {
-            const n = await env.DB.prepare("SELECT supplier, kind FROM site_needs WHERE id=?").bind(String(b.id || "")).first();
-            if (!n || level === "av" && !(AV_SUPPLIER.test(n.supplier || "") || n.kind === "podium"))
-              return json({ error: "not allowed" }, 403);
-            await env.DB.prepare("UPDATE site_needs SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, String(b.id)).run();
-            return json({ ok: true });
-          }
-          if (b.kind === "shift" && level === "crew") {
-            const r = await env.DB.prepare("UPDATE crew_shifts SET done=?, updated_at=datetime('now') WHERE id=?").bind(on, String(b.id || "")).run();
-            return r.meta.changes ? json({ ok: true }) : json({ error: "not found" }, 404);
-          }
-          return json({ error: "bad kind" }, 400);
-        }
-        // presentations and run-sheet files linked to an event
-        if ((level === "av" || level === "crew") && path === "/api/files/download" && request.method === "GET") {
-          const row = await env.DB.prepare("SELECT r2_key, filename, content_type FROM files WHERE id=? AND section='content'").bind(url.searchParams.get("id")).first();
-          if (!row || !env.BUCKET)
-            return json({ error: "not found" }, 404);
-          const obj = await env.BUCKET.get(row.r2_key);
-          if (!obj)
-            return json({ error: "not found" }, 404);
-          return new Response(obj.body, { headers: { "content-type": row.content_type || "application/octet-stream", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`, "cache-control": "private, no-store" } });
-        }
-        return json({ error: "this key only opens its own page" }, 403);
-      }
+        return json({ ok: true }, 200, { "set-cookie": CLEAR_COOKIE });
+      const auth = await authenticate(request, env, url);
+      if (!auth)
+        return json({ error: "unauthorized" }, 401, { "set-cookie": CLEAR_COOKIE });
+      if (auth.level === "driver" || FIELD_PAGES[auth.level])
+        return await handleField(request, env, url, path, auth);
+      // the download cookie carries the real level, chief included, so the budget files stay chief-only
       if (path === "/api/session" && request.method === "POST") {
-        const res = json({ ok: true, level });
-        res.headers.append("set-cookie", await makeSessionCookie(level, env));
+        const res = json({ ok: true, level: auth.level });
+        res.headers.append("set-cookie", await makeSessionCookie(auth.level, env));
         return res;
       }
+      // the chief key is an admin key that also opens the budget sheet
+      const chief = auth.level === "chief";
+      const level = chief ? "admin" : auth.level;
       const admin = level === "admin";
       if (path.startsWith("/api/access/")) {
         const res = await handleAccess(path, request, env, level);
@@ -640,44 +743,11 @@ var src_default = {
           return res;
       }
       if (level === "view") {
-        if (path === "/api/state" && request.method === "GET") {
-          try {
-            const segs = await env.DB.prepare(
-              "SELECT id, day, time, end_time, title, venue, descr, title_he, venue_he, descr_he FROM segments ORDER BY day, time, sort_order"
-            ).all();
-            let vRuns = { results: [] };
-            try {
-              vRuns = await env.DB.prepare(
-                "SELECT id, day, depart_time, arrive_time, title, title_he, destination, destination_he, linked_segment, pdf_hide FROM transport_runs WHERE pdf_hide=0 ORDER BY day, sort_order"
-              ).all();
-            } catch (e) {
-            }
-            let vStops = { results: [] };
-            try {
-              vStops = await env.DB.prepare(
-                "SELECT id, run_id, time, stop_label, hotel_match, sort_order FROM run_stops ORDER BY run_id, sort_order"
-              ).all();
-            } catch (e) {
-            }
-            return json({
-              level: "view",
-              segments: segs.results,
-              people: [],
-              checklist: [],
-              venues: [],
-              contacts: [],
-              guests: [],
-              transport_runs: vRuns.results,
-              run_stops: vStops.results
-            });
-          } catch (e) {
-            console.error("api error", path, e);
-            return json({ error: "server error" }, 500);
-          }
-        }
+        if (path === "/api/state" && request.method === "GET")
+          return json({ level: "view", ...await publicProjection(env), people: [], checklist: [], venues: [], contacts: [], guests: [] });
         if (path === "/api/ai/ask" && request.method === "POST")
           return await handleAsk(request, env, "view");
-        return json({ error: "forbidden" }, 403);
+        throw new HttpError(403, "forbidden");
       }
       try {
         if (path === "/api/state" && request.method === "GET") {
@@ -2100,13 +2170,12 @@ ${context}`;
         }
         return json({ error: "not found" }, 404);
       } catch (e) {
-        console.error("api error", path, e);
+        if (e instanceof HttpError)
+          throw e;
+        console.error("api error", path, e && e.name, e && e.message);
         return json({ error: "server error" }, 500);
       }
-    }
-    return env.ASSETS.fetch(request);
-  }
-};
+}
 export {
   src_default as default
 };

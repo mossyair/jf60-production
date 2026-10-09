@@ -89,7 +89,7 @@ $('gateForm').onsubmit = async e => { e.preventDefault(); KEY = $('gKey').value.
   try { const s = await api('state'); if (s.redirect && s.redirect !== location.pathname) { location.href = s.redirect; return; } if (!s.redirect) { location.href = '/'; return; } } catch(err){}
   start(); };
 // log out to the main sign-in screen, so any key (another mode included) can be used next
-$('logout').onclick = () => { try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; location.href = '/'; };
+$('logout').onclick = () => { fetch('/api/logout', { method:'POST' }).catch(() => {}); try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; location.href = '/'; };
 // refresh every 2 minutes (not while a box is being saved); the connection line ages every 30 seconds
 setInterval(() => { if (DATA && document.visibilityState === 'visible' && !document.querySelector('input:focus, .chk.saving')) load().then(FIELD.render).catch(() => {}); }, 120000);
 setInterval(() => { if (DATA) connLine(); }, 30000);

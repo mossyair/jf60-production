@@ -1265,6 +1265,7 @@ const D_STATUS = {
   in_design:{label:"In design", he:"בעיצוב", color:"var(--st-progress)"},
   awaiting_approval:{label:"Awaiting approval", he:"ממתין לאישור", color:"var(--sky)"},
   approved:{label:"Approved", he:"מאושר", color:"var(--st-confirmed)"},
+  changes:{label:"Changes requested", he:"נדרשים תיקונים", color:"var(--terra)"},
   at_printer:{label:"At printer", he:"בדפוס", color:"var(--olive)"},
   delivered:{label:"Delivered", he:"נמסר", color:"var(--ink-soft)"},
   no_design:{label:"No design line", he:"ללא שורת עיצוב", color:"var(--ink-soft)"},
@@ -1444,6 +1445,7 @@ async function decideProof(it, proofId, decision){
   const r=await api("design/decide",{proof_id:proofId, decision, comment, by:NAME||""});
   if(r.error){ toast(r.error,true); return; }
   await refresh();
+  if(r.latest===false){ toast(DL("Recorded on that older version. The item's status follows the latest proof, so it did not change.","נרשם על הגרסה הישנה. הסטטוס של הפריט נקבע לפי ההגהה האחרונה, ולכן לא השתנה."),true); return; }
   toast(decision==="approved"?DL("Approved for print","אושר להדפסה"):DL("Changes requested","התבקשו שינויים"));
 }
 

@@ -125,6 +125,6 @@ $('gateForm').onsubmit = async e => { e.preventDefault(); KEY = $('gKey').value.
   try { const s = await apiRequest('state', { key:KEY }); if (s.redirect !== '/driver') { location.href = s.redirect || '/'; return; } } catch(err){}
   start(); };
 // log out to the main sign-in screen, so any key (another mode included) can be used next
-$('logout').onclick = () => { if (WATCH !== null) stopShare(); try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; setTimeout(() => { location.href = '/'; }, 150); };
+$('logout').onclick = () => { if (WATCH !== null) stopShare(); fetch('/api/logout', { method:'POST' }).catch(() => {}); try { Object.keys(sessionStorage).filter(k => k.startsWith('jf60')).forEach(k => sessionStorage.removeItem(k)); } catch(e){} KEY = ''; DATA = null; setTimeout(() => { location.href = '/'; }, 150); };
 setInterval(() => { if (DATA && document.visibilityState === 'visible') load().then(render).catch(() => {}); }, 120000);
 start();

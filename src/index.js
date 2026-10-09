@@ -1117,12 +1117,13 @@ async function importApply(env, b) {
 // ---- AI helpers: quotas, minimal context, timeouts ----
 var AI_TIMEOUT_MS = 6e4;
 function anthropicClient(env) {
-  return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
+  // ANTHROPIC_BASE_URL is unset in production; the local test run points it at a fake server
+  return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, baseURL: env.ANTHROPIC_BASE_URL || void 0, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
 }
 async function anthropicFetch(env, body) {
   let r;
   try {
-    r = await fetch("https://api.anthropic.com/v1/messages", {
+    r = await fetch((env.ANTHROPIC_BASE_URL || "https://api.anthropic.com") + "/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify(body),

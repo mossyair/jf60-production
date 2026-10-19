@@ -28,7 +28,7 @@ function boardList(day){
     <span class="m"><b><bdi>${esc(gname(g))}</bdi></b></span>${callBtn(gname(g), g.phone)}</label>`;
   const stay = list.filter(g => !g.joining), join = list.filter(g => g.joining);
   return `<div class="card" id="board"><div class="title">צ׳ק-אין לאוטובוס · <span id="bcount">${on.size}/${list.length}</span> עלו</div>
-    <div class="s muted">סמני כל אורח שעלה. הסימון נשמר בשרת ומוצג כאן, בדף מלווי הקבוצה של המלון.</div>
+    <div class="s muted">סמני כל אורח שעלה. הסימון נשמר בשרת ומוצג כאן, בדף מלווי הקבוצה של המלון; הוא לא מוצג כרגע בחדר הבקרה או בדשבורד.</div>
     ${stay.length ? `<div class="sec">לנים במלון · ${stay.length}</div>${stay.map(row).join('')}` : ''}
     ${join.length ? `<div class="sec">מצטרפים לנסיעה מהלובי · ${join.length}</div>${join.map(row).join('')}` : ''}
     ${list.length ? '' : '<div class="empty">אין נוסעים מהמלון ביום הזה</div>'}</div>`;

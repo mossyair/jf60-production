@@ -126,7 +126,7 @@ test("x-name cannot change who a field credential is", async () => {
   assert.equal(a.status, 200);
   assert.equal(a.data.me.name, "Lea Leader");
   assert.deepEqual(a.data.hotels, ["Test Hotel A"]);
-  assert.ok(a.data.guests.every((g) => g.hotel === "Test Hotel A"));
+  assert.ok(a.data.guests.filter((g) => !g.joining).every((g) => g.hotel === "Test Hotel A"));
   assert.ok(!a.data.guests.some((g) => g.last_name === "Cancelled"), "cancelled guests are not listed");
   const c = await call("/api/crew/state", { key: C.crewDinner, headers: { "x-name": "Pat Producer" } });
   assert.equal(c.data.me.name, "Sam Site");

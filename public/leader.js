@@ -24,8 +24,9 @@ function boardList(day){
   // the count is "marked on board" out of the guests listed below (staying at the hotel that night)
   const ids = new Set(list.map(g => g.id));
   const on = new Set(DATA.boarded.filter(b => b.day === day && ids.has(b.guest_id)).map(b => b.guest_id));
+  // the boarding list shows only the name and a call button; details stay in the guests tab
   const rows = list.map(g => `<label class="chk ${on.has(g.id) ? 'done' : ''}"><input type="checkbox" data-board="${g.id}" ${on.has(g.id) ? 'checked' : ''}>
-    <span class="m"><b><bdi>${esc(gname(g))}</bdi></b>${guestTags(g)}<div class="s">${esc(g.room_type || '')}${g.guest_note ? ' · ' + esc(g.guest_note) : ''}</div></span>${callBtn(gname(g), g.phone)}</label>`).join('');
+    <span class="m"><b><bdi>${esc(gname(g))}</bdi></b></span>${callBtn(gname(g), g.phone)}</label>`).join('');
   return `<div class="card" id="board"><div class="title">צ׳ק-אין לאוטובוס · <span id="bcount">${on.size}/${list.length}</span> עלו</div>
     <div class="s muted">סמני כל אורח שעלה. הסימון נשמר בשרת ומוצג כאן, בדף מלווי הקבוצה של המלון; הוא לא מוצג כרגע בחדר הבקרה או בדשבורד.</div>${rows || '<div class="empty">אין אורחים במלון ביום הזה</div>'}</div>`;
 }

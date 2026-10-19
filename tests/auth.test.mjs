@@ -26,7 +26,7 @@ test("the field keys in use before this release still work (kept during the even
   const crew = await call("/api/crew/state", { key: "site manager", headers: { "x-name": "Sam Site" } });
   assert.equal(crew.data.me.name, "Sam Site");
   assert.equal((await call("/api/files", { key: "site manager", headers: { "x-name": "Sam Site" } })).status, 403, "still only its own page");
-  for (const k of ["leader", "jf60", "admin", "crew"])
+  for (const k of ["jf60", "admin", "crew", "leaders"])
     assert.equal((await call("/api/state", { key: k })).status, 401, k);
 });
 

@@ -48,7 +48,7 @@ Field apps never use dashboard keys:
 
 With an individual credential, identity comes only from the credential.
 
-**During the event the field keys used before this release still work** (kept on purpose so nobody in the field needs a new key mid-production): `driver`, `shuster`, `group leader`, `site manager`, `assistant producer` (case and spaces ignored), or the values of `DRIVER_TOKEN`, `AV_TOKEN`, `LEADER_TOKEN`, `CREW_TOKEN` when those are set. With these words, group leaders and crew are identified by the name they type, matched to the staff sheet, as before; a leader's hotel comes from her role ("Hotel group leader · <hotel>"). Scope rules still apply: leaders see and mark only their hotel, AV and crew open only event-linked team files. These words are easy to guess. After the event, issue individual credentials and set the secret `LEGACY_FIELD_KEYS` to `off`.
+**During the event the field keys used before this release still work** (kept on purpose so nobody in the field needs a new key mid-production): `driver`, `shuster`, `group leader` (or just `leader`), `site manager`, `assistant producer` (case and spaces ignored), or the values of `DRIVER_TOKEN`, `AV_TOKEN`, `LEADER_TOKEN`, `CREW_TOKEN` when those are set. With these words, group leaders and crew are identified by the name they type, matched to the staff sheet, as before; a leader's hotel comes from her role ("Hotel group leader · <hotel>"). Scope rules still apply: leaders see and mark only their hotel, AV and crew open only event-linked team files. These words are easy to guess. After the event, issue individual credentials and set the secret `LEGACY_FIELD_KEYS` to `off`.
 
 ---
 

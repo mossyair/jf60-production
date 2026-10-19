@@ -17,6 +17,9 @@ INSERT INTO guests (id, first_name, last_name, email, phone, passport_no, hotel,
   (3, 'Cy', 'Gamma', 'cy@example.test', '', '', 'Test Hotel B', '2026-10-19', '2026-10-22', 'active', 'R-3'),
   (4, 'José', 'Núñez', '', '', '', 'Test Hotel A', '2026-10-19', '2026-10-22', 'active', ''),
   (5, 'Dana', 'Cancelled', '', '', '', 'Test Hotel A', '2026-10-19', '2026-10-22', 'cancelled', 'R-5');
+-- stays elsewhere, rides from Test Hotel A's lobby
+INSERT INTO guests (id, first_name, last_name, hotel, status, reg_id, accommodation_note) VALUES
+  (6, 'Eli', 'Lobby', '', 'active', 'R-6', 'Somewhere St. 1 Bus pickup and drop-off: Test Hotel A (pickup list).');
 INSERT INTO guest_sessions (guest_id, segment_id, attending) VALUES (1, 's1-dinner', 1), (2, 's1-dinner', 1), (5, 's1-dinner', 1);
 INSERT INTO transport_runs (id, day, depart_time, arrive_time, title, destination, status, sort_order, pdf_hide, driver, driver_phone) VALUES
   ('r1', 1, '08:30', '09:00', 'Hotels to garden', 'Test Garden', 'to_confirm', 0, 0, 'Dov Driver', '+972-50-000-0009'),

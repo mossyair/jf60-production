@@ -85,7 +85,7 @@ async function authenticate(request, env, url) {
   return null;
 }
 // ---- the field keys in use before individual credentials (kept during the event, by the owner's decision) ----
-// Shared words per role, compared without case or extra spaces: "driver", "group leader", "shuster",
+// Shared words per role, compared without case or extra spaces: "driver", "group leader" (or "leader"), "shuster",
 // "site manager" / "assistant producer" (or DRIVER_TOKEN, LEADER_TOKEN, AV_TOKEN, CREW_TOKEN when set).
 // Leaders and crew are identified by the name they type (x-name), matched to the staff sheet, as before.
 // Turn them off after the event with the secret LEGACY_FIELD_KEYS = "off" once individual credentials are out.
@@ -116,7 +116,8 @@ async function legacyFieldKey(request, env, token) {
     return { level: "driver", cred: null };
   if (await is(env.AV_TOKEN || "shuster"))
     return { level: "av", cred: null };
-  const leader = await is(env.LEADER_TOKEN || "group leader");
+  // "leader" is the short word handed to the group leaders on the event days
+  const leader = await is(env.LEADER_TOKEN || "group leader") || await is("leader");
   let crew = false;
   for (const k of env.CREW_TOKEN ? [env.CREW_TOKEN] : ["site manager", "assistant producer"])
     if (await is(k))

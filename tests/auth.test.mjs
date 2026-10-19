@@ -21,6 +21,7 @@ test("the field keys in use before this release still work (kept during the even
   assert.ok(lead.data.guests.every((g) => g.hotel === "Test Hotel A"));
   assert.equal((await call("/api/leader/board", { key: "group leader", headers: { "x-name": "Lea" }, body: { guest_id: 3, day: 1, on: true } })).status, 403, "still only her own hotel");
   assert.equal((await call("/api/leader/state", { key: "group leader" })).status, 403, "no name, no access");
+  assert.equal((await call("/api/leader/state", { key: "Leader", headers: { "x-name": "Lea" } })).status, 200, "the short word works too");
   assert.equal((await call("/api/leader/state", { key: "group leader", headers: { "x-name": "Nobody" } })).data.error, "name not found");
   const crew = await call("/api/crew/state", { key: "site manager", headers: { "x-name": "Sam Site" } });
   assert.equal(crew.data.me.name, "Sam Site");

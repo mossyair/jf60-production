@@ -2,9 +2,6 @@
 window.FIELD = { level:'leader', render };
 const onDay = (g, date) => g.checkin && g.checkout && g.checkin <= date && g.checkout >= date;
 const gname = g => `${g.first_name || ''} ${g.last_name || ''}`.trim();
-function guestTags(g){
-  return (g.dietary ? `<span class="tag ${g.dietary_severe ? 'warn' : ''}">${esc(g.dietary)}</span>` : '') + (g.early_late ? `<span class="tag">${esc(g.early_late)}</span>` : '');
-}
 function runCard(r){
   const stops = DATA.stops.filter(s => s.run_id === r.id).sort((a, b) => a.sort_order - b.sort_order);
   const seg = DATA.segments.find(s => s.id === r.linked_segment);
@@ -44,15 +41,10 @@ function dayView(day){
     ${segs ? `<div class="card"><div class="title">התוכנית היום</div>${segs}</div>` : ''}`;
 }
 function guestsView(){
-  const parties = {};
-  DATA.guests.forEach(g => (parties[g.party_id || 'g' + g.id] ||= []).push(g));
-  const segById = Object.fromEntries(DATA.segments.map(s => [s.id, s]));
-  return `<div class="card"><div class="title">${DATA.guests.length} אורחים · ${Object.keys(parties).length} הזמנות</div><div class="s muted">כל מי שלן ב${esc(DATA.hotels.map(h => HOTEL_HE[h] || h).join(' / '))}</div></div>` +
-    Object.values(parties).map(ps => `<div class="card">${ps.map(g => { const ev = DATA.sessions.filter(x => x.guest_id === g.id).map(x => segById[x.segment_id]).filter(Boolean).sort((a, b) => a.day - b.day || mins(a.time) - mins(b.time));
-      return `<div class="row"><span class="m"><b><bdi>${esc(gname(g))}</bdi></b>${guestTags(g)}
-        <div class="s"><bdi>${esc(g.country || '')}</bdi> · ${esc(g.room_type || '')} · <bdi dir="ltr">${esc((g.checkin || '').slice(5))} → ${esc((g.checkout || '').slice(5))}</bdi></div>
-        ${g.guest_note ? `<div class="s">${esc(g.guest_note)}</div>` : ''}
-        ${ev.length ? `<details><summary>${ev.length} אירועים</summary><div class="s">${ev.map(s => `יום ${s.day} ${esc(s.time)} · ${esc(segName(s))}`).join('<br>')}</div></details>` : ''}</span>${callBtn(gname(g), g.phone)}</div>`; }).join('')}</div>`).join('');
+  // names only: the leader works from the list, guest details stay in the Control Room
+  const list = DATA.guests.slice().sort((a, b) => gname(a).localeCompare(gname(b)));
+  return `<div class="card"><div class="title">${list.length} אורחים</div><div class="s muted">כל מי שלן ב${esc(DATA.hotels.map(h => HOTEL_HE[h] || h).join(' / '))}</div></div>` +
+    `<div class="card">${list.map(g => `<div class="row"><span class="m"><b><bdi>${esc(gname(g))}</bdi></b></span>${callBtn(gname(g), g.phone)}</div>`).join('')}</div>`;
 }
 function render(){
   $('who').innerHTML = `<bdi>${esc(DATA.me.name)}</bdi> · ${esc(roleHe(DATA.me.role))}`;

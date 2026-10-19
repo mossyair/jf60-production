@@ -553,12 +553,32 @@ async function hotelNames(env, ids) {
   const rows = await q(env, `SELECT id, name FROM hotels WHERE id IN (${ids.map(() => "?").join(",")})`, ...ids);
   return rows.map((r) => r.name);
 }
+// Guests who stay elsewhere but ride from this hotel's lobby are listed with "Bus pickup …: <hotel>" in their
+// accommodation note. The leader sees them as joining the ride; the note itself (an address) is not sent.
+var PICKUP_NOTE = /bus pickup(?: and drop-off)?:\s*([^(,.]+)/i;
+var hotelKey = (x) => normName(String(x || "").replace(/hotel/i, "")).replace(/'/g, "");
+function pickupDays(note) {
+  return /tower of david|thursday only|evening only/i.test(note) ? [3] : [1, 2, 3];
+}
 async function leaderGuests(env, cred) {
   const hotels = await hotelNames(env, cred.hotel_ids);
   if (!hotels.length)
     return { hotels, guests: [] };
-  const guests = await q(env, `SELECT id, party_id, first_name, last_name, ptype, country, phone, dietary, dietary_severe, hotel, room_type, checkin, checkout, early_late, guest_note FROM guests WHERE status='active' AND hotel IN (${hotels.map(() => "?").join(",")}) ORDER BY last_name, first_name`, ...hotels);
-  return { hotels, guests };
+  const cols = "id, party_id, first_name, last_name, ptype, country, phone, dietary, dietary_severe, hotel, room_type, checkin, checkout, early_late, guest_note";
+  const staying = await q(env, `SELECT ${cols} FROM guests WHERE status='active' AND hotel IN (${hotels.map(() => "?").join(",")}) ORDER BY last_name, first_name`, ...hotels);
+  const mine = hotels.map(hotelKey);
+  const joining = (await q(env, `SELECT ${cols}, accommodation_note FROM guests WHERE status='active' AND accommodation_note LIKE '%pickup%' ORDER BY last_name, first_name`))
+    .filter((g) => !hotels.includes(g.hotel))
+    .map((g) => {
+      const m = PICKUP_NOTE.exec(g.accommodation_note || "");
+      const k = m ? hotelKey(m[1]) : "";
+      if (!k || !mine.some((h) => h.includes(k) || k.includes(h)))
+        return null;
+      const { accommodation_note, ...rest } = g;
+      return { ...rest, joining: 1, ride_days: pickupDays(accommodation_note) };
+    })
+    .filter(Boolean);
+  return { hotels, guests: staying.concat(joining) };
 }
 async function leaderState(env, cred) {
   const me = cred.person;
@@ -659,7 +679,7 @@ async function handleField(request, env, url, path, auth) {
   }
   if (path === `/api/${level}/state` && request.method === "GET")
     return json(level === "leader" ? await leaderState(env, cred) : level === "crew" ? await crewState(env, cred) : await avState(env));
-  // group leader: mark one of her own hotel's guests, staying that day, as on board for the day
+  // group leader: mark one of her riders (staying at her hotel that day, or joining from its lobby) as on board for the day
   if (level === "leader" && path === "/api/leader/board" && request.method === "POST") {
     const b = await readBody(request);
     const day = dayNum(b.day), gid = Number(b.guest_id), date = DRIVER_DAYS[day];
@@ -667,8 +687,9 @@ async function handleField(request, env, url, path, auth) {
     const g = guests.find((x) => x.id === gid);
     if (!g)
       throw new HttpError(403, "not your guest");
-    if (!(g.checkin && g.checkout && g.checkin <= date && g.checkout >= date))
-      throw new HttpError(400, "this guest is not at the hotel on that day");
+    const rides = g.joining ? g.ride_days.includes(day) : g.checkin && g.checkout && g.checkin <= date && g.checkout >= date;
+    if (!rides)
+      throw new HttpError(400, "this guest does not ride from your hotel on that day");
     if (b.on)
       await env.DB.prepare("INSERT OR REPLACE INTO boarding (guest_id, day, by, at) VALUES (?,?,?,datetime('now'))").bind(gid, day, cred.person.name).run();
     else

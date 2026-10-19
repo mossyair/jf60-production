@@ -18,7 +18,12 @@ test("the field keys in use before this release still work (kept during the even
   assert.equal(lead.status, 200);
   assert.equal(lead.data.me.name, "Lea Leader");
   assert.deepEqual(lead.data.hotels, ["Test Hotel A"], "hotel from the role in the staff sheet");
-  assert.ok(lead.data.guests.every((g) => g.hotel === "Test Hotel A"));
+  assert.ok(lead.data.guests.filter((g) => !g.joining).every((g) => g.hotel === "Test Hotel A"));
+  const lobby = lead.data.guests.find((g) => g.joining);
+  assert.equal(lobby && lobby.first_name, "Eli", "a guest riding from her lobby is on her list");
+  assert.ok(!("accommodation_note" in lobby), "the joiner's address is not sent");
+  assert.deepEqual(lobby.ride_days, [1, 2, 3]);
+  assert.equal((await call("/api/leader/board", { key: "group leader", headers: { "x-name": "Lea" }, body: { guest_id: 6, day: 1, on: true } })).status, 200, "and she can mark him on board");
   assert.equal((await call("/api/leader/board", { key: "group leader", headers: { "x-name": "Lea" }, body: { guest_id: 3, day: 1, on: true } })).status, 403, "still only her own hotel");
   assert.equal((await call("/api/leader/state", { key: "group leader" })).status, 403, "no name, no access");
   assert.equal((await call("/api/leader/state", { key: "Leader", headers: { "x-name": "Lea" } })).status, 200, "the short word works too");
